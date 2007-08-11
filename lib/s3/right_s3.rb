@@ -1,0 +1,900 @@
+#
+# Copyright (c) 2007 RightScale Inc
+#
+# Permission is hereby granted, free of charge, to any person obtaining
+# a copy of this software and associated documentation files (the
+# "Software"), to deal in the Software without restriction, including
+# without limitation the rights to use, copy, modify, merge, publish,
+# distribute, sublicense, and/or sell copies of the Software, and to
+# permit persons to whom the Software is furnished to do so, subject to
+# the following conditions:
+#
+# The above copyright notice and this permission notice shall be
+# included in all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+# NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+# LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+# OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+# WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+#
+
+module RightAws
+
+=begin rdoc
+All RightAws AWS interfaces work in one of two ways:
+1) They use a single persistent HTTP connection per
+process or 2) per Ruby thread. It doesn't matter how many RightAws::S3
+objects you create, they all use the same per-program or per-thread
+connection. The purpose of sharing the connection is to keep a single
+persistent HTTP connection open to avoid paying connection
+overhead on every request. However, if you have multiple concurrent
+threads, you may want or need an HTTP connection per thread to enable
+concurrent requests to S3. The way this plays out in practice is:
+- If you have a non-multithreaded Ruby program, use the non-multithreaded setting for Gem.
+- If you have a multi-threaded Ruby program, use the multithreaded setting to enable
+concurrent requests to S3 (SQS, EC2).
+- For running under Mongrel/Rails, use thhe non-multithreaded setting for Gem even though
+Mongrel is multithreaded.  This is because only one Rails handler is invoked at
+any time (i.e. it acts like a single-threaded program)
+
+By default, S3 instances are created in single-threaded mode.  Set
+"params[:multi_thread]" to "true" in the initialization argumnts to use
+multithreaded mode.
+=end
+  class S3
+    attr_reader :interface
+    
+    def initialize(aws_access_key_id, aws_secret_access_key, params={})
+      @interface = S3Interface.new(aws_access_key_id, aws_secret_access_key, params)
+    end
+    
+      # Retrieve a list of buckets.
+      # Returns an array of Bucket instances.
+      #
+      #  s3 = RightAws::S3.new(aws_access_key_id, aws_secret_access_key)
+      #  p s3.buckets #=> array of buckets
+      #
+    def buckets
+      @interface.list_all_my_buckets.map! do |entry|
+        owner = Owner.new(entry[:owner_id], entry[:owner_display_name])
+        Bucket.new(self, entry[:name], entry[:creation_date], owner)
+      end
+    end
+    
+      # Return an object representing a bucket.
+      # If the bucket does not exist and +create+ is set, a new bucket
+      # is created on S3.  The +create+ parameter has no effect if
+      # the bucket alrady exists. 
+      # Returns Bucket instance or +nil+ if the bucket does not exist 
+      # and +create+ is not set.
+      #
+      #  s3 = RightAws::S3.new(aws_access_key_id, aws_secret_access_key)
+      #  bucket1 = s3.bucket('my_awesome_bucket')
+      #  bucket1.keys  #=> exception here if the bucket does not exists
+      #   ...
+      #  bucket2 = s3.bucket('my_awesome_bucket', true)
+      #  bucket2.keys  #=> list of keys
+      #
+      #  see http://docs.amazonwebservices.com/AmazonS3/2006-03-01/RESTAccessPolicy.html
+      #  (section: Canned Access Policies)
+      #
+    def bucket(name, create=true, perms=nil, headers={})
+      headers['x-amz-acl'] = perms if perms
+      @interface.create_bucket(name, headers) if create
+      buckets.each { |bucket| return bucket if bucket.name == name }
+      nil
+    end
+    
+
+    class Bucket
+      attr_reader :s3, :name, :owner, :creation_date
+      
+        # Create a Bucket instance.
+      # If the bucket does not exist and +create+ is set, a new bucket
+      # is created on S3.  The +create+ parameter has no effect if
+      # the bucket alrady exists. 
+      # Returns Bucket instance or +nil+ if the bucket does not exist 
+      # and +create+ is not set.
+        #
+        #  s3 = RightAws::S3.new(aws_access_key_id, aws_secret_access_key)
+        #   ...
+        #  bucket1 = RightAws::S3::Bucket.create(s3, 'my_awesome_bucket')
+        #  bucket1.keys  #=> exception here if the bucket does not exists
+        #   ...
+        #  bucket2 = RightAws::S3::Bucket.create(s3, 'my_awesome_bucket', true)
+        #  bucket2.keys  #=> list of keys
+        #
+      def self.create(s3, name, create=true, perms=nil, headers={}) 
+        s3.bucket(name, create, perms, headers)
+      end
+
+
+        # Create a bucket instance. In normal use this method should
+	# not be called directly.
+        # Use RightAws::S3::Bucket.create or RightAws::S3.bucket instead. 
+      def initialize(s3, name, creation_date=nil, owner=nil)
+        @s3    = s3
+        @name  = name
+        @owner = owner
+        @creation_date = creation_date
+        if @creation_date && !@creation_date.is_a?(Time)
+          @creation_date = Time.parse(@creation_date)
+        end
+      end
+      
+        # Return bucket name as a String.
+        #
+        #  bucket = RightAws::S3.bucket('my_awesome_bucket') 
+        #  puts bucket #=> 'my_awesome_bucket'
+        #
+      def to_s
+        @name.to_s
+      end
+      alias_method :full_name, :to_s
+      
+        # Return a public link to bucket.
+        # 
+        #  bucket.public_link #=> 'https://s3.amazonaws.com:443/my_awesome_bucket'
+        #
+      def public_link
+        params = @s3.interface.params
+        "#{params[:protocol]}://#{params[:server]}:#{params[:port]}/#{full_name}"
+      end
+
+        # Retrieve a group of keys from Amazon. 
+        # +options+ is a hash: { 'prefix'=>'', 'marker'=>'', 'max-keys'=>5, 'delimiter'=>'' }). 
+        # Retrieves meta-headers information if +head+ it +true+. 
+        # Returns an array of Key instances. 
+        #
+        #  bucket.keys                     #=> # returns all keys from bucket
+        #  bucket.keys('prefix' => 'logs') #=> # returns all keys that starts with 'logs'
+        #
+      def keys(options={}, head=false)
+        keys_and_service(options, head)[0]
+      end
+
+        # Same as +keys+ method but return an array of [keys, service_data]. 
+        # where +service_data+ is a hash with additional output information.
+        #
+        #  keys, service = bucket.keys_and_service({'max-keys'=> 2, 'prefix' => 'logs'})
+        #  p keys    #=> # 2 keys array
+        #  p service #=> {"max-keys"=>"2", "prefix"=>"logs", "name"=>"my_awesome_bucket", "marker"=>"", "is_truncated"=>true}
+        #
+      def keys_and_service(options={}, head=false)
+        opt = {}; options.each{ |key, value| opt[key.to_s] = value }
+        service_data = {}
+        thislist = {}
+        list = []
+        @s3.interface.incrementally_list_bucket(@name, opt) do |thislist|
+          thislist[:contents].each do |entry|
+            owner = Owner.new(entry[:owner_id], entry[:owner_display_name])
+            key = Key.new(self, entry[:key], nil, {}, {}, entry[:last_modified], entry[:e_tag], entry[:size], entry[:storage_class], owner)
+            key.head if head
+            list << key
+          end
+        end
+        thislist.each_key do |key|
+          service_data[key] = thislist[key] unless (key == :contents || key == :common_prefixes)
+        end
+        [list, service_data]
+      end
+
+        # Retrieve key information from Amazon. 
+        # The +key_name+ is a +String+ or Key instance. 
+        # Retrieves meta-header information if +head+ is +true+. 
+        # Returns new Key instance. 
+        #
+        #  key = bucket.key('logs/today/1.log', true) #=> #<RightAws::S3::Key:0xb7b1e240 ... >
+        #   # is the same as:
+        #  key = RightAws::S3::Key.create(bucket, 'logs/today/1.log')
+        #  key.head
+        #
+      def key(key_name, head=false)
+        raise 'Key name can not be empty.' if key_name.blank?
+        key_instance = nil
+          # if this key exists - find it ....
+        keys({'prefix'=>key_name}, head).each do |key|
+          if key.name == key_name.to_s
+            key_instance = key
+            break
+          end
+        end
+          # .... else this key is unknown
+        unless key_instance
+          key_instance = Key.create(self, key_name.to_s)
+        end
+        key_instance
+      end
+      
+        # Store object data. 
+        # The +key+ is a +String+ or Key instance. 
+        # Returns +true+.
+        #
+        #  bucket.put('logs/today/1.log', 'Olala!') #=> true
+        #
+      def put(key, data=nil, meta_headers={}, perms=nil, headers={})
+        key = Key.create(self, key.to_s, data, meta_headers) unless key.is_a?(Key) 
+        key.put(data, perms, headers)
+      end
+
+        # Retrieve object data from Amazon. 
+        # The +key+ is a +String+ or Key. 
+        # Returns Key instance. 
+        #
+        #  key = bucket.get('logs/today/1.log') #=> 
+        #  puts key.data #=> 'sasfasfasdf'
+        #
+      def get(key, headers={})
+        key = Key.create(self, key.to_s) unless key.is_a?(Key)
+        key.get(headers)
+      end
+      
+        # Remove all keys from a bucket. 
+        # Returns +true+. 
+        #
+        #  bucket.clear #=> true
+        #
+      def clear
+        @s3.interface.clear_bucket(@name)  
+      end
+
+        # Delete all keys where the 'folder_key' can be interpreted
+	# as a 'folder' name. 
+        # Returns an array of string keys that have been deleted.
+        #
+        #  bucket.keys.map{|key| key.name}.join(', ') #=> 'test, test/2/34, test/3, test1, test1/logs'
+        #  bucket.delete_folder('test')               #=> ['test','test/2/34','test/3']
+        #
+      def delete_folder(folder, separator='/')
+        @s3.interface.delete_folder(@name, folder, separator)
+      end
+      
+        # Delete a bucket. Bucket must be empty.
+        # If +force+ is set, clears and deletes the bucket. 
+        # Returns +true+. 
+        #
+        #  bucket.delete(true) #=> true
+        #
+      def delete(force=false)
+        force ? @s3.interface.force_delete_bucket(@name) : @s3.interface.delete_bucket(@name)
+      end
+
+        # Return a list of grantees. 
+        #
+      def grantees
+        Grantee::grantees(self)
+      end
+
+    end
+
+
+    class Key
+      attr_reader   :bucket,  :name, :last_modified, :e_tag, :size, :storage_class, :owner
+      attr_accessor :headers, :meta_headers
+      attr_writer   :data
+
+        # Separate Amazon meta headers from other headers
+      def self.split_meta(headers) #:nodoc:
+        hash = headers.dup
+        meta = {}
+        hash.each do |key, value|
+          if key[/^#{S3Interface::AMAZON_METADATA_PREFIX}/]
+            meta[key.gsub(S3Interface::AMAZON_METADATA_PREFIX,'')] = value
+            hash.delete(key)
+          end
+        end
+        [hash, meta]
+      end
+      
+      def self.add_meta_prefix(meta_headers, prefix=S3Interface::AMAZON_METADATA_PREFIX)
+        meta = {}
+        meta_headers.each do |meta_header, value|
+          if meta_header[/#{prefix}/]
+            meta[meta_header] = value
+          else
+            meta["#{S3Interface::AMAZON_METADATA_PREFIX}#{meta_header}"] = value
+          end
+        end
+        meta
+      end
+
+
+        # Create a new Key instance, but do not create the actual key. 
+        # The +name+ is a +String+.
+        # Returns a new Key instance. 
+        #
+        #  key = RightAws::S3::Key.create(bucket, 'logs/today/1.log') #=> #<RightAws::S3::Key:0xb7b1e240 ... >
+        #  key.exists?                                                  #=> true | false
+        #  key.put('Woohoo!')                                           #=> true
+        #  key.exists?                                                  #=> true
+        #
+      def self.create(bucket, name, data=nil, meta_headers={})
+        new(bucket, name, data, {}, meta_headers)
+      end
+      
+        # Create a new Key instance, but do not create the actual key.
+	# In normal use this method should not be called directly.
+        # Use RightAws::S3::Key.create or bucket.key() instead. 
+        #
+      def initialize(bucket, name, data=nil, headers={}, meta_headers={}, 
+                     last_modified=nil, e_tag=nil, size=nil, storage_class=nil, owner=nil)
+        raise 'Bucket must be a Bucket instance.' unless bucket.is_a?(Bucket)
+        @bucket        = bucket
+        @name          = name
+        @data          = data
+        @e_tag         = e_tag
+        @size          = size.to_i
+        @storage_class = storage_class
+        @owner         = owner
+        @last_modified = last_modified
+        if @last_modified && !@last_modified.is_a?(Time) 
+          @last_modified = Time.parse(@last_modified)
+        end
+        @headers, @meta_headers = self.class.split_meta(headers)
+        @meta_headers.merge!(meta_headers)
+      end
+      
+        # Return key name as a String.
+        #
+        #  key = RightAws::S3::Key.create(bucket, 'logs/today/1.log') #=> #<RightAws::S3::Key:0xb7b1e240 ... >
+        #  puts key                                                   #=> 'logs/today/1.log'
+        #
+      def to_s
+        @name.to_s
+      end
+      
+        # Return the full S3 path to this key (bucket/key).
+        # 
+        #  key.full_name #=> 'my_awesome_bucket/cool_key'
+        #
+      def full_name(separator='/')
+        "#{@bucket.to_s}#{separator}#{@name}"
+      end
+        
+        # Return a public link to a key.
+        # 
+        #  key.public_link #=> 'https://s3.amazonaws.com:443/my_awesome_bucket/cool_key'
+        #
+      def public_link
+        params = @bucket.s3.interface.params
+        "#{params[:protocol]}://#{params[:server]}:#{params[:port]}/#{full_name('/')}"
+      end
+         
+        # Return Key data. Retrieve this data from Amazon if it is the first time call.
+        # TODO TRB 6/19/07 What does the above mean? Clarify.
+        #
+      def data
+        get if !@data and exists?
+        @data
+      end
+      
+        # Retrieve object data and attributes from Amazon. 
+        # Returns a +String+. 
+        #
+      def get(headers={})
+        response = @bucket.s3.interface.get(@bucket.name, @name, headers)
+        @data    = response[:object]
+        @headers, @meta_headers = self.class.split_meta(response[:headers])
+        refresh(false)
+        @data
+      end
+      
+        # Store object data on S3. 
+        # Parameter +data+ is a +String+ or S3Object instance. 
+        # Returns +true+.
+        #
+        #  key = RightAws::S3::Key.create(bucket, 'logs/today/1.log')
+        #  key.data = 'Qwerty'
+        #  key.put             #=> true
+        #   ...
+        #  key.put('Olala!')   #=> true
+        #
+      def put(data=nil, perms=nil, headers={})
+        headers['x-amz-acl'] = perms if perms
+        @data = data || @data
+        meta  = self.class.add_meta_prefix(@meta_headers)
+        @bucket.s3.interface.put(@bucket.name, @name, @data, meta.merge(headers))
+      end
+      
+        # Retrieve key info from bucket and update attributes.
+        # Refresh meta-headers (by calling +head+ method) if +head+ is set. 
+        # Returns +true+ if the key exists in bucket and +false+ otherwise. 
+        #
+        #  key = RightAws::S3::Key.create(bucket, 'logs/today/1.log')
+        #  key.e_tag        #=> nil
+        #  key.meta_headers #=> {}
+        #  key.refresh      #=> true
+        #  key.e_tag        #=> '12345678901234567890bf11094484b6'
+        #  key.meta_headers #=> {"family"=>"qwerty", "name"=>"asdfg"}
+        #
+      def refresh(head=true)
+        new_key        = @bucket.key(self)
+        @last_modified = new_key.last_modified
+        @e_tag         = new_key.e_tag
+        @size          = new_key.size
+        @storage_class = new_key.storage_class
+        @owner         = new_key.owner
+        if @last_modified
+          self.head
+          true
+        else
+          @headers = @meta_headers = {}
+          false
+        end
+      end
+
+        # Retrieve meta-headers from S3.
+        # Returns +true+. 
+        #
+        #  key.meta_headers #=> {"family"=>"qwerty"}
+        #  key.head         #=> true
+        #  key.meta_headers #=> {"family"=>"qwerty", "name"=>"asdfg"}
+        #
+      def head
+        @headers, @meta_headers = self.class.split_meta(@bucket.s3.interface.head(@bucket, @name))
+        true
+      end
+
+        # Check for existence of the key in the given bucket. 
+        # Returns +true+ or +false+. 
+        #
+        #  key = RightAws::S3::Key.create(bucket,'logs/today/1.log')
+        #  key.exists?        #=> false
+        #  key.put('Woohoo!') #=> true
+        #  key.exists?        #=> true
+        #
+      def exists?
+        @bucket.key(self).last_modified ? true : false
+      end
+      
+        # Remove key from bucket. 
+        # Returns +true+. 
+        #
+        #  key.delete #=> true
+        #
+      def delete
+        raise 'Key name must be specified.' if @name.blank?
+        @bucket.s3.interface.delete(@bucket, @name) 
+      end
+      
+        # Return a list of grantees. 
+        #
+      def grantees
+        Grantee::grantees(self)
+      end
+      
+    end
+    
+
+    class Owner
+      attr_reader :id, :name
+      
+      def initialize(id, name)
+        @id   = id
+        @name = name
+      end
+      
+        # Return Owner name as a +String+.
+      def to_s
+        @name
+      end
+    end
+    
+    
+      # There are 2 ways to set permissions for a bucket or key (called a +thing+ below):
+      #
+      # 1 . Use +perms+ param to set 'Canned Access Policies' when calling the <tt>bucket.create</tt>, 
+      # <tt>bucket.put</tt> and <tt>key.put</tt> methods. 
+      # The +perms+ param can take these values: 'private', 'public-read', 'public-read-write' and
+      # 'authenticated-read'. 
+      # (see http://docs.amazonwebservices.com/AmazonS3/2006-03-01/RESTAccessPolicy.html).
+      #
+      #  bucket = s3.bucket('bucket_for_kd_test_13', true, 'public-read')
+      #  key.put('Woohoo!','public-read-write' )
+      #
+      # 2 . Use Grantee instances (the permission is a +String+ or an +Array+ of: 'READ', 'WRITE', 
+      # 'READ_ACP', 'WRITE_ACP', 'FULL_CONTROL'):
+      #
+      #  bucket  = s3.bucket('my_awesome_bucket', true)
+      #  grantee1 = RightAws::S3::Grantee.new(bucket, 'a123b...223c', FULL_CONTROL, :apply)
+      #  grantee2 = RightAws::S3::Grantee.new(bucket, 'xy3v3...5fhp', [READ, WRITE], :apply)
+      #
+      # There is only one way to get and to remove permission (via Grantee instances):
+      #
+      #  grantees = bucket.grantees # a list of Grantees that have any access for this bucket
+      #  grantee1 = RightAws::S3::Grantee.new(bucket, 'a123b...223c')
+      #  grantee1.perms #=> returns a list of perms for this grantee to that bucket
+      #    ...
+      #  grantee1.drop             # remove all perms for this grantee
+      #  grantee2.revoke('WRITE')  # revoke write access only
+      #
+    class Grantee
+        # A bucket or a key the grantee has an access to.
+      attr_reader :thing
+        # Grantee Amazon id.
+      attr_reader :id
+        # Grantee display name.
+      attr_reader :name
+        # Array of permissions.
+      attr_accessor :perms
+        
+        # Retrieve Owner information and a list of Grantee instances that have
+        # a access to this thing (bucket or key). 
+        #
+        #  bucket = s3.bucket('my_awesome_bucket', true, 'public-read')
+        #   ...
+        #  RightAws::S3::Grantee.owner_and_grantees(bucket) #=> [owner, grantees]
+        #
+      def self.owner_and_grantees(thing)
+        if thing.is_a?(Bucket)
+          bucket, key = thing, ''
+        else
+          bucket, key = thing.bucket, thing
+        end
+        hash = bucket.s3.interface.get_acl_parse(bucket.to_s, key.to_s)
+        owner = Owner.new(hash[:owner][:id], hash[:owner][:display_name])
+        
+        grantees = []
+        hash[:grantees].each do |id, params|
+          grantees << new(thing, id, params[:permissions], nil, params[:display_name])
+        end
+        [owner, grantees]
+      end
+
+        # Retrieves a list of Grantees instances that have an access to this thing(bucket or key). 
+        #
+        #  bucket = s3.bucket('my_awesome_bucket', true, 'public-read')
+        #   ...
+        #  RightAws::S3::Grantee.grantees(bucket) #=> grantees
+        #
+      def self.grantees(thing)
+        owner_and_grantees(thing)[1]
+      end
+
+      def self.put_acl(thing, owner, grantees) #:nodoc:
+        if thing.is_a?(Bucket)
+          bucket, key = thing, ''
+        else
+          bucket, key = thing.bucket, thing
+        end
+        body = "<AccessControlPolicy>" +
+               "<Owner>" +
+               "<ID>#{owner.id}</ID>" +
+               "<DisplayName>#{owner.name}</DisplayName>" +
+               "</Owner>" +
+               "<AccessControlList>" +
+               grantees.map{|grantee| grantee.to_xml}.join +
+               "</AccessControlList>" +
+               "</AccessControlPolicy>"
+        bucket.s3.interface.put_acl(bucket.to_s, key.to_s, body)
+      end
+
+        # Create a new Grantee instance. 
+        # Grantee +id+ must exist on S3. If +action+ == :refresh, then retrieve
+        # permissions from S3 and update @perms. If +action+ == :apply, then apply
+        # perms to +thing+ at S3. The default action is :refresh.
+        #
+        #  bucket = s3.bucket('my_awesome_bucket', true, 'public-read')
+        #  grantee1 = RightAws::S3::Grantee.new(bucket, 'a123b...223c', FULL_CONTROL)
+        #    ...
+        #  grantee2 = RightAws::S3::Grantee.new(bucket, 'abcde...asdf', [FULL_CONTROL, READ], :apply)
+        #
+        #
+      def initialize(thing, id, perms=[], action=:refresh, name=nil)
+        @thing = thing
+        @id    = id
+        @name  = name
+        @perms = perms.to_a
+        case action
+          when :apply;   apply
+          when :refresh; refresh
+        end
+      end
+      
+        # Return Grantee type (+String+): "Group" or "CanonicalUser".
+      def type
+        @id[/^http:/] ? "Group" : "CanonicalUser"
+      end
+ 
+        # Return a name or an id.
+      def to_s
+        @name || @id
+      end
+      
+        # Add permissions for grantee. 
+        # Permissions: 'READ', 'WRITE', 'READ_ACP', 'WRITE_ACP', 'FULL_CONTROL'. 
+        # See http://docs.amazonwebservices.com/AmazonS3/2006-03-01/UsingPermissions.html .
+        # Returns +true+. 
+        #
+        #  grantee.grant('FULL_CONTROL') #=> true
+        #
+      def grant(permission)
+        return true if @perms.include?(permission)
+        @perms += permission.to_a
+        apply
+      end
+      
+        # Revoke permissions for grantee. 
+        # Permissions: 'READ', 'WRITE', 'READ_ACP', 'WRITE_ACP', 'FULL_CONTROL'
+        # See http://docs.amazonwebservices.com/AmazonS3/2006-03-01/UsingPermissions.html .
+        # Default value is 'FULL_CONTROL'. 
+        # Returns +true+.
+        #
+        #  grantee.revoke #=> true
+        #
+      def revoke(permission)
+        return true unless @perms.include?(permission)
+        @perms -= permission.to_a
+        apply
+      end
+     
+        # Revoke all permissions for this grantee. 
+        # Returns +true+.
+        #
+        #  grantee.drop #=> true
+        #
+      def drop
+        @perms = []
+        apply
+      end
+         
+        # Refresh grantee perms for its +thing+.
+        # Returns +true+ if the grantee has perms for this +thing+ or
+        # +false+ otherwise, and updates @perms value as a side-effect.
+        #
+        #  grantee.grant('FULL_CONTROL') #=> true
+        #  grantee.refresh               #=> true
+        #  grantee.drop                  #=> true
+        #  grantee.refresh               #=> false
+        #
+      def refresh
+        @perms = []
+        self.class.grantees(@thing).each do |grantee|
+          if @id == grantee.id
+            @name  = grantee.name
+            @perms = grantee.perms
+            return true
+          end
+        end
+        false
+      end
+
+        # Apply current grantee @perms to +thing+. This method is called internally by the +grant+
+        # and +revoke+ methods. In normal use this method should not
+	# be called directly.
+        # 
+        #  grantee.perms = ['FULL_CONTROL']
+        #  grantee.apply #=> true
+        #
+      def apply
+        owner, grantees = self.class.owner_and_grantees(@thing)
+        grantees.map! do |grantee|
+          grantee.id == @id ? self : grantee
+        end
+        self.class.put_acl(@thing, owner, grantees)
+      end
+
+      def to_xml   # :nodoc:
+        id_str = @id[/^http/] ? "<URI>#{@id}</URI>" : "<ID>#{@id}</ID>"
+        grants = ''
+        @perms.each do |perm|
+          grants << "<Grant>"    +
+                    "<Grantee xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" " +
+                      "xsi:type=\"#{type}\">#{id_str}</Grantee>" +
+                    "<Permission>#{perm}</Permission>" +
+                    "</Grant>"
+        end
+        grants
+      end
+
+    end
+    
+  end
+
+    # RightAws::S3Generator and RightAws::S3Generator::Bucket methods:
+    #
+    #  s3g = RightAws::S3Generator.new('1...2', 'nx...Y6') #=> #<RightAws::S3Generator:0xb7b5cc94>
+    #
+    #    # List all buckets(method 'GET'):
+    #  buckets_list = s3g.buckets #=> 'https://s3.amazonaws.com:443/?Signature=Y...D&Expires=1180941864&AWSAccessKeyId=1...2'
+    #    # Create bucket link (method 'PUT'):
+    #  bucket = s3g.bucket('my_awesome_bucket')     #=> #<RightAws::S3Generator::Bucket:0xb7bcbda8>
+    #  link_to_create = bucket.create_link(1.hour)  #=> https://s3.amazonaws.com:443/my_awesome_bucket?Signature=4...D&Expires=1180942132&AWSAccessKeyId=1...2
+    #    # ... or:
+    #  bucket = RightAws::S3Generator::Bucket.create(s3g, 'my_awesome_bucket') #=> #<RightAws::S3Generator::Bucket:0xb7bcbda8>
+    #  link_to_create = bucket.create_link(1.hour)                                 #=> https://s3.amazonaws.com:443/my_awesome_bucket?Signature=4...D&Expires=1180942132&AWSAccessKeyId=1...2
+    #    # ... or:
+    #  bucket = RightAws::S3Generator::Bucket.new(s3g, 'my_awesome_bucket') #=> #<RightAws::S3Generator::Bucket:0xb7bcbda8>
+    #  link_to_create = bucket.create_link(1.hour)                              #=> https://s3.amazonaws.com:443/my_awesome_bucket?Signature=4...D&Expires=1180942132&AWSAccessKeyId=1...2
+    #    # List bucket(method 'GET'):
+    #  bucket.keys(1.day) #=> https://s3.amazonaws.com:443/my_awesome_bucket?Signature=i...D&Expires=1180942620&AWSAccessKeyId=1...2
+    #    # Create/put key (method 'PUT'):
+    #  bucket.put('my_cool_key') #=> https://s3.amazonaws.com:443/my_awesome_bucket/my_cool_key?Signature=q...D&Expires=1180943094&AWSAccessKeyId=1...2
+    #    # Get key data (method 'GET'):
+    #  bucket.get('logs/today/1.log', 1.hour) #=> https://s3.amazonaws.com:443/my_awesome_bucket/my_cool_key?Signature=h...M%3D&Expires=1180820032&AWSAccessKeyId=1...2
+    #    # Delete bucket (method 'DELETE'): 
+    #  bucket.delete(2.hour) #=> https://s3.amazonaws.com:443/my_awesome_bucket/logs%2Ftoday%2F1.log?Signature=4...D&Expires=1180820032&AWSAccessKeyId=1...2
+    #  
+    # RightAws::S3Generator::Key methods:
+    #
+    #    # Create Key instance:  
+    #  key = RightAws::S3Generator::Key.new(bicket, 'my_cool_key') #=> #<RightAws::S3Generator::Key:0xb7b7394c>
+    #    # Put key data (method 'PUT'):
+    #  key.put    #=> https://s3.amazonaws.com:443/my_awesome_bucket/my_cool_key?Signature=2...D&Expires=1180943302&AWSAccessKeyId=1...2
+    #    # Get key data (method 'GET'):
+    #  key.get    #=> https://s3.amazonaws.com:443/my_awesome_bucket/my_cool_key?Signature=a...D&Expires=1180820032&AWSAccessKeyId=1...2
+    #    # Head key (method 'HEAD'):
+    #  key.head   #=> https://s3.amazonaws.com:443/my_awesome_bucket/my_cool_key?Signature=b...D&Expires=1180820032&AWSAccessKeyId=1...2
+    #    # Delete key (method 'DELETE'):
+    #  key.delete #=> https://s3.amazonaws.com:443/my_awesome_bucket/my_cool_key?Signature=x...D&Expires=1180820032&AWSAccessKeyId=1...2
+    #
+  class S3Generator
+    attr_reader :interface
+    
+    def initialize(aws_access_key_id, aws_secret_access_key, params={})
+      @interface = S3Interface.new(aws_access_key_id, aws_secret_access_key, params)
+    end
+    
+      # Generate link to list all buckets
+      #
+      #  s3.buckets(1.hour)
+      #
+    def buckets(expires=nil, headers={})
+      @interface.list_all_my_buckets_link(expires, headers)
+    end
+
+      # Create new S3LinkBucket instance and generate link to create it at S3.
+      #
+      #  bucket= s3.bucket('my_owesome_bucket')
+      #
+    def bucket(name, expires=nil, headers={})
+      Bucket.create(self, name.to_s)
+    end
+  
+    class Bucket
+      attr_reader :s3, :name
+      
+      def to_s
+        @name
+      end
+      alias_method :full_name, :to_s
+        
+        # Return a public link to bucket.
+        # 
+        #  bucket.public_link #=> 'https://s3.amazonaws.com:443/my_awesome_bucket'
+        #
+      def public_link
+        params = @s3.interface.params
+        "#{params[:protocol]}://#{params[:server]}:#{params[:port]}/#{full_name}"
+      end
+      
+        #  Create new S3LinkBucket instance and generate creation link for it. 
+      def self.create(s3, name, expires=nil, headers={})
+        new(s3, name.to_s)
+      end
+        
+        #  Create new S3LinkBucket instance. 
+      def initialize(s3, name)
+        @s3, @name = s3, name.to_s
+      end
+        
+        # Return a link to create this bucket. 
+        #
+      def create_link(expires=nil, headers={})
+        @s3.interface.create_bucket_link(@name, expires, headers)
+      end
+
+        # Generate link to list keys. 
+        #
+        #  bucket.keys
+        #  bucket.keys('prefix'=>'logs')
+        #
+      def keys(options=nil, expires=nil, headers={})
+        @s3.interface.list_bucket_link(@name, options, expires, headers)
+      end
+
+        # Return a S3Generator::Key instance.
+        #
+        #  bucket.key('my_cool_key').get    #=> https://s3.amazonaws.com:443/my_awesome_bucket/my_cool_key?Signature=B...D&Expires=1180820032&AWSAccessKeyId=1...2
+        #  bucket.key('my_cool_key').delete #=> https://s3.amazonaws.com:443/my_awesome_bucket/my_cool_key?Signature=B...D&Expires=1180820098&AWSAccessKeyId=1...2
+        #
+      def key(name)
+        Key.new(self, name)
+      end
+
+        # Generates link to PUT key data. 
+        #
+        #  puts bucket.put('logs/today/1.log', 2.hour)
+        #
+      def put(key, meta_headers={}, expires=nil, headers={})
+        meta = RightAws::S3::Key.add_meta_prefix(meta_headers)
+        @s3.interface.put_link(@name, key.to_s, nil, expires, meta.merge(headers))
+      end
+        
+        # Generate link to GET key data. 
+        #
+        #  bucket.get('logs/today/1.log', 1.hour)
+        #
+      def get(key, expires=nil, headers={})
+        @s3.interface.get_link(@name, key.to_s, expires, headers)
+      end
+       
+        # Generate link to delete bucket. 
+        #
+        #  bucket.delete(2.hour)
+        #
+      def delete(expires=nil,  headers={})
+        @s3.interface.delete_bucket_link(@name, expires,  headers)
+      end
+    end
+
+
+    class Key
+      attr_reader :bucket, :name
+      
+      def to_s
+        @name
+      end
+      
+        # Return a full S# name (bucket/key).
+        # 
+        #  key.full_name #=> 'my_awesome_bucket/cool_key'
+        #
+      def full_name(separator='/')
+        "#{@bucket.to_s}#{separator}#{@name}"
+      end
+        
+        # Return a public link to key.
+        # 
+        #  key.public_link #=> 'https://s3.amazonaws.com:443/my_awesome_bucket/cool_key'
+        #
+      def public_link
+        params = @bucket.s3.interface.params
+        "#{params[:protocol]}://#{params[:server]}:#{params[:port]}/#{full_name('/')}"
+      end
+      
+      def initialize(bucket, name, meta_headers={})
+        @bucket       = bucket
+        @name         = name.to_s
+        @meta_headers = meta_headers
+        raise 'Key name can not be empty.' if @name.blank?
+      end
+      
+        # Generate link to PUT key data. 
+        #
+        #  puts bucket.put('logs/today/1.log', '123', 2.hour) #=> https://s3.amazonaws.com:443/my_awesome_bucket/logs%2Ftoday%2F1.log?Signature=B...D&Expires=1180820032&AWSAccessKeyId=1...2
+        #
+      def put(expires=nil, headers={})
+        @bucket.put(@name.to_s, @meta_headers, expires, headers)
+      end
+        
+        # Generate link to GET key data. 
+        #
+        #  bucket.get('logs/today/1.log', 1.hour) #=> https://s3.amazonaws.com:443/my_awesome_bucket/logs%2Ftoday%2F1.log?Signature=h...M%3D&Expires=1180820032&AWSAccessKeyId=1...2
+        #
+      def get(expires=nil, headers={})
+        @bucket.s3.interface.get_link(@bucket.to_s, @name, expires, headers)
+      end
+       
+        # Generate link to delete key. 
+        #
+        #  bucket.delete(2.hour) #=> https://s3.amazonaws.com:443/my_awesome_bucket/logs%2Ftoday%2F1.log?Signature=4...D&Expires=1180820032&AWSAccessKeyId=1...2
+        #
+      def delete(expires=nil,  headers={})
+        @bucket.s3.interface.delete_link(@bucket.to_s, @name, expires,  headers)
+      end
+      
+        # Generate link to head key. 
+        #
+        #  bucket.head(2.hour) #=> https://s3.amazonaws.com:443/my_awesome_bucket/logs%2Ftoday%2F1.log?Signature=4...D&Expires=1180820032&AWSAccessKeyId=1...2
+        #
+      def head(expires=nil,  headers={})
+        @bucket.s3.interface.head_link(@bucket.to_s, @name, expires,  headers)
+      end
+    end
+  end
+
+end
