@@ -10,7 +10,7 @@ service.
 RightAws::S3 and RightAws::S3Interface are Ruby libraries for the Amazon S3
 (Simple Storage Service) service.
 
-RightAws::Sqs and RightAws::SqsInterface is a Ruby library foor the Amazon SQS (Simple Queue Service)
+RightAws::Sqs and RightAws::SqsInterface is a Ruby library for the Amazon SQS (Simple Queue Service)
 service.
 
   
@@ -37,7 +37,7 @@ multithreaded mode.
 == FEATURES/PROBLEMS:
 
 - Full programmmatic access to Ec2, S3, and Sqs
-- Robust network-level retry layer (using RightHttpConnection).  This includes
+- Robust network-level retry layer (using Rightscale::HttpConnection).  This includes
   socket connect and read timeouts and retries.
 - Robust HTTP-level retry layer.  Certain (user-adjustable) HTTP errors are
   classified as temporary errors.  These errors are automaticallly retried
@@ -55,7 +55,7 @@ Known Problems:
 - Amazon recently (8/07) changed the semantics of the SQS service.  A
   new queue may not be created within 60 seconds of the destruction of any
   older queue with the same name.  Certain methods of RightAws::Sqs and
-  RightAws:SqsInterface will fail with the message:
+  RightAws::SqsInterface will fail with the message:
   "AWS.SimpleQueueService.QueueDeletedRecently: You must wait 60 seconds after deleting a queue before you can create another with the same name."
   
 == SYNOPSIS:
