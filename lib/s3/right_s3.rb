@@ -23,27 +23,6 @@
 
 module RightAws
 
-=begin rdoc
-All RightAws AWS interfaces work in one of two ways:
-1) They use a single persistent HTTP connection per
-process or 2) per Ruby thread. It doesn't matter how many RightAws::S3
-objects you create, they all use the same per-program or per-thread
-connection. The purpose of sharing the connection is to keep a single
-persistent HTTP connection open to avoid paying connection
-overhead on every request. However, if you have multiple concurrent
-threads, you may want or need an HTTP connection per thread to enable
-concurrent requests to S3. The way this plays out in practice is:
-- If you have a non-multithreaded Ruby program, use the non-multithreaded setting for Gem.
-- If you have a multi-threaded Ruby program, use the multithreaded setting to enable
-concurrent requests to S3 (SQS, EC2).
-- For running under Mongrel/Rails, use thhe non-multithreaded setting for Gem even though
-Mongrel is multithreaded.  This is because only one Rails handler is invoked at
-any time (i.e. it acts like a single-threaded program)
-
-By default, S3 instances are created in single-threaded mode.  Set
-"params[:multi_thread]" to "true" in the initialization argumnts to use
-multithreaded mode.
-=end
   class S3
     attr_reader :interface
     

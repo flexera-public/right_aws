@@ -81,7 +81,7 @@ module RightAws
 
       # Creates new RightS3 instance.
       #
-      #  s3 = RightS3.new('1E3GDYEOGFJPIT75KDT40','hgTHt68JY07JKUY08ftHYtERkjgtfERn57DFE379', {:multi_thread => true, :logger => Logger.new('/tmp/x.log')}) #=> #<RightS3:0xb7b3c27c>
+      #  s3 = RightAws::S3Interface.new('1E3GDYEOGFJPIT7XXXXXX','hgTHt68JY07JKUY08ftHYtERkjgtfERn57XXXXXX', {:multi_thread => true, :logger => Logger.new('/tmp/x.log')}) #=> #<RightS3:0xb7b3c27c>
       #  
       # Params is a hash:
       #

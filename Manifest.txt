@@ -16,6 +16,6 @@ test/s3/test_helper.rb
 test/s3/test_right_s3.rb
 test/sqs/test_helper.rb
 test/sqs/test_right_sqs.rb
-test/test_right_aws.rb
-test/test_right_aws.rb
+test/ts_right_aws.rb
+test/test_credentials.rb
 
