@@ -17,4 +17,9 @@ Hoe.new('right_aws', RightAws::VERSION::STRING) do |p|
                   ['right_http_connection','>= 0.1.4']]
 end
 
+task :test do
+  puts "Hi There"
+  require './test/ts_right_aws'
+end
+
 # vim: syntax=Ruby

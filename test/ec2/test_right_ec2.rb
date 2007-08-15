@@ -1,26 +1,21 @@
 require File.dirname(__FILE__) + '/test_helper.rb'
 require 'pp'
 
-class TestT < Test::Unit::TestCase
+class TestEc2 < Test::Unit::TestCase
 
-    # Please, change the constants below to your own AWS credentials
-  
-  USER_AWS_ID           = 'xxxxxxxxxxxx'
-  AWS_ACCESS_KEY_ID     = 'xxxxxxxxxxxxxxxxxxxx'
-  AWS_SECRET_ACCESS_KEY = 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
-  
     # Some of RightEc2 instance methods concerning instance launching and image registration
     # are not tested here due to their potentially risk.
   
   def setup
-    @ec2   = Rightscale::Ec2.new(AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY)
+    @ec2   = Rightscale::Ec2.new(TestCredentials.aws_access_key_id,
+                                 TestCredentials.aws_secret_access_key)
     @key   = 'right_ec2_awesome_test_key'
     @group = 'right_ec2_awesome_test_security_group'
   end
   
   def test_01_create_describe_key_pairs
     new_key = @ec2.create_key_pair(@key)
-    assert new_key[:aws_material][/BEGIN RSA PRIVATE KEY/], "New key material is abcent"
+    assert new_key[:aws_material][/BEGIN RSA PRIVATE KEY/], "New key material is absent"
     keys = @ec2.describe_key_pairs
     assert keys.map{|key| key[:aws_key_name] }.include?(@key), "#{@key} must exist"
   end
@@ -32,7 +27,7 @@ class TestT < Test::Unit::TestCase
   end
   
   def test_03_perms_add
-    assert @ec2.authorize_security_group_named_ingress(@group, USER_AWS_ID, 'default')
+    assert @ec2.authorize_security_group_named_ingress(@group, TestCredentials.account_number, 'default')
     assert @ec2.authorize_security_group_IP_ingress(@group, 80,80,'udp','192.168.1.0/8')
   end
   
@@ -42,7 +37,8 @@ class TestT < Test::Unit::TestCase
 
   def test_05_perms_remove
     assert @ec2.revoke_security_group_IP_ingress(@group, 80,80,'udp','192.168.1.0/8')
-    assert @ec2.revoke_security_group_named_ingress(@group, USER_AWS_ID, 'default')
+    assert @ec2.revoke_security_group_named_ingress(@group,
+                                                    TestCredentials.account_number, 'default')
   end
 
   def test_06_describe_images
@@ -58,7 +54,7 @@ class TestT < Test::Unit::TestCase
     assert_raise(Rightscale::AwsError){ @ec2.describe_instances(['i-ABCDEFGH'])}
   end
 
-  def test_08_delete_securiry_group
+  def test_08_delete_security_group
     assert @ec2.delete_security_group(@group), 'Delete_security_group fail'
   end
   
