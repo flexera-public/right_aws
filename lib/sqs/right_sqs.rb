@@ -282,8 +282,8 @@ multithreaded mode.
     
     
     class Message
-      attr_reader   :queue, :id, :body
-      attr_accessor :sent_at, :received_at, :visibility
+      attr_reader   :queue, :id, :body, :visibility
+      attr_accessor :sent_at, :received_at
       
       def initialize(queue, id=nil, body=nil, visibility=nil)
         @queue       = queue

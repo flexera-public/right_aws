@@ -557,10 +557,13 @@ module RightAws
       #
     def delete_folder(bucket, folder_key, separator='/')
       folder_key.chomp!(separator)
+      allkeys = []
       incrementally_list_bucket(bucket, { 'prefix' => folder_key }) do |results|
         keys = results[:contents].map{ |s3_key| s3_key[:key][/^#{folder_key}($|#{separator}.*)/] ? s3_key[:key] : nil}.compact
         keys.each{ |key| delete(bucket, key) }
+        allkeys << keys
       end
+      allkeys
     rescue
       on_exception
     end

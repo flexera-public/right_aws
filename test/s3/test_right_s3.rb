@@ -1,19 +1,15 @@
 require File.dirname(__FILE__) + '/test_helper.rb'
 
-class TestT < Test::Unit::TestCase
-
-    # Please, change the constants below to your own AWS credentials
+class TestS3 < Test::Unit::TestCase
 
   RIGHT_OBJECT_TEXT     = 'Right test message'
-  AWS_ACCESS_KEY_ID     = 'XXXXXXXXXXXXXXXXXXXX'
-  AWS_SECRET_ACCESS_KEY = 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
   
   def setup
-    @s3     = Rightscale::S3Interface.new(AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY)
+    @s3     = Rightscale::S3Interface.new(TestCredentials.aws_access_key_id, TestCredentials.aws_secret_access_key)
     @bucket = 'right_s3_awesome_test_bucket'
     @key1   = 'test/woohoo1'
     @key2   = 'test1/key/woohoo2'
-    @s      = Rightscale::S3.new(AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY)
+    @s      = Rightscale::S3.new(TestCredentials.aws_access_key_id, TestCredentials.aws_secret_access_key)
   end
 
   #---------------------------

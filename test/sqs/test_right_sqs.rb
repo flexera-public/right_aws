@@ -1,20 +1,16 @@
 require File.dirname(__FILE__) + '/test_helper.rb'
 
-class TestT < Test::Unit::TestCase
+class TestSqs < Test::Unit::TestCase
 
-    # Please, change the constants below to your own AWS credentials
-
-  AWS_ACCESS_KEY_ID     = 'xxxxxxxxxxxxxxxxxxxx'
-  AWS_SECRET_ACCESS_KEY = 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
-  GRANTEE_EMAIL_ADDRESS = 'x.xxxxxxx@gmail.com'
+  GRANTEE_EMAIL_ADDRESS = 'fester@example.com'
   RIGHT_MESSAGE_TEXT    = 'Right test message'
 
   
   def setup
-    @sqs = Rightscale::SqsInterface.new(AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY)
+    @sqs = Rightscale::SqsInterface.new(TestCredentials.aws_access_key_id, TestCredentials.aws_secret_access_key)
     @queue_name = 'right_sqs_test_awesome_queue'
       # for classes
-    @s = Rightscale::Sqs.new(AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY)
+    @s = Rightscale::Sqs.new(TestCredentials.aws_access_key_id, TestCredentials.aws_secret_access_key)
   end
   
   #---------------------------
@@ -100,7 +96,7 @@ class TestT < Test::Unit::TestCase
       # get queues list
     queues = @s.queues
       # create new queue
-    queue  = @s.queue(@queue_name, true)
+    queue  = @s.queue("#{@queue_name}_20", true)
       # check that it is created
     assert queue.is_a?(Rightscale::Sqs::Queue)
       # check that amount of queues has increased
@@ -111,13 +107,15 @@ class TestT < Test::Unit::TestCase
   
   def test_21_queue_create
       # create new queue
-    queue = Rightscale::Sqs::Queue.create(@s, @queue_name, true)
+    queue = Rightscale::Sqs::Queue.create(@s, "#{@queue_name}_21", true)
       # check that it is created
     assert queue.is_a?(Rightscale::Sqs::Queue)
+    # Don't test this - just for cleanup purposes
+    queue.delete
   end
   
   def test_22_queue_attributes
-    queue = Rightscale::Sqs::Queue.create(@s, @queue_name, false)
+    queue = Rightscale::Sqs::Queue.create(@s, "#{@queue_name}_22", false)
       # get a list of attrinutes
     attributes = queue.get_attribute
     assert attributes.is_a?(Hash) && attributes.size>0
@@ -135,10 +133,12 @@ class TestT < Test::Unit::TestCase
     queue.visibility += 10
       # make sure that it is changed
     assert v.to_i + 10, queue.visibility
+    # Don't test this - just for cleanup purposes
+    queue.delete
   end
   
   def test_23_grantees
-    queue = Rightscale::Sqs::Queue.create(@s, @queue_name, false)
+    queue = Rightscale::Sqs::Queue.create(@s, "#{@queue_name}_23", false)
       # get a list of grantees
     grantees = queue.grantees
       # create new grantee
@@ -155,10 +155,12 @@ class TestT < Test::Unit::TestCase
     assert_equal 1, grantee.perms.size
       # remove grantee
     assert grantee.drop
+    # Don't test this - just for cleanup purposes
+    queue.delete
   end
   
   def test_24_send_size
-    queue = Rightscale::Sqs::Queue.create(@s, @queue_name, false)
+    queue = Rightscale::Sqs::Queue.create(@s, "#{@queue_name}_24", false)
       # send 5 messages
     assert queue.push('a1')
     assert queue.push('a2')
@@ -171,10 +173,13 @@ class TestT < Test::Unit::TestCase
     assert queue.push('a6')
       # check queue size again
     assert_equal 6, queue.size
+    # Don't test this - just for cleanup purposes
+    queue.clear
+    queue.delete
   end
   
   def test_25_message_receive_pop_peek_delete
-    queue = Rightscale::Sqs::Queue.create(@s, @queue_name, false)
+    queue = Rightscale::Sqs::Queue.create(@s, "#{@queue_name}_25", false)
       # get queue size
     size = queue.size
       # get first message
@@ -196,10 +201,12 @@ class TestT < Test::Unit::TestCase
     assert m1.delete
       # make sure that queue size has decreased again
     assert_equal size-2, queue.size
+    # Don't test this - just for cleanup purposes
+    queue.delete
   end
   
   def test_26
-    queue = Rightscale::Sqs::Queue.create(@s, @queue_name, false)
+    queue = Rightscale::Sqs::Queue.create(@s, "#{@queue_name}_26", false)
       # lock message 
     queue.receive(100)
       # clear queue
