@@ -21,36 +21,48 @@
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
-
+# Test
 module RightAws
 
-    AMAZON_PROBLEMS = [ 'internal service error', 
-                        'is currently unavailable', 
-                        'no response from', 
-                        'Please try again',
-                        'InternalError',
-                        'ServiceUnavailable', #from SQS docs
-                        'Unavailable',
-                        'This application is not currently available',
-                        'InsufficientInstanceCapacity'
-                      ]
- 
-    # Exception class to handle any Amazon errors
-    # Attributes:
-    #  message    - the text of error
-    #  errors     - a list of errors as array or a string(==message if raised manually as AwsError.new('err_text'))
-    #  request_id - amazon's request id (if exists)
-    #  http_code  - HTTP response error code (if exists)
+  # Text, if found in an error message returned by AWS, indicates that this may be a transient
+  # error. Transient errors are automatically retried with exponential back-off.
+  AMAZON_PROBLEMS = [ 'internal service error', 
+                      'is currently unavailable', 
+                      'no response from', 
+                      'Please try again',
+                      'InternalError',
+                      'ServiceUnavailable', #from SQS docs
+                      'Unavailable',
+                      'This application is not currently available',
+                      'InsufficientInstanceCapacity'
+                    ]
+
+  # Exception class to signal any Amazon errors. All errors occuring during calls to Amazon's
+  # web services raise this type of error.
+  # Attribute inherited by RuntimeError:
+  #  message    - the text of the error, generally as returned by AWS in its XML response.
+
   class AwsError < RuntimeError
-    attr_reader :errors       # Array of errors list(each item is an array - [code,message]) or error string
-    attr_reader :request_id   # Request id (if exists)
-    attr_reader :http_code    # Response HTTP error code
+    
+    # either an array of errors where each item is itself an array of [code, message]),
+    # or an error string if the error was raised manually, as in <tt>AwsError.new('err_text')</tt>
+    attr_reader :errors
+    
+    # Request id (if exists)
+    attr_reader :request_id
+    
+    # Response HTTP error code
+    attr_reader :http_code
+    
     def initialize(errors=nil, http_code=nil, request_id=nil)
       @errors      = errors
       @request_id  = request_id
       @http_code   = http_code
       super(@errors.is_a?(Array) ? @errors.map{|code, msg| "#{code}: #{msg}"}.join("; ") : @errors.to_s)
     end
+    
+    # Does any of the error messages include the regexp +pattern+?
+    # Used to determine whether to retry request.
     def include?(pattern)
       if @errors.is_a?(Array)
         @errors.each{ |code, msg| return true if code =~ pattern } 
@@ -60,8 +72,14 @@ module RightAws
       false
     end
     
+    # Generic handler for AwsErrors. +aws+ is the RightAws::S3, RightAws::EC2, or RightAws::SQS
+    # object that caused the exception (it must provide last_request and last_response). Supported
+    # boolean options are:
+    # * <tt>:log</tt> print a message into the log using aws.logger to access the Logger
+    # * <tt>:puts</tt> do a "puts" of the error
+    # * <tt>:raise</tt> re-raise the error after logging
     def self.on_aws_exception(aws, options={:raise=>true, :log=>true})
- 	        # Only log & notify if not user error
+ 	    # Only log & notify if not user error
       if !options[:raise] || system_error?($!)
         error_text = "#{$!.inspect}\n#{$@}.join('\n')}"
         puts error_text if options[:puts]
@@ -78,6 +96,8 @@ module RightAws
       return nil
     end
     
+    # True if e is an AWS system error, i.e. something that is for sure not the caller's fault.
+    # Used to force logging.
     def self.system_error?(e)
  	    !e.is_a?(self) || e.message =~ /InternalError|InsufficientInstanceCapacity|Unavailable/
  	  end

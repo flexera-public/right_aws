@@ -1,56 +1,73 @@
-RightAws
-    by RightScale, Inc.
-    www.RightScale.com 
+= RightScale Amazon Web Services Ruby Gems
+
+Published by RightScale, Inc. under the MIT License.
+For information about RightScale, see http://www.rightscale.com
 
 == DESCRIPTION:
 
-RightAws::Ec2 is a Ruby library for the Amazon EC2 (Elastic Compute Cloud)
-service.
+The RightScale AWS gems have been designed to provide a robust, fast, and secure interface to Amazon EC2, Amazon, S3, and Amazon SQS. These gems have been used in production by RightScale since late 2006 and are being maintained to track enhancements made by Amazon. The RightScale AWS gems comprise:
 
-RightAws::S3 and RightAws::S3Interface are Ruby libraries for the Amazon S3
-(Simple Storage Service) service.
+- RightAws::Ec2 -- interface to Amazon EC2 (Elastic Compute Cloud)
+- RightAws::S3 and RightAws::S3Interface -- interface to Amazon S3 (Simple Storage Service)
+- RightAws::Sqs and RightAws::SqsInterface -- interface to Amazon SQS (Simple Queue Service)
 
-RightAws::Sqs and RightAws::SqsInterface is a Ruby library for the Amazon SQS (Simple Queue Service)
-service.
+== FEATURES:
 
-  
-All RightAws interfaces work in one of two ways:
-1) They use a single persistent HTTP connection per
-process or 2) per Ruby thread. Foir example, it doesn't matter how many RightAws::S3
-objects you create, they all use the same per-program or per-thread
+- Full programmmatic access to EC2, S3, and SQS
+- Complete error handling: all operations check for errors and report complete
+  error information by raising an AwsError.
+- Persistent HTTP connections with robust network-level retry layer using
+  RightHttpConnection).  This includes socket timeouts and retries.
+- Robust HTTP-level retry layer.  Certain (user-adjustable) HTTP errors returned
+  by Amazon's services are classified as temporary errors.
+  These errors are automaticallly retried using exponentially increasing intervals.
+  The number of retries is user-configurable.
+- Fast REXML-based parsing of responses (as fast as a pure Ruby solution allows)
+- Support for large S3 list operations.  Buckets and key subfolders containing
+  many (> 1000) keys are listed in entirety.  Operations based on list (like
+  bucket clear) work on arbitrary numbers of keys.
+- Support for streaming GETs from S3, and streaming PUTs to S3 if the data source is a file.
+- Support for single-threaded usage, multithreaded usage, as well as usage with multiple
+  AWS accounts.
+- Test suite (requires AWS account to do "live" testing)
+
+== THREADING:
+
+All RightScale AWS gems offer two threading options:
+1. Use a single persistent HTTP connection per process.
+1. Use a persistent HTTP connection per Ruby thread.
+ 
+Either way, it doesn't matter how many RightAws::S3 objects you create,
+they all use the same per-program or per-thread
 connection. The purpose of sharing the connection is to keep a single
 persistent HTTP connection open to avoid paying connection
 overhead on every request. However, if you have multiple concurrent
 threads, you may want or need an HTTP connection per thread to enable
 concurrent requests to S3. The way this plays out in practice is:
-1) If you have a non-multithreaded Ruby program, use the non-multithreaded setting for Gem.
-2) If you have a multi-threaded Ruby program, use the multithreaded setting to enable
-concurrent requests to S3 (SQS, EC2).
-3) For running under Mongrel/Rails, use thhe non-multithreaded setting for Gem even though
-Mongrel is multithreaded.  This is because only one Rails handler is invoked at
-any time (i.e. it acts like a single-threaded program)
+1. If you have a non-multithreaded Ruby program, use the non-multithreaded setting for Gem.
+1. If you have a multi-threaded Ruby program, use the multithreaded setting to enable
+   concurrent requests to S3 (SQS, EC2).
+1. For running under Mongrel/Rails, use thhe non-multithreaded setting for Gem even though
+   rel is multithreaded.  This is because only one Rails handler is invoked at
+   time (i.e. it acts like a single-threaded program)
 
-By default, Ec2/S3/Sqs interface instances are created in single-threaded mode.  Set
+Note that due to limitations in the I/O of the Ruby interpreter you
+may not get the degree of parallelism you may expect with the multi-threaded setting.
+
+By default, EC2/S3/SQS interface instances are created in single-threaded mode.  Set
 "params[:multi_thread]" to "true" in the initialization arguments to use
 multithreaded mode.
 
-== FEATURES/PROBLEMS:
+== GETTING STARTED:
 
-- Full programmmatic access to Ec2, S3, and Sqs
-- Robust network-level retry layer (using Rightscale::HttpConnection).  This includes
-  socket connect and read timeouts and retries.
-- Robust HTTP-level retry layer.  Certain (user-adjustable) HTTP errors are
-  classified as temporary errors.  These errors are automaticallly retried
-  over exponentially increasing intervals.  The number of retries is
-  user-configurable.
-- Support for large S3 list operations.  Buckets and key subfolders containing
-  many (> 1000) keys are listed in entirety.  Operations based on list (like
-  bucket clear) work on arbitrary numbers of keys.
-- Support for streaming PUTs to S3 if the data source is a file.
-- Support for streaming GETs from S3.
-- Interfaces for HTML link generation.
+* For EC2 read RightAws::Ec2 and consult the Amazon EC2 API documentation at
+  http://developer.amazonwebservices.com/connect/kbcategory.jspa?categoryID=87
+* For S3 read RightAws::S3 and consult the Amazon S3 API documentation at
+  http://developer.amazonwebservices.com/connect/kbcategory.jspa?categoryID=48
+* For SQS read RightAws::Sqs and consult the Amazon SQS API documentation at
+  http://developer.amazonwebservices.com/connect/kbcategory.jspa?categoryID=31
 
-Known Problems:
+== KNOWN ISSUES:
 
 - Amazon recently (8/07) changed the semantics of the SQS service.  A
   new queue may not be created within 60 seconds of the destruction of any
@@ -58,15 +75,9 @@ Known Problems:
   RightAws::SqsInterface will fail with the message:
   "AWS.SimpleQueueService.QueueDeletedRecently: You must wait 60 seconds after deleting a queue before you can create another with the same name."
   
-== SYNOPSIS:
-
-
-
-
-
 == REQUIREMENTS:
 
-RightAws requires activesupport and RightScale's right_http_connection gem.
+RightAws requires ActiveSupport, REXML, and RightHttpConnection gem.
 
 == INSTALL:
 

@@ -55,6 +55,8 @@ module RightAws #:nodoc:
   end
 end
 
+#-
+
 # We also want everything available in the Rightscale namespace for backward
 # compatibility reasons.
 module Rightscale

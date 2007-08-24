@@ -23,55 +23,79 @@
 
 module RightAws
 
+  # = RightAWS::EC2 -- RightScale Amazon EC2 interface
+  # The RightAws::EC2 class provides a complete interface to Amazon's
+  # Elastic Compute Cloud service.
+  # For explanations of the semantics
+  # of each call, please refer to Amazon's documentation at
+  # http://developer.amazonwebservices.com/connect/kbcategory.jspa?categoryID=87
+  #
+  # Example:
+  #  # TODO!
+  #
+  # Error handling: all operations raise an RightAws::AwsError in case
+  # of problems. Note that transient errors are automatically retried.
+    
   class Ec2
     
     SIGNATURE_VERSION = "1"
+    # Amazon EC2 API version being used
     API_VERSION       = "2007-01-19"
     DEFAULT_HOST      = "ec2.amazonaws.com"
     DEFAULT_PROTOCOL  = 'https'
     DEFAULT_PORT      = 443
     
+    # Default addressing type (public=NAT, direct=no-NAT) used when launching instances.
     DEFAULT_ADDRESSING_TYPE =  'public'
     DNS_ADDRESSING_SET      = ['public','direct']
     
-        # A list if Amazons problems we can handle by AWSErrorHandler.
+    # A list of Amazon problems we can handle by AWSErrorHandler.
     @@amazon_problems = RightAws::AMAZON_PROBLEMS
     
-      # Current aws_access_key_id
+    # Current aws_access_key_id
     attr_reader :aws_access_key_id
-      # Last HTTP request object
+    # Last HTTP request object
     attr_reader :last_request
-      # Last HTTP response object
+    # Last HTTP response object
     attr_reader :last_response
-      # Last AWS errors list (used by AWSErrorHandler)
+    # Last AWS errors list (used by AWSErrorHandler)
     attr_accessor :last_errors
-      # Last AWS request id (used by AWSErrorHandler)
+    # Last AWS request id (used by AWSErrorHandler)
     attr_accessor :last_request_id
-      # Logger object
+    # Logger object, used by this class to generate log messages
     attr_accessor :logger
-      # Initial params hash
+    # Option params passed into new
     attr_accessor :params
     
     @@bench_ec2 = Benchmark::Tms.new()
     @@bench_xml = Benchmark::Tms.new()
     
-      # Benchmark::Tms instance for EC2 access benchmark.
+    # Benchmark::Tms instance that accumulates time spent in requests to EC2.
     def self.bench_ec2;  @@bench_ec2;  end
     
-      # Benchmark::Tms instance for XML parsing benchmark.
+    # Benchmark::Tms instance that accumulates time spent in XML parsing.
     def self.bench_xml; @@bench_xml; end
 
-      # Returns a list of Amazon service responses which are known as problems on Amazon side. 
-      # We have to re-request again if we've got any of them - probably the problem will disappear. By default returns the same value as AMAZON_PROBLEMS const.
+    # Returns a list of Amazon service responses which are known to be transient errors.
+    # By default returns the same value as AMAZON_PROBLEMS const. See AWSErrorHandler.
     def self.amazon_problems
       @@amazon_problems
     end
 
-      # Sets a list of Amazon side problems.
+    # Sets the list of Amazon problems that are automatically retried. See AWSErrorHandler.
     def self.amazon_problems=(problems_list)
       @@amazon_problems = problems_list
     end
     
+    # Create a new handle to an EC2 account. All handles share the same per process or per thread
+    # HTTP connection to Amazon EC2. Each handle is for a specific account. The params have the
+    # following options:
+    # * <tt>:server</tt>: EC2 service host, default: DEFAULT_HOST
+    # * <tt>:port</tt>: EC2 service port, default: DEFAULT_PORT
+    # * <tt>:protocol</tt>: 'http' or 'https', default: DEFAULT_PROTOCOL
+    # * <tt>:multi_thread</tt>: true=HTTP connection per thread, false=per process
+    # * <tt>:logger</tt>: for log messages, default: RAILS_DEFAULT_LOGGER else STDOUT
+    #
     def initialize(aws_access_key_id, aws_secret_access_key, params={})
       @params = params
       raise AwsError.new("AWS access keys are required to operate on EC2") \
@@ -94,7 +118,7 @@ module RightAws
       AwsError::on_aws_exception(self, options)
     end
     
-      # Return the +true+ if this RightEc2NativeQuery instance works in multi_thread state and +false+ otherwise.
+      # Return +true+ if this RightEc2NativeQuery instance works in multi_thread mode and +false+ otherwise.
     def multi_thread
       @params[:multi_thread]
     end
@@ -183,18 +207,25 @@ module RightAws
       return ec2_describe_images('ExecutableBy', list)
     end
 
-      # Retrieve a list of images. Returns array of hashes or an exception:
+      # Retrieve a list of images. Returns array of hashes describing the images or an exception:
       #
       #  ec2.describe_images #=>
-      #    [{:aws_owner=>"522821470517", :aws_id=>"ami-e4b6538d", :aws_state=>"available",
-      #      :aws_location=>"marcins_cool_public_images/ubuntu-6.10.manifest.xml",:aws_is_public=>true},
-      #      ..., {...} ]
+      #    [{:aws_owner => "522821470517",
+      #      :aws_id => "ami-e4b6538d",
+      #      :aws_state => "available",
+      #      :aws_location => "marcins_cool_public_images/ubuntu-6.10.manifest.xml",
+      #      :aws_is_public => true},
+      #     {...},
+      #     {...} ]
       #
       # If +list+ param is set, then retrieve information about the listed images only:
       #
       #  ec2.describe_images(['ami-e4b6538d']) #=>
-      #    [{:aws_owner=>"522821470517", :aws_id=>"ami-e4b6538d", :aws_state=>"available",
-      #      :aws_location=>"marcins_cool_public_images/ubuntu-6.10.manifest.xml",:aws_is_public=>true}]
+      #    [{:aws_owner => "522821470517",
+      #      :aws_id => "ami-e4b6538d",
+      #      :aws_state => "available",
+      #      :aws_location => "marcins_cool_public_images/ubuntu-6.10.manifest.xml",
+      #      :aws_is_public => true}]
       #
     def describe_images(list=[])
       images = list.nil? ? ec2_describe_images_by_executable_by(['self']) : ec2_describe_images_by_id(list)
@@ -264,8 +295,10 @@ module RightAws
       on_exception
     end
 
-      # Users should prefer modify_image_launch_perm_add|remove_users|groups() instead of modify_image_attribute() because the signature of 
-      # modify_image_attribute() may change with EC2 service changes.
+      # Modify an image's attributes. It is recommended that you use
+      # modify_image_launch_perm_add_users, modify_image_launch_perm_remove_users, etc.
+      # instead of modify_image_attribute because the signature of 
+      # modify_image_attribute may change with EC2 service changes.
       #
       #  attribute     : currently, only 'launchPermission' is supported.
       #  operationType : currently, only 'add' & 'remove' are supported.
@@ -284,7 +317,9 @@ module RightAws
       on_exception
     end
 
-      # Grant image launch permissions for users. Parameter +userId+ is a list of users' AWS account ids. Returns +true+ or an exception.
+      # Grant image launch permissions to users.
+      # Parameter +userId+ is a list of user AWS account ids.
+      # Returns +true+ or an exception.
       #
       #  ec2.modify_image_launch_perm_add_users('ami-e444444d',['000000000777','000000000778']) #=> true
       #
@@ -342,7 +377,8 @@ module RightAws
       on_exception
     end
     
-      # Retrieve information about EC2 instances. If +list+ is omitted then returns the whole list.
+      # Retrieve information about EC2 instances. If +list+ is omitted then returns the
+      # list of all instances.
       #
       #  ec2.describe_instances #=> 
       #    [{:aws_image_id       => "ami-e444444d",
@@ -394,7 +430,7 @@ module RightAws
         user_data.strip!
           # Do not use CGI::escape(encode64(...)) as it is done in Amazons EC2 library.
           # Amazon 169.254.169.254 does not like escaped symbols!
-          # And it dont like "\n" inside of encoded string! Grrr....
+          # And it doesn't like "\n" inside of encoded string! Grrr....
           # Otherwise, some of UserData symbols will be lost...
         params['UserData'] = Base64.encode64(user_data).delete("\n") unless user_data.empty?
       end
@@ -544,9 +580,10 @@ module RightAws
       on_exception
     end
     
-      # Authorize named ingress for security group.
+      # Authorize named ingress for security group. Allows instances that are member of someone
+      # else's security group to open connections to instances in my group.
       #
-      #  ec2.authorize_security_group_named_ingress('my_awesome_group', aws_user_id, 'another_group_name') #=> true
+      #  ec2.authorize_security_group_named_ingress('my_awesome_group', '7011-0219-8268', 'their_group_name') #=> true
       #
     def authorize_security_group_named_ingress(name, owner, group)
       link = generate_request("AuthorizeSecurityGroupIngress", 
@@ -572,7 +609,7 @@ module RightAws
       on_exception
     end
     
-      # Add permission to a security group. Returns +true+ or an exception. +protocol+ is one of :'tcp'|'udp'|'icmp' ('tcp' is default). 
+      # Add permission to a security group. Returns +true+ or an exception. +protocol+ is one of :'tcp'|'udp'|'icmp'.
       #
       #  ec2.authorize_security_group_IP_ingress('my_awesome_group', 80, 82, 'udp', '192.168.1.0/8') #=> true
       #  ec2.authorize_security_group_IP_ingress('my_awesome_group', -1, -1, 'icmp') #=> true
@@ -605,7 +642,8 @@ module RightAws
       on_exception
     end
 
-      # Retrieve a list of SSH keys. Returms an array of keys or an exception.
+      # Retrieve a list of SSH keys. Returns an array of keys or an exception. Each key is
+      # represented as a two-element hash.
       #
       #  ec2.describe_key_pairs #=>
       #    [{:aws_fingerprint=> "01:02:03:f4:25:e6:97:e8:9b:02:1a:26:32:4e:58:6b:7a:8c:9f:03", :aws_key_name=>"key-1"},
@@ -624,7 +662,7 @@ module RightAws
       on_exception
     end
       
-      # Create new SSH key. Returns a hash of key's data or an exception.
+      # Create new SSH key. Returns a hash of the key's data or an exception.
       #
       #  ec2.create_key_pair('my_awesome_key') #=>
       #    {:aws_key_name    => "my_awesome_key",
@@ -642,7 +680,7 @@ module RightAws
       on_exception
     end
       
-      # Delete key pair. Returns +true+ or an exception.
+      # Delete a key pair. Returns +true+ or an exception.
       #
       #  ec2.delete_key_pair('my_awesome_key') #=> true
       #
@@ -653,13 +691,15 @@ module RightAws
     rescue Exception
       on_exception
     end
+    
+  #- Internal stuff from here on down...
 
 
   #-----------------------------------------------------------------
   #      PARSERS: Boolean Response Parser
   #-----------------------------------------------------------------
     
-  class RightBoolResponseParser < RightAWSParser # :nodoc:
+  class RightBoolResponseParser < RightAWSParser
     def tagend(name)
       @result = @text=='true' ? true : false if name == 'return'
     end
@@ -669,16 +709,16 @@ module RightAws
   #      PARSERS: Key Pair
   #-----------------------------------------------------------------
 
-    class QEc2DescribeKeyPairType # :nodoc:
+    class QEc2DescribeKeyPairType
       attr_accessor :keyName 
       attr_accessor :keyFingerprint
     end
 
-    class QEc2CreateKeyPairType < QEc2DescribeKeyPairType # :nodoc:
+    class QEc2CreateKeyPairType < QEc2DescribeKeyPairType
       attr_accessor :keyMaterial
     end
 
-    class QEc2DescribeKeyPairParser < RightAWSParser # :nodoc:
+    class QEc2DescribeKeyPairParser < RightAWSParser
       def tagstart(name, attributes)
         @item = QEc2DescribeKeyPairType.new if name == 'item'
       end
@@ -694,7 +734,7 @@ module RightAws
       end
     end
 
-    class QEc2CreateKeyPairParser < RightAWSParser # :nodoc:
+    class QEc2CreateKeyPairParser < RightAWSParser
       def tagstart(name, attributes)
         @result = QEc2CreateKeyPairType.new if !@result
       end
@@ -711,12 +751,12 @@ module RightAws
   #      PARSERS: Security Groups
   #-----------------------------------------------------------------
 
-    class QEc2UserIdGroupPairType # :nodoc:
+    class QEc2UserIdGroupPairType
       attr_accessor :userId
       attr_accessor :groupName
     end
 
-    class QEc2IpPermissionType # :nodoc:
+    class QEc2IpPermissionType
       attr_accessor :ipProtocol
       attr_accessor :fromPort
       attr_accessor :toPort
@@ -724,7 +764,7 @@ module RightAws
       attr_accessor :ipRanges
     end
 
-    class QEc2SecurityGroupItemType # :nodoc:
+    class QEc2SecurityGroupItemType
       attr_accessor :groupName
       attr_accessor :groupDescription
       attr_accessor :ownerId
@@ -732,7 +772,7 @@ module RightAws
     end
 
 
-    class QEc2DescribeSecurityGroupsParser < RightAWSParser # :nodoc:
+    class QEc2DescribeSecurityGroupsParser < RightAWSParser
       def tagstart(name, attributes)
         case name
           when 'item' 
@@ -782,7 +822,7 @@ module RightAws
   #      PARSERS: Images
   #-----------------------------------------------------------------
 
-    class QEc2DescribeImagesResponseItemType # :nodoc:
+    class QEc2DescribeImagesResponseItemType
       attr_accessor :imageId 
       attr_accessor :imageState 
       attr_accessor :imageLocation
@@ -790,7 +830,7 @@ module RightAws
       attr_accessor :isPublic
     end
 
-    class QEc2DescribeImagesParser < RightAWSParser # :nodoc:
+    class QEc2DescribeImagesParser < RightAWSParser
       def tagstart(name, attributes)
         @image = QEc2DescribeImagesResponseItemType.new if name == 'item'
       end
@@ -809,7 +849,7 @@ module RightAws
       end
     end
 
-    class QEc2RegisterImageParser < RightAWSParser # :nodoc:
+    class QEc2RegisterImageParser < RightAWSParser
       def tagend(name)
         @result = @text if name == 'imageId'
       end
@@ -819,17 +859,17 @@ module RightAws
   #      PARSERS: Image Attribute
   #-----------------------------------------------------------------
 
-    class QEc2LaunchPermissionItemType # :nodoc:
+    class QEc2LaunchPermissionItemType
       attr_accessor :groups
       attr_accessor :userIds
     end
     
-    class QEc2DescribeImageAttributeType # :nodoc:
+    class QEc2DescribeImageAttributeType
       attr_accessor :imageId 
       attr_accessor :launchPermission
     end
 
-    class QEc2DescribeImageAttributeParser < RightAWSParser # :nodoc:
+    class QEc2DescribeImageAttributeParser < RightAWSParser
       def tagstart(name, attributes)
         case name
           when 'launchPermission'
@@ -859,12 +899,12 @@ module RightAws
   #      PARSERS: Instances
   #-----------------------------------------------------------------
 
-    class QEc2InstanceStateType # :nodoc:
+    class QEc2InstanceStateType
       attr_accessor :code
       attr_accessor :name
     end
 
-    class QEc2RunningInstancesItemType # :nodoc:
+    class QEc2RunningInstancesItemType
       attr_accessor :instanceId
       attr_accessor :imageId
       attr_accessor :instanceState
@@ -875,14 +915,14 @@ module RightAws
       attr_accessor :amiLaunchIndex
     end
 
-    class QEc2DescribeInstancesType # :nodoc:
+    class QEc2DescribeInstancesType
       attr_accessor :reservationId
       attr_accessor :ownerId
       attr_accessor :groupSet
       attr_accessor :instancesSet 
     end
 
-    class QEc2DescribeInstancesParser < RightAWSParser # :nodoc:
+    class QEc2DescribeInstancesParser < RightAWSParser
       def tagstart(name, attributes)
         case name
           when 'item'
@@ -929,7 +969,7 @@ module RightAws
       end
     end
 
-    class QEc2RunInstancesParser < RightAWSParser # :nodoc:
+    class QEc2RunInstancesParser < RightAWSParser
       def tagstart(name, attributes)
         case name
           when 'RunInstancesResponse'
@@ -973,13 +1013,13 @@ module RightAws
       end
     end
 
-    class QEc2TerminateInstancesResponseInfoType # :nodoc:
+    class QEc2TerminateInstancesResponseInfoType
       attr_accessor :instanceId
       attr_accessor :shutdownState
       attr_accessor :previousState
     end
 
-    class QEc2TerminateInstancesParser < RightAWSParser # :nodoc:
+    class QEc2TerminateInstancesParser < RightAWSParser
       def tagstart(name, attributes)
         if name == 'item'
           @instance = QEc2TerminateInstancesResponseInfoType.new 
@@ -1010,13 +1050,13 @@ module RightAws
   #      PARSERS: Console
   #-----------------------------------------------------------------
 
-    class QEc2GetConsoleOutputResponseType # :nodoc:
+    class QEc2GetConsoleOutputResponseType
       attr_accessor :instanceId
       attr_accessor :timestamp
       attr_accessor :output
     end
 
-    class QEc2GetConsoleOutputParser < RightAWSParser # :nodoc:
+    class QEc2GetConsoleOutputParser < RightAWSParser
       def tagend(name)
         case name
         when 'instanceId' ; @result.instanceId = @text

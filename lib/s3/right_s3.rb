@@ -22,20 +22,35 @@
 #
 
 module RightAws
-
+  
+  # = RightAWS::S3 -- RightScale Amazon S3 interface
+  # The RightAws::S3 class provides a complete interface to Amazon's Simple
+  # Storage Service.
+  # For explanations of the semantics
+  # of each call, please refer to Amazon's documentation at
+  # http://developer.amazonwebservices.com/connect/kbcategory.jspa?categoryID=48
+  #
+  # See examples below for the bucket and buckets methods.
+  #
+  # Error handling: all operations raise an RightAws::AwsError in case
+  # of problems. Note that transient errors are automatically retried.
+    
   class S3
     attr_reader :interface
     
+    # Create a new handle to an S3 account. All handles share the same per process or per thread
+    # HTTP connection to Amazon S3. Each handle is for a specific account.
+    # The +params+ are passed through as-is to RightAws::S3Interface.new
     def initialize(aws_access_key_id, aws_secret_access_key, params={})
       @interface = S3Interface.new(aws_access_key_id, aws_secret_access_key, params)
     end
     
-      # Retrieve a list of buckets.
-      # Returns an array of Bucket instances.
-      #
-      #  s3 = RightAws::S3.new(aws_access_key_id, aws_secret_access_key)
-      #  p s3.buckets #=> array of buckets
-      #
+    # Retrieve a list of buckets.
+    # Returns an array of RightAws::S3::Bucket instances.
+    #  # Create handle to S3 account
+    #  s3 = RightAws::S3.new(aws_access_key_id, aws_secret_access_key)
+    #  my_buckets_names = s3.buckets.map{|b| b.name}
+    #  puts "Buckets on S3: #{my_bucket_names.join(', ')}"
     def buckets
       @interface.list_all_my_buckets.map! do |entry|
         owner = Owner.new(entry[:owner_id], entry[:owner_display_name])
@@ -43,23 +58,23 @@ module RightAws
       end
     end
     
-      # Return an object representing a bucket.
-      # If the bucket does not exist and +create+ is set, a new bucket
-      # is created on S3.  The +create+ parameter has no effect if
-      # the bucket alrady exists. 
-      # Returns Bucket instance or +nil+ if the bucket does not exist 
-      # and +create+ is not set.
-      #
-      #  s3 = RightAws::S3.new(aws_access_key_id, aws_secret_access_key)
-      #  bucket1 = s3.bucket('my_awesome_bucket')
-      #  bucket1.keys  #=> exception here if the bucket does not exists
-      #   ...
-      #  bucket2 = s3.bucket('my_awesome_bucket', true)
-      #  bucket2.keys  #=> list of keys
-      #
-      #  see http://docs.amazonwebservices.com/AmazonS3/2006-03-01/RESTAccessPolicy.html
-      #  (section: Canned Access Policies)
-      #
+    # Retrieve an individual bucket.
+    # If the bucket does not exist and +create+ is set, a new bucket
+    # is created on S3.  The +create+ parameter has no effect if
+    # the bucket alrady exists. 
+    # Returns a RightAws::S3::Bucket instance or +nil+ if the bucket does not exist 
+    # and +create+ is not set.
+    #
+    #  s3 = RightAws::S3.new(aws_access_key_id, aws_secret_access_key)
+    #  bucket1 = s3.bucket('my_awesome_bucket')
+    #  bucket1.keys  #=> exception here if the bucket does not exists
+    #   ...
+    #  bucket2 = s3.bucket('my_awesome_bucket', true)
+    #  bucket2.keys  #=> list of keys
+    #
+    #  see http://docs.amazonwebservices.com/AmazonS3/2006-03-01/RESTAccessPolicy.html
+    #  (section: Canned Access Policies)
+    #
     def bucket(name, create=true, perms=nil, headers={})
       headers['x-amz-acl'] = perms if perms
       @interface.create_bucket(name, headers) if create
