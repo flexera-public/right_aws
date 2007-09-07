@@ -147,7 +147,7 @@ module RightAws
       if response.body && response.body[/<\?xml/]         # ... it is a xml document
         @aws.class.bench_xml.add! do
           error_parser = RightErrorResponseParser.new
-          REXML::Document.parse_stream(response.body, error_parser)
+          error_parser.parse(response)
           @aws.last_errors     = error_parser.errors
           @aws.last_request_id = error_parser.requestID
           last_errors_text     = @aws.last_errors.flatten.join("\n")
@@ -186,13 +186,25 @@ module RightAws
 
   #-----------------------------------------------------------------
 
-  class RightAWSParser #:nodoc:
+  class RightAWSParser  #:nodoc:
+    @@xml_lib = 'rexml' # xml library name: 'rexml' | 'libxml'
+    def self.xml_lib
+      @@xml_lib
+    end
+    def self.xml_lib=(new_lib_name)
+      @@xml_lib = new_lib_name
+    end
+    
     attr_accessor :result
     attr_reader   :xmlpath
-    def initialize
+    attr_accessor :xml_lib
+    
+    def initialize(params={})
       @xmlpath = ''
       @result  = false
       @text    = ''
+      @xml_lib = params[:xml_lib] || @@xml_lib
+      @logger  = params[:logger]
       reset
     end
     def tag_start(name, attributes)
@@ -208,6 +220,43 @@ module RightAws
     def text(text)
       @text = text
       tagtext(text)
+    end
+      # Parser method.
+      # Params:
+      #   xml_text         - xml message text(String) or Net:HTTPxxx instance (response)
+      #   params[:xml_lib] - library name: 'rexml' | 'libxml'
+    def parse(xml_text, params={})
+        # Get response body
+      xml_text = xml_text.body unless xml_text.is_a?(String)
+      @xml_lib = params[:xml_lib] || @xml_lib
+        # load xml library
+      if @xml_lib=='libxml' && !defined?(XML::SaxParser)
+        begin
+          require 'xml/libxml' 
+        rescue LoadError => e
+          @xml_lib = 'rexml'
+          if @logger
+            @logger.error e.inspect
+            @logger.error e.backtrace
+            @logger.info "Can not load 'libxml' library. 'Rexml' is used for parsing."
+          end
+        end
+      end
+        # Parse the xml text
+      case @xml_lib
+      when 'libxml'  
+        xml = XML::SaxParser.new
+        xml.string = xml_text
+        xml.on_start_element{|name, attr_hash| self.tag_start(name, attr_hash)}
+        xml.on_characters{   |text|            self.text(text)}
+        xml.on_end_element{  |name|            self.tag_end(name)}
+        xml.parse
+      else
+        if @logger && @xml_lib!='rexml'
+          @logger.info "RightAWSParser#parse: Unknown xml library ('#{@xml_lib}') is selected. The default 'rexml' is used."
+        end
+        REXML::Document.parse_stream(xml_text, self)
+      end
     end
       # Parser must have a lots of methods 
       # (see /usr/lib/ruby/1.8/rexml/parsers/streamparser.rb)

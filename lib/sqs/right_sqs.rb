@@ -86,7 +86,7 @@ module RightAws
         #  RightAws::Sqs::Queue.create(sqs, 'my_awesome_queue') #=> #<RightAws::Sqs::Queue:0xb7b626e4 ... >
         #
       def self.create(sqs, url_or_name, create=true, visibility=nil)
-        sqs.queue(url_or_name, create=true, visibility)
+        sqs.queue(url_or_name, create, visibility)
       end
       
         # Creates new Queue instance. 
@@ -119,12 +119,15 @@ module RightAws
         # this queue. If you have no grantees except of 'root' then you have no problems.
         # But if the grantees are there - better use <tt>queue.clear(false)</tt>.
         #
+        # PS This is not supported any more - Amazon needes to be at least 60 seconds between 
+        # queue deletion and creation. Hence +force+ param does not affect to +clear+ behaviour...
+        #
       def clear(force=false)
-        if force
-          @sqs.interface.force_clear_queue(@url)
-        else
+##        if force
+##          @sqs.interface.force_clear_queue(@url)
+##        else
           @sqs.interface.clear_queue(@url)
-        end
+##        end
       end
       
         # Deletes queue. 

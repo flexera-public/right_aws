@@ -32,11 +32,11 @@ require "openssl"
 require "digest/sha1"
 
 require 'rubygems'
-require 'active_support'
 require 'right_http_connection'
 
 $:.unshift(File.dirname(__FILE__))
 require 'awsbase/benchmark_fix'
+require 'awsbase/support'
 require 'awsbase/right_awsbase'
 require 'ec2/right_ec2'
 require 's3/right_s3_interface'
@@ -49,7 +49,7 @@ module RightAws #:nodoc:
   module VERSION #:nodoc:
     MAJOR = 1
     MINOR = 1
-    TINY  = 0
+    TINY  = 1
 
     STRING = [MAJOR, MINOR, TINY].join('.')
   end

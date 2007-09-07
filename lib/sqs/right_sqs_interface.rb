@@ -120,7 +120,8 @@ module RightAws
       param.each{ |key, value| param.delete(key) if (value.nil? || key.is_a?(Symbol)) }
         # prepare output hash
       request_hash = { "Action"           => action,
-                       "Expires"          => Time.now.utc.since(REQUEST_TTL).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                       # "Expires"          => Time.now.utc.since(REQUEST_TTL).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                       "Expires"          => (Time.now + REQUEST_TTL).utc.strftime("%Y-%m-%dT%H:%M:%SZ"),
                        "AWSAccessKeyId"   => @aws_access_key_id,
                        "Version"          => API_VERSION,
                        "SignatureVersion" => SIGNATURE_VERSION }
@@ -145,7 +146,7 @@ module RightAws
         # created request
       param_to_str = param.to_a.collect{|key,val| key.to_s + "=" + CGI::escape(val.to_s) }.join("&")
       param_to_str = "?#{param_to_str}" unless param_to_str.blank?
-      request = "Net::HTTP::#{method.titleize}".constantize.new("#{queue_uri}#{param_to_str}")
+      request = "Net::HTTP::#{method.capitalize}".constantize.new("#{queue_uri}#{param_to_str}")
       request.body = message if message
         # set main headers
       request['content-md5']  = ''
@@ -179,13 +180,7 @@ module RightAws
       @last_response = response
       if response.is_a?(Net::HTTPSuccess)
         @error_handler = nil
-        @@bench_xml.add! do
-          if parser.kind_of?(RightAWSParser)
-            REXML::Document.parse_stream(response.body, parser)
-          else
-            parser.parse(response)
-          end
-        end
+        @@bench_xml.add! { parser.parse(response) }
         return parser.result
       else
         @error_handler = AWSErrorHandler.new(self, parser, @@amazon_problems) unless @error_handler
@@ -206,11 +201,14 @@ module RightAws
       #
       #  sqs.create_queue('my_awesome_queue') #=> 'http://queue.amazonaws.com/ZZ7XXXYYYBINS/my_awesome_queue'
       #
+      # PS Some queue based requests may become available in a couple of minutes after queue creation
+      # (permission grant and removal for example)
+      #
     def create_queue(queue_name, default_visibility_timeout=nil)
       req_hash = generate_request('CreateQueue', 
                                   'QueueName'                => queue_name,
                                   'DefaultVisibilityTimeout' => default_visibility_timeout || DEFAULT_VISIBILITY_TIMEOUT )
-      request_info(req_hash, SqsCreateQueueParser.new)
+      request_info(req_hash, SqsCreateQueueParser.new(:logger => @logger))
     end
 
      # Creates new queue. If +queue_name_prefix+ is omitted then retrieves a list of all queues.
@@ -221,7 +219,7 @@ module RightAws
      #
     def list_queues(queue_name_prefix=nil)
       req_hash = generate_request('ListQueues', 'QueueNamePrefix' => queue_name_prefix)
-      request_info(req_hash, SqsListQueuesParser.new)
+      request_info(req_hash, SqsListQueuesParser.new(:logger => @logger))
     rescue
       on_exception
     end
@@ -234,7 +232,7 @@ module RightAws
       req_hash = generate_request('DeleteQueue', 
                                   'ForceDeletion' => force_deletion.to_s,
                                   :queue_url      => queue_url)
-      request_info(req_hash, SqsStatusParser.new)
+      request_info(req_hash, SqsStatusParser.new(:logger => @logger))
     rescue
       on_exception
     end
@@ -247,7 +245,7 @@ module RightAws
       req_hash = generate_request('GetQueueAttributes', 
                                   'Attribute' => attribute,
                                   :queue_url  => queue_url)
-      request_info(req_hash, SqsGetQueueAttributesParser.new)
+      request_info(req_hash, SqsGetQueueAttributesParser.new(:logger => @logger))
     rescue
       on_exception
     end
@@ -262,7 +260,7 @@ module RightAws
                                   'Attribute' => attribute,
                                   'Value'     => value,
                                   :queue_url  => queue_url)
-      request_info(req_hash, SqsStatusParser.new)
+      request_info(req_hash, SqsStatusParser.new(:logger => @logger))
     rescue
       on_exception
     end
@@ -277,7 +275,7 @@ module RightAws
       req_hash = generate_request('SetVisibilityTimeout', 
                                   'VisibilityTimeout' => visibility_timeout || DEFAULT_VISIBILITY_TIMEOUT,
                                   :queue_url => queue_url )
-      request_info(req_hash, SqsStatusParser.new)
+      request_info(req_hash, SqsStatusParser.new(:logger => @logger))
     rescue
       on_exception
     end
@@ -290,7 +288,7 @@ module RightAws
      #
     def get_visibility_timeout(queue_url)
       req_hash = generate_request('GetVisibilityTimeout', :queue_url => queue_url )
-      request_info(req_hash, SqsGetVisibilityTimeoutParser.new)
+      request_info(req_hash, SqsGetVisibilityTimeoutParser.new(:logger => @logger))
     rescue
       on_exception
     end
@@ -304,7 +302,7 @@ module RightAws
                                   'Grantee.EmailAddress' => grantee_email_address,
                                   'Permission'           => permission,
                                   :queue_url             => queue_url)
-      request_info(req_hash, SqsStatusParser.new)
+      request_info(req_hash, SqsStatusParser.new(:logger => @logger))
     rescue
       on_exception
     end
@@ -320,7 +318,7 @@ module RightAws
                                   'Grantee.EmailAddress' => grantee_email_address,
                                   'Permission'           => permission,
                                   :queue_url             => queue_url)
-      response = request_info(req_hash, SqsListGrantsParser.new)
+      response = request_info(req_hash, SqsListGrantsParser.new(:logger => @logger))
         # One user may have up to 3 permission records for every queue.
         # We will join these records to one.
       result = {}    
@@ -345,7 +343,7 @@ module RightAws
                                   grantee_key  => grantee_email_address_or_id,
                                   'Permission' => permission,
                                   :queue_url   => queue_url)
-      request_info(req_hash, SqsStatusParser.new)
+      request_info(req_hash, SqsStatusParser.new(:logger => @logger))
     rescue
       on_exception
     end
@@ -363,7 +361,7 @@ module RightAws
                                        'NumberOfMessages'  => number_of_messages,
                                        'VisibilityTimeout' => visibility_timeout,
                                        :queue_url          => "#{queue_url}/front" )
-      request_info(req_hash, SqsReceiveMessagesParser.new)
+      request_info(req_hash, SqsReceiveMessagesParser.new(:logger => @logger))
     rescue
       on_exception
     end
@@ -375,7 +373,7 @@ module RightAws
       #
     def peek_message(queue_url, message_id)
       req_hash = generate_rest_request('GET', :queue_url => "#{queue_url}/#{CGI::escape message_id}" )
-      messages = request_info(req_hash, SqsReceiveMessagesParser.new)
+      messages = request_info(req_hash, SqsReceiveMessagesParser.new(:logger => @logger))
       messages.blank? ? nil : messages[0]
     rescue
       on_exception
@@ -389,7 +387,7 @@ module RightAws
       req_hash = generate_rest_request('PUT',
                                        :message   => message,
                                        :queue_url => "#{queue_url}/back")
-      request_info(req_hash, SqsSendMessagesParser.new)
+      request_info(req_hash, SqsSendMessagesParser.new(:logger => @logger))
     rescue
       on_exception
     end
@@ -402,7 +400,7 @@ module RightAws
       req_hash = generate_request('DeleteMessage', 
                                   'MessageId' => message_id,
                                   :queue_url  => queue_url)
-      request_info(req_hash, SqsStatusParser.new)
+      request_info(req_hash, SqsStatusParser.new(:logger => @logger))
     rescue
       on_exception
     end
@@ -416,7 +414,7 @@ module RightAws
                                   'MessageId'         => message_id,
                                   'VisibilityTimeout' => visibility_timeout.to_s,
                                   :queue_url          => queue_url)
-      request_info(req_hash, SqsStatusParser.new)
+      request_info(req_hash, SqsStatusParser.new(:logger => @logger))
     rescue
       on_exception
     end
@@ -481,12 +479,15 @@ module RightAws
       #
       #  sqs.force_clear_queue('http://queue.amazonaws.com/ZZ7XXXYYYBINS/my_awesome_queue') #=> true
       #
+      # PS This function is not supported any more - Amazon needes to be at least 60 seconds between 
+      # queue deletion and creation. Hence it should fail with exception...
+      #
     def force_clear_queue(queue_url)
       queue_name       = queue_name_by_url(queue_url)
       queue_attributes = get_queue_attributes(queue_url)
       force_delete_queue(queue_url)
       create_queue(queue_name)
-        # hmmm... The next like is a trick. Amazon do not want change attributes immediately after queue creation
+        # hmmm... The next line is a trick. Amazon do not want change attributes immediately after queue creation
         # So we do 'empty' get_queue_attributes. Probably they need some time to allow attributes change.
       get_queue_attributes(queue_url)  
       queue_attributes.each{ |attribute, value| set_queue_attributes(queue_url, attribute, value) }

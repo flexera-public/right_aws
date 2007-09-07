@@ -40,7 +40,7 @@ module RightAws
     
     SIGNATURE_VERSION = "1"
     # Amazon EC2 API version being used
-    API_VERSION       = "2007-01-19"
+    API_VERSION       = "2007-03-01"
     DEFAULT_HOST      = "ec2.amazonaws.com"
     DEFAULT_PROTOCOL  = 'https'
     DEFAULT_PORT      = 443
@@ -156,13 +156,7 @@ module RightAws
       @last_response = response
       if response.is_a?(Net::HTTPSuccess)
         @error_handler = nil
-        @@bench_xml.add! do
-          if parser.kind_of?(RightAWSParser)
-            REXML::Document.parse_stream(response.body, parser)
-          else
-            parser.parse(response)
-          end
-        end
+        @@bench_xml.add! { parser.parse(response) }
         return parser.result
       else
         @error_handler = AWSErrorHandler.new(self, parser, @@amazon_problems) unless @error_handler
@@ -191,20 +185,19 @@ module RightAws
   #-----------------------------------------------------------------
 
     def ec2_describe_images(type, list) #:nodoc:
-      link   = generate_request("DescribeImages", hash_params(type,list))
-      return request_info(link, QEc2DescribeImagesParser.new)
-    end
-
-    def ec2_describe_images_by_id( list) #:nodoc:
-      return ec2_describe_images('ImageId', list)
-    end
-
-    def ec2_describe_images_by_owner(list) #:nodoc:
-      return ec2_describe_images('Owner', list)
-    end
-
-    def ec2_describe_images_by_executable_by(list) #:nodoc:
-      return ec2_describe_images('ExecutableBy', list)
+      link   = generate_request("DescribeImages", hash_params(type,list.to_a))
+      images = request_info(link, QEc2DescribeImagesParser.new(:logger => @logger))
+      images.collect! do |image|
+                    {:aws_id            => image.imageId,
+                     :aws_location      => image.imageLocation,
+                     :aws_owner         => image.imageOwnerId,
+                     :aws_state         => image.imageState.downcase,
+                     :aws_is_public     => image.isPublic,
+                     :aws_product_codes => image.productCodes}
+      end
+      images
+    rescue Exception
+      on_exception
     end
 
       # Retrieve a list of images. Returns array of hashes describing the images or an exception:
@@ -228,19 +221,30 @@ module RightAws
       #      :aws_is_public => true}]
       #
     def describe_images(list=[])
-      images = list.nil? ? ec2_describe_images_by_executable_by(['self']) : ec2_describe_images_by_id(list)
-      images.collect! do |image|
-                    {:aws_id        => image.imageId,
-                     :aws_location  => image.imageLocation,
-                     :aws_owner     => image.imageOwnerId,
-                     :aws_state     => image.imageState.downcase,
-                     :aws_is_public => image.isPublic }
-      end
-      images
-    rescue Exception
-      on_exception
+      ec2_describe_images('ImageId', list)
     end
-     
+
+      #
+      #  Example:
+      #
+      #  ec2.describe_images_by_owner('522821470517')
+      #  ec2.describe_images_by_owner('self')
+      #
+    def describe_images_by_owner(list)
+      ec2_describe_images('Owner', list)
+    end
+
+      #
+      #  Example:
+      #
+      #  ec2.describe_images_by_executable_by('522821470517')
+      #  ec2.describe_images_by_executable_by('self')
+      #
+    def describe_images_by_executable_by(list)
+      ec2_describe_images('ExecutableBy', list)
+    end
+
+
       # Register new image at Amazon. 
       # Returns new image id or an exception.
       #
@@ -249,7 +253,7 @@ module RightAws
     def register_image(image_location)
       link = generate_request("RegisterImage", 
                               'ImageLocation' => image_location.to_s)
-      request_info(link, QEc2RegisterImageParser.new)
+      request_info(link, QEc2RegisterImageParser.new(:logger => @logger))
     rescue Exception
       on_exception
     end
@@ -261,13 +265,13 @@ module RightAws
     def deregister_image(image_id)
       link = generate_request("DeregisterImage", 
                               'ImageId' => image_id.to_s)
-      request_info(link, RightBoolResponseParser.new)
+      request_info(link, RightBoolResponseParser.new(:logger => @logger))
     rescue Exception
       on_exception
     end
 
 
-      # Describe image attributes. Currently, only 'launchPermission' is supported.
+      # Describe image attributes. Currently 'launchPermission' and 'productCodes' are supported.
       #
       #  ec2.describe_image_attribute('ami-e444444d') #=> {:groups=>["all"], :users=>["000000000777"]}
       #
@@ -275,9 +279,15 @@ module RightAws
       link = generate_request("DescribeImageAttribute", 
                               'ImageId'   => image_id,
                               'Attribute' => attribute)
-      image_attr = request_info(link, QEc2DescribeImageAttributeParser.new)
-      { :users  => image_attr.launchPermission.userIds,
-        :groups => image_attr.launchPermission.groups }
+      image_attr = request_info(link, QEc2DescribeImageAttributeParser.new(:logger => @logger))
+      result = {}
+      if image_attr.launchPermission
+        result = { :users  => image_attr.launchPermission.userIds,
+                   :groups => image_attr.launchPermission.groups }
+      elsif image_attr.productCodes
+        result = { :aws_product_codes => image_attr.productCodes}
+      end
+      result
     rescue Exception
       on_exception
     end
@@ -290,7 +300,7 @@ module RightAws
       link = generate_request("ResetImageAttribute", 
                               'ImageId'   => image_id,
                               'Attribute' => attribute)
-      request_info(link, RightBoolResponseParser.new)
+      request_info(link, RightBoolResponseParser.new(:logger => @logger))
     rescue Exception
       on_exception
     end
@@ -300,19 +310,21 @@ module RightAws
       # instead of modify_image_attribute because the signature of 
       # modify_image_attribute may change with EC2 service changes.
       #
-      #  attribute     : currently, only 'launchPermission' is supported.
-      #  operationType : currently, only 'add' & 'remove' are supported.
-      #  userGroup     : currently, only 'all' is supported.
-    def modify_image_attribute(image_id, attribute, operation_type, user_id=[], user_group=[])
-      user_id    = user_id.to_a
-      user_group = user_group.to_a
-      params =  {'ImageId'       => image_id,
-                 'Attribute'     => attribute,
-                 'OperationType' => operation_type}
-      params.update(hash_params('UserId',    user_id))    unless user_id.empty?
-      params.update(hash_params('UserGroup', user_group)) unless user_group.empty?
+      #  attribute      : currently, only 'launchPermission' is supported.
+      #  operation_type : currently, only 'add' & 'remove' are supported.
+      #  vars: 
+      #    :user_group  : currently, only 'all' is supported.  
+      #    :user_id
+      #    :product_code
+    def modify_image_attribute(image_id, attribute, operation_type = nil, vars = {})
+      params =  {'ImageId'   => image_id,
+                 'Attribute' => attribute}
+      params['OperationType'] = operation_type if operation_type
+      params.update(hash_params('UserId',      vars[:user_id].to_a))    if vars[:user_id]
+      params.update(hash_params('UserGroup',   vars[:user_group].to_a)) if vars[:user_group]
+      params.update(hash_params('ProductCode', vars[:product_code]))    if vars[:product_code]
       link = generate_request("ModifyImageAttribute", params)
-      request_info(link, RightBoolResponseParser.new)
+      request_info(link, RightBoolResponseParser.new(:logger => @logger))
     rescue Exception
       on_exception
     end
@@ -322,9 +334,8 @@ module RightAws
       # Returns +true+ or an exception.
       #
       #  ec2.modify_image_launch_perm_add_users('ami-e444444d',['000000000777','000000000778']) #=> true
-      #
     def modify_image_launch_perm_add_users(image_id, user_id=[])
-      modify_image_attribute(image_id, 'launchPermission', 'add', user_id, [])
+      modify_image_attribute(image_id, 'launchPermission', 'add', :user_id => user_id.to_a)
     end
 
       # Revokes image launch permissions for users. +userId+ is a list of users AWS accounts ids. Returns +true+ or an exception.
@@ -332,7 +343,7 @@ module RightAws
       #  ec2.modify_image_launch_perm_remove_users('ami-e444444d',['000000000777','000000000778']) #=> true
       #
     def modify_image_launch_perm_remove_users(image_id, user_id=[])
-      modify_image_attribute(image_id, 'launchPermission', 'remove', user_id, [])
+      modify_image_attribute(image_id, 'launchPermission', 'remove', :user_id => user_id.to_a)
     end
 
       # Add image launch permissions for users groups (currently only 'all' is supported, which gives public launch permissions). 
@@ -341,7 +352,7 @@ module RightAws
       #  ec2.modify_image_launch_perm_add_groups('ami-e444444d') #=> true
       #
     def modify_image_launch_perm_add_groups(image_id, userGroup=['all'])
-      modify_image_attribute(image_id, 'launchPermission', 'add', [], userGroup)
+      modify_image_attribute(image_id, 'launchPermission', 'add', :user_group => userGroup.to_a)
     end
     
       # Remove image launch permissions for users groups (currently only 'all' is supported, which gives public launch permissions). 
@@ -349,7 +360,15 @@ module RightAws
       #  ec2.modify_image_launch_perm_remove_groups('ami-e444444d') #=> true
       #
     def modify_image_launch_perm_remove_groups(image_id, userGroup=['all'])
-      modify_image_attribute(image_id, 'launchPermission', 'remove', [], userGroup)
+      modify_image_attribute(image_id, 'launchPermission', 'remove', :user_group => userGroup.to_a)
+    end
+    
+      # Add product code to image
+      #
+      #  ec2.modify_image_product_code('ami-e444444d','0ABCDEF') #=> true
+      #
+    def modify_image_product_code(image_id, productCode=[])
+      modify_image_attribute(image_id, 'productCodes', nil, :product_code => productCode.to_a)
     end
 
     def get_desc_instances(instances)  # :nodoc:
@@ -369,7 +388,8 @@ module RightAws
                      :aws_state          => instance.instanceState.name,
                      :ssh_key_name       => instance.keyName,
                      :aws_image_id       => instance.imageId,
-                     :aws_reason         => reason}
+                     :aws_reason         => reason,
+                     :aws_product_codes  => instance.productCodes}
         end
       end
       result
@@ -395,11 +415,22 @@ module RightAws
       #       ..., {...}]
       #
     def describe_instances(list=[])
-      link      = generate_request("DescribeInstances", hash_params('InstanceId',list))
-      instances = request_info(link, QEc2DescribeInstancesParser.new)
+      link      = generate_request("DescribeInstances", hash_params('InstanceId',list.to_a))
+      instances = request_info(link, QEc2DescribeInstancesParser.new(:logger => @logger))
       get_desc_instances(instances)
     rescue Exception
       on_exception
+    end
+    
+      # Return the product code attached to instance or +nil+ otherwise.
+      #
+      #  ec2.confirm_product_instance('ami-e444444d','12345678') #=> nil
+      #  ec2.confirm_product_instance('ami-e444444d','00001111') #=> "000000000888"
+      #
+    def confirm_product_instance(instance, product_code)
+      link = generate_request("ConfirmProductInstance", { 'ProductCode' => product_code,
+                                                          'InstanceId'  => instance })
+      request_info(link, QEc2ConfirmProductInstanceParser.new(:logger => @logger))
     end
     
       # Launch new EC2 instances. Returns a list of launched instances or an exception.
@@ -418,9 +449,9 @@ module RightAws
       #     :private_dns_name   => ""}]
       #
     def run_instances(image_id, min_count, max_count, group_ids, key_name, user_data='', addressing_type=DEFAULT_ADDRESSING_TYPE)
-      @logger.info("Launching instance of image #{image_id} for #{@aws_access_key_id}, key: #{key_name}, groups: #{(group_ids||[]).join(',')}")
+      @logger.info("Launching instance of image #{image_id} for #{@aws_access_key_id}, key: #{key_name}, groups: #{(group_ids||[]).to_a.join(',')}")
         # careful: keyName and securityGroups may be nil
-      params = hash_params('SecurityGroup', group_ids)
+      params = hash_params('SecurityGroup', group_ids.to_a)
       params.update( {'ImageId'        => image_id,
                       'MinCount'       => min_count.to_s,
                       'MaxCount'       => max_count.to_s,
@@ -432,11 +463,11 @@ module RightAws
           # Amazon 169.254.169.254 does not like escaped symbols!
           # And it doesn't like "\n" inside of encoded string! Grrr....
           # Otherwise, some of UserData symbols will be lost...
-        params['UserData'] = Base64.encode64(user_data).delete("\n") unless user_data.empty?
+        params['UserData'] = Base64.encode64(user_data).delete("\n") unless user_data.blank?
       end
       link = generate_request("RunInstances", params)
         #debugger
-      instances = request_info(link, QEc2RunInstancesParser.new)
+      instances = request_info(link, QEc2RunInstancesParser.new(:logger => @logger))
       get_desc_instances(instances)
     rescue Exception
       on_exception
@@ -457,8 +488,8 @@ module RightAws
       #      :aws_prev_state_code     => 16}]
       #
     def terminate_instances(list=[])
-      link      = generate_request("TerminateInstances", hash_params('InstanceId',list))
-      instances = request_info(link, QEc2TerminateInstancesParser.new)
+      link      = generate_request("TerminateInstances", hash_params('InstanceId',list.to_a))
+      instances = request_info(link, QEc2TerminateInstancesParser.new(:logger => @logger))
       instances.collect! do |instance|
               { :aws_instance_id         => instance.instanceId,
                 :aws_shutdown_state      => instance.shutdownState.name,
@@ -480,7 +511,7 @@ module RightAws
       #     :aws_output      => "Linux version 2.6.16-xenU (builder@patchbat.amazonsa) (gcc version 4.0.1 20050727 ..."
     def get_console_output(instance_id)
       link   = generate_request("GetConsoleOutput", { 'InstanceId.1' => instance_id })
-      result = request_info(link, QEc2GetConsoleOutputParser.new)
+      result = request_info(link, QEc2GetConsoleOutputParser.new(:logger => @logger))
       { :aws_instance_id => result.instanceId,
         :aws_timestamp   => result.timestamp,
         :timestamp       => (Time.parse(result.timestamp)).utc,
@@ -495,7 +526,7 @@ module RightAws
       #
     def reboot_instances(list)
       link = generate_request("RebootInstances", hash_params('InstanceId', list.to_a))
-      request_info(link, RightBoolResponseParser.new)
+      request_info(link, RightBoolResponseParser.new(:logger => @logger))
     rescue Exception
       on_exception
     end
@@ -516,8 +547,8 @@ module RightAws
       #    ..., {...}]
       #
     def describe_security_groups(list=[])
-      link   = generate_request("DescribeSecurityGroups", hash_params('GroupName',list))
-      groups = request_info(link, QEc2DescribeSecurityGroupsParser.new)
+      link   = generate_request("DescribeSecurityGroups", hash_params('GroupName',list.to_a))
+      groups = request_info(link, QEc2DescribeSecurityGroupsParser.new(:logger => @logger))
       
       result = []     
       groups.each do |item|
@@ -563,7 +594,7 @@ module RightAws
       link = generate_request("CreateSecurityGroup", 
                               'GroupName'        => name.to_s, 
                               'GroupDescription' => description.to_s)
-      request_info(link, RightBoolResponseParser.new)
+      request_info(link, RightBoolResponseParser.new(:logger => @logger))
     rescue Exception
       on_exception
     end
@@ -575,7 +606,7 @@ module RightAws
     def delete_security_group(name)
       link = generate_request("DeleteSecurityGroup", 
                               'GroupName' => name.to_s)
-      request_info(link, RightBoolResponseParser.new)
+      request_info(link, RightBoolResponseParser.new(:logger => @logger))
     rescue Exception
       on_exception
     end
@@ -590,7 +621,7 @@ module RightAws
                               'GroupName'                  => name.to_s, 
                               'SourceSecurityGroupName'    => group.to_s, 
                               'SourceSecurityGroupOwnerId' => owner.to_s.gsub(/-/,''))
-      request_info(link, RightBoolResponseParser.new)
+      request_info(link, RightBoolResponseParser.new(:logger => @logger))
     rescue Exception
       on_exception
     end
@@ -604,7 +635,7 @@ module RightAws
                               'GroupName'                  => name.to_s, 
                               'SourceSecurityGroupName'    => group.to_s, 
                               'SourceSecurityGroupOwnerId' => owner.to_s.gsub(/-/,''))
-      request_info(link, RightBoolResponseParser.new)
+      request_info(link, RightBoolResponseParser.new(:logger => @logger))
     rescue Exception
       on_exception
     end
@@ -621,7 +652,7 @@ module RightAws
                               'FromPort'   => from_port.to_s, 
                               'ToPort'     => to_port.to_s, 
                               'CidrIp'     => cidr_ip.to_s)
-      request_info(link, RightBoolResponseParser.new)
+      request_info(link, RightBoolResponseParser.new(:logger => @logger))
     rescue Exception
       on_exception
     end
@@ -637,7 +668,7 @@ module RightAws
                               'FromPort'   => from_port.to_s, 
                               'ToPort'     => to_port.to_s, 
                               'CidrIp'     => cidr_ip.to_s)
-      request_info(link, RightBoolResponseParser.new)
+      request_info(link, RightBoolResponseParser.new(:logger => @logger))
     rescue Exception
       on_exception
     end
@@ -651,8 +682,8 @@ module RightAws
       #      ..., {...} ]
       #
     def describe_key_pairs(list=[])
-      link   = generate_request("DescribeKeyPairs", hash_params('KeyName',list))
-      result = request_info(link, QEc2DescribeKeyPairParser.new)
+      link   = generate_request("DescribeKeyPairs", hash_params('KeyName',list.to_a))
+      result = request_info(link, QEc2DescribeKeyPairParser.new(:logger => @logger))
       result.collect! do |key|
           {:aws_key_name    => key.keyName,
            :aws_fingerprint => key.keyFingerprint }
@@ -672,7 +703,7 @@ module RightAws
     def create_key_pair(name)
       link = generate_request("CreateKeyPair", 
                               'KeyName' => name.to_s)
-      key  = request_info(link, QEc2CreateKeyPairParser.new)
+      key  = request_info(link, QEc2CreateKeyPairParser.new(:logger => @logger))
       { :aws_key_name    => key.keyName,
         :aws_fingerprint => key.keyFingerprint,
         :aws_material    => key.keyMaterial}
@@ -687,7 +718,7 @@ module RightAws
     def delete_key_pair(name)
       link = generate_request("DeleteKeyPair", 
                               'KeyName' => name.to_s)
-      request_info(link, RightBoolResponseParser.new)
+      request_info(link, RightBoolResponseParser.new(:logger => @logger))
     rescue Exception
       on_exception
     end
@@ -828,11 +859,14 @@ module RightAws
       attr_accessor :imageLocation
       attr_accessor :imageOwnerId 
       attr_accessor :isPublic
+      attr_accessor :productCodes
     end
 
     class QEc2DescribeImagesParser < RightAWSParser
       def tagstart(name, attributes)
-        @image = QEc2DescribeImagesResponseItemType.new if name == 'item'
+        if name == 'item' && @xmlpath[%r{.*/imagesSet$}]
+          @image = QEc2DescribeImagesResponseItemType.new 
+        end
       end
       def tagend(name)
         case name
@@ -841,7 +875,8 @@ module RightAws
           when 'imageState'    ; @image.imageState    = @text
           when 'imageOwnerId'  ; @image.imageOwnerId  = @text
           when 'isPublic'      ; @image.isPublic      = @text == 'true' ? true : false
-          when 'item'          ; @result << @image
+          when 'productCode'   ; (@image.productCodes ||= []) << @text
+          when 'item'          ; @result << @image if @xmlpath[%r{.*/imagesSet$}]
         end
       end
       def reset
@@ -867,13 +902,14 @@ module RightAws
     class QEc2DescribeImageAttributeType
       attr_accessor :imageId 
       attr_accessor :launchPermission
+      attr_accessor :productCodes
     end
 
     class QEc2DescribeImageAttributeParser < RightAWSParser
       def tagstart(name, attributes)
         case name
           when 'launchPermission'
-             @result.launchPermission = QEc2LaunchPermissionItemType.new
+            @result.launchPermission = QEc2LaunchPermissionItemType.new
             @result.launchPermission.groups  = []
             @result.launchPermission.userIds = []
         end
@@ -888,6 +924,8 @@ module RightAws
             @result.launchPermission.groups  << @text if @xmlpath == 'DescribeImageAttributeResponse/launchPermission/item'
           when 'userId'  
             @result.launchPermission.userIds << @text if @xmlpath == 'DescribeImageAttributeResponse/launchPermission/item'
+          when 'productCode'
+            (@result.productCodes ||= []) << @text
         end
       end
       def reset
@@ -913,6 +951,7 @@ module RightAws
       attr_accessor :reason
       attr_accessor :keyName
       attr_accessor :amiLaunchIndex
+      attr_accessor :productCodes
     end
 
     class QEc2DescribeInstancesType
@@ -962,10 +1001,20 @@ module RightAws
             elsif @xmlpath=='DescribeInstancesResponse/reservationSet'
               @result << @reservation
             end
+          when 'productCode'   ; (@instance.productCodes ||= []) << @text
         end
       end
       def reset
         @result = []
+      end
+    end
+
+    class QEc2ConfirmProductInstanceParser < RightAWSParser
+      def tagend(name)
+        @result = @text if name == 'ownerId'
+      end
+      def reset
+        @result = nil
       end
     end
 
@@ -1006,6 +1055,7 @@ module RightAws
           when 'item'          
             @reservation.instancesSet << @instance if @xmlpath == 'RunInstancesResponse/instancesSet'
           when 'RunInstancesResponse'; @result << @reservation
+          when 'productCode'   ; (@instance.productCodes ||= []) << @text
         end
       end
       def reset

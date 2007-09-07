@@ -25,7 +25,7 @@ class TestS3 < Test::Unit::TestCase
   end
 
   def test_03_list_empty_bucket
-    assert_equal 0, @s3.list_bucket(@bucket).size, "#{@queue_name} must exist!"
+    assert_equal 0, @s3.list_bucket(@bucket).size, "#{@bucket} must exist!"
   end
   
   def test_04_put

@@ -29,7 +29,7 @@ module RightAws
     DEFAULT_PORT           = 443
     DEFAULT_PROTOCOL       = 'https'
     REQUEST_TTL            = 30
-    DEFAULT_EXPIRES_AFTER  = 1.day
+    DEFAULT_EXPIRES_AFTER  = 1 * 24 * 60 * 60 # One day's worth of seconds
     AMAZON_HEADER_PREFIX   = 'x-amz-'
     AMAZON_METADATA_PREFIX = 'x-amz-meta-'
 
@@ -111,6 +111,7 @@ module RightAws
       @logger = RAILS_DEFAULT_LOGGER if !@logger && defined?(RAILS_DEFAULT_LOGGER)
       @logger = Logger.new(STDOUT)   if !@logger
       @logger.info "New #{self.class.name} using #{@params[:multi_thread] ? 'multi' : 'single'}-threaded mode"
+      @error_handler = nil
     end
 
 	# TODO TRB 6/19/07 - Service gem common method
@@ -163,7 +164,7 @@ module RightAws
       headers['content-type'] ||= ''
       headers['date']           = Time.now.httpdate
         # create request
-      request      = "Net::HTTP::#{method.titleize}".constantize.new(URI::escape(CGI::unescape(path)))
+      request      = "Net::HTTP::#{method.capitalize}".constantize.new(URI::escape(CGI::unescape(path)))
       request.body = data if data
         # set request headers and meta headers
       headers.each      { |key, value| request[key.to_s] = value }
@@ -219,13 +220,7 @@ module RightAws
         @last_response = response
         if response.is_a?(Net::HTTPSuccess)
           @error_handler = nil
-          @@bench_xml.add! do
-            if parser.kind_of?(RightAWSParser)
-              REXML::Document.parse_stream(response.body, parser)
-            else
-              parser.parse(response)
-            end
-          end
+          @@bench_xml.add! { parser.parse(response) }
           return parser.result
         else
           @error_handler = AWSErrorHandler.new(self, parser, @@amazon_problems) unless @error_handler
@@ -253,7 +248,7 @@ module RightAws
       #
     def list_all_my_buckets(headers={})
       req_hash = generate_rest_request('GET', headers.merge(:url=>''))
-      request_info(req_hash, S3ListAllMyBucketsParser.new)
+      request_info(req_hash, S3ListAllMyBucketsParser.new(:logger => @logger))
     rescue
       on_exception
     end
@@ -301,7 +296,7 @@ module RightAws
     def list_bucket(bucket, options={}, headers={})
       bucket  += '?'+options.map{|k, v| "#{k.to_s}=#{CGI::escape v.to_s}"}.join('&') unless options.blank?
       req_hash = generate_rest_request('GET', headers.merge(:url=>bucket))
-      request_info(req_hash, S3ListBucketParser.new)
+      request_info(req_hash, S3ListBucketParser.new(:logger => @logger))
     rescue
       on_exception
     end
@@ -339,7 +334,7 @@ module RightAws
         internal_bucket = bucket.dup
         internal_bucket  += '?'+internal_options.map{|k, v| "#{k.to_s}=#{CGI::escape v.to_s}"}.join('&') unless internal_options.blank?
         req_hash = generate_rest_request('GET', headers.merge(:url=>internal_bucket))
-        response = request_info(req_hash, S3ImprovedListBucketParser.new)
+        response = request_info(req_hash, S3ImprovedListBucketParser.new(:logger => @logger))
         there_are_more_keys = response[:is_truncated]
         if(there_are_more_keys)
           if(response[:next_marker])
@@ -482,7 +477,7 @@ module RightAws
     def get_acl_parse(bucket, key='', headers={})
       key = key.blank? ? '' : "/#{CGI::escape key}"
       req_hash = generate_rest_request('GET', headers.merge(:url=>"#{bucket}#{key}?acl"))
-      acl = request_info(req_hash, S3AclParser.new)
+      acl = request_info(req_hash, S3AclParser.new(:logger => @logger))
       result = {}
       result[:owner]    = acl[:owner]
       result[:grantees] = {}

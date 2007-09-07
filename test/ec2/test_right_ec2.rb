@@ -60,8 +60,9 @@ class TestEc2 < Test::Unit::TestCase
   
   def test_09_delete_key_pair
     assert @ec2.delete_key_pair(@key), 'Delete_key_pair fail'
-      # key must be deleted already
-    assert_raise(Rightscale::AwsError) { @ec2.delete_key_pair(@key) }
+##  Hmmm... Amazon does not through the exception any more. It now just returns a 'true' if the key does not exist any more...
+##      # key must be deleted already
+##    assert_raise(Rightscale::AwsError) { @ec2.delete_key_pair(@key) }
   end
   
 end
