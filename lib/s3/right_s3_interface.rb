@@ -68,13 +68,15 @@ module RightAws
       # Benchmark::Tms instance for XML parsing benchmark.
     def self.bench_xml; @@bench_xml; end  # For benchmark puposes.
 
-      # Returns a list of Amazon service responses which are known as problems on Amazon side. 
-      # We have to re-request again if we've got any of them - probably the problem will disappear. By default returns the same value as AMAZON_PROBLEMS const.
+      # Returns a list of Amazon service responses which are known to be transient problems. 
+      # We have to re-request if we get any of them, because the problem will probably disappear. 
+      # By default this method returns the same value as the AMAZON_PROBLEMS const.
     def self.amazon_problems
       @@amazon_problems
     end
 
-      # Sets a list of Amazon side problems.
+      # Sets the list of Amazon side problems.  Use in conjunction with the
+      # getter to append problems.
     def self.amazon_problems=(problems_list)
       @@amazon_problems = problems_list
     end

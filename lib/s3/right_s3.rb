@@ -23,7 +23,7 @@
 
 module RightAws
   
-  # = RightAWS::S3 -- RightScale Amazon S3 interface
+  # = RightAws::S3 -- RightScale's Amazon S3 interface
   # The RightAws::S3 class provides a complete interface to Amazon's Simple
   # Storage Service.
   # For explanations of the semantics

@@ -2,7 +2,10 @@
 
 require 'rubygems'
 require 'hoe'
-require './lib/right_aws.rb'
+require "rake/testtask"
+require 'rcov/rcovtask'
+$: << File.dirname(__FILE__)
+require 'lib/right_aws.rb'
 
 Hoe.new('right_aws', RightAws::VERSION::STRING) do |p|
   p.rubyforge_name = 'rightaws'
@@ -14,10 +17,14 @@ Hoe.new('right_aws', RightAws::VERSION::STRING) do |p|
   p.changes = p.paragraphs_of('History.txt', 0..1).join("\n\n")
   p.remote_rdoc_dir = "/right_aws_gem_doc"
   p.extra_deps = [['right_http_connection','>= 0.1.4']]
+  p.test_globs = ['test/ts_right_aws.rb']
 end
 
-task :test do
-  require './test/ts_right_aws'
+desc "Analyze code coverage of the unit tests."
+Rcov::RcovTask.new do |t|
+  t.test_files = FileList["test/ts*.rb"]
+  #t.verbose = true     # uncomment to see the executed command
 end
+
 
 # vim: syntax=Ruby

@@ -24,7 +24,15 @@
 module RightAws
 
     #
-    # SQS.
+    # = RightAws::Sqs -- RightScale's Amazon SQS interface
+    # The RightAws::Sqs class provides a complete interface to Amazon's Simple
+    # Queue Service.
+    # For explanations of the semantics
+    # of each call, please refer to Amazon's documentation at
+    # http://developer.amazonwebservices.com/connect/kbcategory.jspa?categoryID=31
+    #
+    # Error handling: all operations raise an RightAws::AwsError in case
+    # of problems. Note that transient errors are automatically retried.
     #
     #  sqs    = RightAws::Sqs.new(aws_access_key_id, aws_secret_access_key)
     #  queue1 = sqs.queue('my_awesome_queue')
@@ -66,7 +74,7 @@ module RightAws
     end
     
       # Returns Queue instance by queue name. 
-      # If the queue does not exist at Amazon SQS and +create+ then creates it.
+      # If the queue does not exist at Amazon SQS and +create+ is true, the method creates it.
       #
       #  RightAws::Sqs.queue('my_awesome_queue') #=> #<RightAws::Sqs::Queue:0xb7b626e4 ... >
       #
@@ -81,7 +89,7 @@ module RightAws
       attr_reader :name, :url, :sqs
       
         # Returns Queue instance by queue name. 
-        # If the queue does not exist at Amazon SQS and +create+ then creates it.
+        # If the queue does not exist at Amazon SQS and +create+ is true, the method creates it.
         #
         #  RightAws::Sqs::Queue.create(sqs, 'my_awesome_queue') #=> #<RightAws::Sqs::Queue:0xb7b626e4 ... >
         #
@@ -90,7 +98,7 @@ module RightAws
       end
       
         # Creates new Queue instance. 
-        # Does not create queue at Amazon.
+        # Does not create a queue at Amazon.
         #
         #  queue = RightAws::Sqs::Queue.new(sqs, 'my_awesome_queue')
         #
@@ -114,13 +122,13 @@ module RightAws
         #  queue.clear(true) #=> true
         #
         # P.S. when <tt>force==true</tt> the queue deletes then creates again. This is 
-        # the quickest method to clear big queue oe the queue with 'locked' messages. All queue
-        # attributes restores. But there is no way to restore grantees permissions to 
-        # this queue. If you have no grantees except of 'root' then you have no problems.
-        # But if the grantees are there - better use <tt>queue.clear(false)</tt>.
+        # the quickest method to clear a big queue or a queue with 'locked' messages. All queue
+        # attributes are restored. But there is no way to restore grantees' permissions to 
+        # this queue. If you have no grantees except 'root' then you have no problems.
+        # Otherwise, it's better to use <tt>queue.clear(false)</tt>.
         #
-        # PS This is not supported any more - Amazon needes to be at least 60 seconds between 
-        # queue deletion and creation. Hence +force+ param does not affect to +clear+ behaviour...
+        # PS This function is no longer supported.  Amazon has changed the SQS semantics to require at least 60 seconds between 
+        # queue deletion and creation. Hence this method will fail with an exception.
         #
       def clear(force=false)
 ##        if force
@@ -150,7 +158,7 @@ module RightAws
       end
       alias_method :push, :send_message
 
-        # Retrieves a bunch of message from queue. 
+        # Retrieves several messages from queue. 
         # Returns an array of Message instances. 
         #
         #  queue.receive_messages(2,10) #=> array of messages
@@ -231,7 +239,7 @@ module RightAws
         
         # Retrieves queue attributes. 
         # At this moment Amazon supports +VisibilityTimeout+ and +ApproximateNumberOfMessages+ only. 
-        # If the name of attribute is set - returns its value otherwise - returns a hash of attributes.
+        # If the name of attribute is set, returns its value. Otherwise, returns a hash of attributes.
         #
         # queue.get_attribute('VisibilityTimeout')  #=> '100'
         #
@@ -240,9 +248,9 @@ module RightAws
         attribute=='All' ? attributes : attributes[attribute]
       end
         
-        # Retrieves a list grantees. 
+        # Retrieves a list of grantees. 
         # Returns an +array+ of Grantee instances if the +grantee_email_address+ is unset. 
-        # Else returns Grantee instance that points to +grantee_email_address+ or +nil+.
+        # Otherwise returns a Grantee instance that points to +grantee_email_address+ or +nil+.
         #
         #  grantees = queue.grantees #=> [#<RightAws::Sqs::Grantee:0xb7bf0888 ... >, ...]
         #   ...
@@ -315,7 +323,7 @@ module RightAws
       end
 
         # Retrieves security information for grantee identified by email. 
-        # Returns +nil+ if such user does not has any permissions for this queue or 
+        # Returns +nil+ if the named user has no privileges on this queue, or 
         # +true+ if perms updated successfully. 
       def retrieve # :nodoc:
         @id    = nil
@@ -334,7 +342,7 @@ module RightAws
         
         # Adds permissions for grantee. 
         # Permission: 'FULLCONTROL' | 'RECEIVEMESSAGE' | 'SENDMESSAGE'. 
-        # User must have @email set. 
+        # The caller must have set the email instance variable. 
       def grant(permission=nil)
         raise "You can't grant permission without defining a grantee email address!" unless @email
         @queue.sqs.interface.add_grant(@queue.url, @email, permission)

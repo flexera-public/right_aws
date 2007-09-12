@@ -13,7 +13,7 @@ The RightScale AWS gems have been designed to provide a robust, fast, and secure
 
 == FEATURES:
 
-- Full programmmatic access to EC2, S3, and SQS
+- Full programmmatic access to EC2, S3, and SQS.
 - Complete error handling: all operations check for errors and report complete
   error information by raising an AwsError.
 - Persistent HTTP connections with robust network-level retry layer using
@@ -22,33 +22,34 @@ The RightScale AWS gems have been designed to provide a robust, fast, and secure
   by Amazon's services are classified as temporary errors.
   These errors are automaticallly retried using exponentially increasing intervals.
   The number of retries is user-configurable.
-- Fast REXML-based parsing of responses (as fast as a pure Ruby solution allows)
+- Fast REXML-based parsing of responses (as fast as a pure Ruby solution allows).
+- Uses libxml (if available) for faster response parsing. 
 - Support for large S3 list operations.  Buckets and key subfolders containing
   many (> 1000) keys are listed in entirety.  Operations based on list (like
   bucket clear) work on arbitrary numbers of keys.
 - Support for streaming GETs from S3, and streaming PUTs to S3 if the data source is a file.
 - Support for single-threaded usage, multithreaded usage, as well as usage with multiple
   AWS accounts.
-- Test suite (requires AWS account to do "live" testing)
+- Test suite (requires AWS account to do "live" testing).
 
 == THREADING:
 
-All RightScale AWS gems offer two threading options:
+All RightScale AWS interfaces offer two threading options:
 1. Use a single persistent HTTP connection per process.
 2. Use a persistent HTTP connection per Ruby thread.
  
-Either way, it doesn't matter how many RightAws::S3 objects you create,
+Either way, it doesn't matter how many (for example) RightAws::S3 objects you create,
 they all use the same per-program or per-thread
 connection. The purpose of sharing the connection is to keep a single
 persistent HTTP connection open to avoid paying connection
 overhead on every request. However, if you have multiple concurrent
 threads, you may want or need an HTTP connection per thread to enable
-concurrent requests to S3. The way this plays out in practice is:
-1. If you have a non-multithreaded Ruby program, use the non-multithreaded setting for Gem.
+concurrent requests to AWS. The way this plays out in practice is:
+1. If you have a non-multithreaded Ruby program, use the non-multithreaded setting.
 2. If you have a multi-threaded Ruby program, use the multithreaded setting to enable
-   concurrent requests to S3 (SQS, EC2).
-3. For running under Mongrel/Rails, use thhe non-multithreaded setting for Gem even though
-   rel is multithreaded.  This is because only one Rails handler is invoked at
+   concurrent requests to S3 (or SQS, or EC2).
+3. For running under Mongrel/Rails, use the non-multithreaded setting even though
+   mongrel is multithreaded.  This is because only one Rails handler is invoked at
    time (i.e. it acts like a single-threaded program)
 
 Note that due to limitations in the I/O of the Ruby interpreter you
@@ -78,6 +79,11 @@ multithreaded mode.
 == REQUIREMENTS:
 
 RightAws requires REXML and the RightHttpConnection gem.
+If libxml and its Ruby bindings (distributed in the libxml-ruby gem) are
+present, RightAws can be configured to use them:
+  RightAws::RightAWSParser.xml_lib = 'libxml'
+Any error with the libxml installation will result in RightAws failing-safe to
+REXML parsing.
 
 == INSTALL:
 

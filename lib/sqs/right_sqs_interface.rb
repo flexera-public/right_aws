@@ -32,7 +32,7 @@ module RightAws
     DEFAULT_PROTOCOL  = 'https'
     REQUEST_TTL       = 30
     DEFAULT_VISIBILITY_TIMEOUT = 30
-      # A list if Amazons problems we can handle by AWSErrorHandler.
+      # A list of Amazon problems we can handle via AWSErrorHandler.
     @@amazon_problems = RightAws::AMAZON_PROBLEMS
 
       # Current aws_access_key_id
@@ -53,25 +53,27 @@ module RightAws
     @@bench_sqs = Benchmark::Tms.new()
     @@bench_xml = Benchmark::Tms.new()
     
-      # Benchmark::Tms instance for SQS access benchmark.
+      # Benchmark::Tms instance for SQS access benchmarking.
     def self.bench_sqs; @@bench_sqs;  end  
-      # Benchmark::Tms instance for XML parsing benchmark.
-    def self.bench_xml; @@bench_xml; end  # For benchmark puposes.
+      # Benchmark::Tms instance for XML parsing benchmarking.
+    def self.bench_xml; @@bench_xml; end  # For benchmark purposes.
 
-      # Returns a list of Amazon service responses which are known as problems on Amazon side. 
-      # We have to re-request again if we've got any of them - probably the problem will disappear. By default returns the same value as AMAZON_PROBLEMS const.
+      # Returns a list of Amazon service responses which are known to be transient problems. 
+      # We have to re-request if we get any of them, because the problem will probably disappear. 
+      # By default this method returns the same value as the AMAZON_PROBLEMS const.
     def self.amazon_problems
       @@amazon_problems
     end
     
-      # Sets a list of Amazon side problems.
+      # Sets the list of Amazon side problems.  Use in conjunction with the
+      # getter to append problems.
     def self.amazon_problems=(problems_list)
       @@amazon_problems = problems_list
     end
 
-      # Creates new RightSqs instance.
+      # Creates a new SqsInterface instance.
       #
-      #  sqs = RightSqs.new('1E3GDYEOGFJPIT75KDT40','hgTHt68JY07JKUY08ftHYtERkjgtfERn57DFE379', {:multi_thread => true, :logger => Logger.new('/tmp/x.log')}) #=> <RightSqs:0xb7af6264>
+      #  sqs = RightAws::SqsInterface.new('1E3GDYEOGFJPIT75KDT40','hgTHt68JY07JKUY08ftHYtERkjgtfERn57DFE379', {:multi_thread => true, :logger => Logger.new('/tmp/x.log')}) #=> <RightSqs:0xb7af6264>
       #  
       # Params is a hash:
       #
@@ -102,7 +104,7 @@ module RightAws
       AwsError::on_aws_exception(self, options)
     end
 
-      # Return the +true+ if this RightS3 instance works in multi_thread state and +false+ otherwise.
+      # Return +true+ if this RightS3 instance is running in multi_thread state and +false+ otherwise.
     def multi_thread
       @params[:multi_thread]
     end
@@ -111,7 +113,7 @@ module RightAws
   #      Requests
   #-----------------------------------------------------------------
 
-      # Generates request hash for QUERY API
+      # Generates a request hash for the query API
     def generate_request(action, param={})  # :nodoc:
         # Sometimes we need to use queue uri (delete queue etc)
         # In that case we will use Symbol key: 'param[:queue_url]'
@@ -137,7 +139,7 @@ module RightAws
         :protocol => @params[:protocol] }
     end
 
-      # Generates request hash for REST API
+      # Generates a request hash for the REST API
     def generate_rest_request(method, param) # :nodoc:
       queue_uri = param[:queue_url] ? URI(param[:queue_url]).path : '/'
       message   = param[:message]                # extract message body if nesessary
@@ -201,7 +203,7 @@ module RightAws
       #
       #  sqs.create_queue('my_awesome_queue') #=> 'http://queue.amazonaws.com/ZZ7XXXYYYBINS/my_awesome_queue'
       #
-      # PS Some queue based requests may become available in a couple of minutes after queue creation
+      # PS Some queue based requests may not become available until a couple of minutes after queue creation
       # (permission grant and removal for example)
       #
     def create_queue(queue_name, default_visibility_timeout=nil)
@@ -211,11 +213,11 @@ module RightAws
       request_info(req_hash, SqsCreateQueueParser.new(:logger => @logger))
     end
 
-     # Creates new queue. If +queue_name_prefix+ is omitted then retrieves a list of all queues.
+     # Lists all queues owned by this user that have names beginning with +queue_name_prefix+. If +queue_name_prefix+ is omitted then retrieves a list of all queues.
      #
      #  sqs.create_queue('my_awesome_queue')
      #  sqs.create_queue('my_awesome_queue_2')
-     #  sqs.list_queues('my_qwesome') #=> ['http://queue.amazonaws.com/ZZ7XXXYYYBINS/my_awesome_queue','http://queue.amazonaws.com/ZZ7XXXYYYBINS/my_awesome_queue_2']
+     #  sqs.list_queues('my_awesome') #=> ['http://queue.amazonaws.com/ZZ7XXXYYYBINS/my_awesome_queue','http://queue.amazonaws.com/ZZ7XXXYYYBINS/my_awesome_queue_2']
      #
     def list_queues(queue_name_prefix=nil)
       req_hash = generate_request('ListQueues', 'QueueNamePrefix' => queue_name_prefix)
@@ -254,7 +256,9 @@ module RightAws
       #
       #  sqs.set_queue_attributes('http://queue.amazonaws.com/ZZ7XXXYYYBINS/my_awesome_queue', "VisibilityTimeout", 10) #=> true
       #
-      # P.S. Hmm... Amazon returns success even if such attribute does not exist. And they need some seconds to change attribute value.
+      # P.S. Amazon returns success even if the attribute does not exist. Also, attribute values may not be immediately available to other queries
+      # for some time after an update (see the SQS documentation for
+      # semantics).
     def set_queue_attributes(queue_url, attribute, value)
       req_hash = generate_request('SetQueueAttributes', 
                                   'Attribute' => attribute,
@@ -353,7 +357,7 @@ module RightAws
       #   sqs.receive_messages('http://queue.amazonaws.com/ZZ7XXXYYYBINS/my_awesome_queue',10, 5) #=>
       #    [{:id=>"12345678904GEZX9746N|0N9ED344VK5Z3SV1DTM0|1RVYH4X3TJ0987654321", :body=>"message_1"}, ..., {}]
       #
-      # P.S. Usually returns less messages than have been requested even if they are available.
+      # P.S. Usually returns fewer messages than requested even if they are available.
       #
     def receive_messages(queue_url, number_of_messages=1, visibility_timeout=nil)
       return [] if number_of_messages == 0
@@ -392,7 +396,8 @@ module RightAws
       on_exception
     end
     
-      # Deletes message from queue. Returns +true+ or an exception.
+      # Deletes message from queue. Returns +true+ or an exception.  Amazon
+      # returns +true+ on deletion of non-existent messages.
       #
       #  sqs.delete_message('http://queue.amazonaws.com/ZZ7XXXYYYBINS/my_awesome_queue', '12345678904...0987654321') #=> true
       #
@@ -454,7 +459,7 @@ module RightAws
       on_exception
     end
 
-      # Returns approximate amount of messages in queue.
+      # Returns approximate number of messages in queue.
       #
       #  sqs.get_queue_length('http://queue.amazonaws.com/ZZ7XXXYYYBINS/my_awesome_queue') #=> 3
       #
@@ -479,8 +484,8 @@ module RightAws
       #
       #  sqs.force_clear_queue('http://queue.amazonaws.com/ZZ7XXXYYYBINS/my_awesome_queue') #=> true
       #
-      # PS This function is not supported any more - Amazon needes to be at least 60 seconds between 
-      # queue deletion and creation. Hence it should fail with exception...
+      # PS This function is no longer supported.  Amazon has changed the SQS semantics to require at least 60 seconds between 
+      # queue deletion and creation. Hence this method will fail with an exception.
       #
     def force_clear_queue(queue_url)
       queue_name       = queue_name_by_url(queue_url)
