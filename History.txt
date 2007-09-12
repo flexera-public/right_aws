@@ -1,3 +1,50 @@
 == 1.1.0 / 2007-08-10
 Initial release.
 
+== 1.2.0 / 2007-09-12
+------------------------------------------------------------------------
+r1718 | todd | 2007-09-12 15:34:37 -0700 (Wed, 12 Sep 2007) | 3 lines
+
+(#458) Extensive documentation review, rework, and expansion.  Also added
+coverage analysis to the test suite using RCov.
+
+------------------------------------------------------------------------
+r1690 | todd | 2007-09-07 15:23:11 -0700 (Fri, 07 Sep 2007) | 2 lines
+
+(#447) Add support.rb to manifest
+
+------------------------------------------------------------------------
+r1688 | todd | 2007-09-07 13:57:39 -0700 (Fri, 07 Sep 2007) | 4 lines
+
+#(447)  Use Active Support if available, but don't require it.  Load our own
+extensions if it's not present.  This keeps us from overloading ActiveSupport if
+a user's already using it.
+
+------------------------------------------------------------------------
+r1687 | todd | 2007-09-07 11:36:43 -0700 (Fri, 07 Sep 2007) | 2 lines
+
+(#447) Removed dependency on activesupport
+
+------------------------------------------------------------------------
+r1676 | konstantin | 2007-09-06 01:27:09 -0700 (Thu, 06 Sep 2007) | 1 line
+
+paid AMIs, small fix
+------------------------------------------------------------------------
+r1667 | konstantin | 2007-09-05 12:58:10 -0700 (Wed, 05 Sep 2007) | 1 line
+
+#427, Gems,  paid AMI support for ec2_instances
+------------------------------------------------------------------------
+r1658 | konstantin | 2007-09-05 01:02:25 -0700 (Wed, 05 Sep 2007) | 1 line
+
+RightGems: a couple of params improvements, now ones can use a String as well as an Array.
+------------------------------------------------------------------------
+r1653 | konstantin | 2007-09-04 12:31:19 -0700 (Tue, 04 Sep 2007) | 1 line
+
+Right gems: libxml and paid AMI support added
+------------------------------------------------------------------------
+r1581 | tve | 2007-08-24 16:21:45 -0700 (Fri, 24 Aug 2007) | 1 line
+
+Improved RightAws documentation
+------------------------------------------------------------------------
+
+
