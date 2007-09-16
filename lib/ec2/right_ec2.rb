@@ -67,7 +67,7 @@ module RightAws
     
     SIGNATURE_VERSION = "1"
     # Amazon EC2 API version being used
-    API_VERSION       = "2007-03-01"
+    API_VERSION       = "2007-08-29"
     DEFAULT_HOST      = "ec2.amazonaws.com"
     DEFAULT_PROTOCOL  = 'https'
     DEFAULT_PORT      = 443
@@ -75,6 +75,10 @@ module RightAws
     # Default addressing type (public=NAT, direct=no-NAT) used when launching instances.
     DEFAULT_ADDRESSING_TYPE =  'public'
     DNS_ADDRESSING_SET      = ['public','direct']
+    
+    # Default EC2 instance type (platform)
+    DEFAULT_INSTANCE_TYPE   =  'm1.small'
+    INSTANCE_TYPES          = ['m1.small','m1.large','m1.xlarge']
     
     # A list of Amazon problems we can handle by AWSErrorHandler.
     @@amazon_problems = RightAws::AMAZON_PROBLEMS
@@ -123,16 +127,18 @@ module RightAws
     # * <tt>:multi_thread</tt>: true=HTTP connection per thread, false=per process
     # * <tt>:logger</tt>: for log messages, default: RAILS_DEFAULT_LOGGER else STDOUT
     #
-    def initialize(aws_access_key_id, aws_secret_access_key, params={})
+    def initialize(aws_access_key_id=nil, aws_secret_access_key=nil, params={})
       @params = params
+      aws_access_key_id     ||= ENV['AWS_ACCESS_KEY_ID']
+      aws_secret_access_key ||= ENV['AWS_SECRET_ACCESS_KEY']
       raise AwsError.new("AWS access keys are required to operate on EC2") \
         if aws_access_key_id.blank? || aws_secret_access_key.blank?
       @aws_access_key_id     = aws_access_key_id
       @aws_secret_access_key = aws_secret_access_key
         # params
-      @params[:server]       ||= DEFAULT_HOST
-      @params[:port]         ||= DEFAULT_PORT
-      @params[:protocol]     ||= DEFAULT_PROTOCOL
+      @params[:server]       ||= ENV['EC2_URL'] ? URI.parse(ENV['EC2_URL']).host   : DEFAULT_HOST
+      @params[:port]         ||= ENV['EC2_URL'] ? URI.parse(ENV['EC2_URL']).port   : DEFAULT_PORT
+      @params[:protocol]     ||= ENV['EC2_URL'] ? URI.parse(ENV['EC2_URL']).scheme : DEFAULT_PROTOCOL
       @params[:multi_thread] ||= defined?(AWS_DAEMON)
         # set logger
       @logger = @params[:logger]
@@ -220,7 +226,7 @@ module RightAws
                      :aws_owner         => image.imageOwnerId,
                      :aws_state         => image.imageState.downcase,
                      :aws_is_public     => image.isPublic,
-                     :aws_product_codes => image.productCodes}
+                     :aws_product_codes => image.productCodes }
       end
       images
     rescue Exception
@@ -416,7 +422,8 @@ module RightAws
                      :ssh_key_name       => instance.keyName,
                      :aws_image_id       => instance.imageId,
                      :aws_reason         => reason,
-                     :aws_product_codes  => instance.productCodes}
+                     :aws_product_codes  => instance.productCodes,
+                     :aws_instance_type  => instance.instanceType }
         end
       end
       result
@@ -438,7 +445,8 @@ module RightAws
       #      :dns_name           => "domU-12-34-67-89-01-C9.usma2.compute.amazonaws.com",
       #      :ssh_key_name       => "staging",
       #      :aws_groups         => ["default"],
-      #      :private_dns_name   => "domU-12-34-67-89-01-C9.usma2.compute.amazonaws.com"},
+      #      :private_dns_name   => "domU-12-34-67-89-01-C9.usma2.compute.amazonaws.com",
+      #      :aws_instance_type  => "m1.small"},
       #       ..., {...}]
       #
     def describe_instances(list=[])
@@ -473,24 +481,77 @@ module RightAws
       #     :dns_name           => "",
       #     :ssh_key_name       => "my_awesome_key",
       #     :aws_groups         => ["my_awesome_group"],
-      #     :private_dns_name   => ""}]
+      #     :private_dns_name   => "",
+      #     :aws_instance_type  => "m1.small"}]
       #
-    def run_instances(image_id, min_count, max_count, group_ids, key_name, user_data='', addressing_type=DEFAULT_ADDRESSING_TYPE)
-      @logger.info("Launching instance of image #{image_id} for #{@aws_access_key_id}, key: #{key_name}, groups: #{(group_ids||[]).to_a.join(',')}")
+    def run_instances(image_id, min_count, max_count, group_ids, key_name, user_data='', 
+                      addressing_type = DEFAULT_ADDRESSING_TYPE, 
+                      instance_type   = DEFAULT_INSTANCE_TYPE)
+        launch_instances(image_id, { :min_count       => min_count,
+                                     :max_count       => max_count,
+                                     :user_data       => user_data,
+                                     :group_ids       => group_ids,
+                                     :key_name        => key_name,
+                                     :instance_type   => instance_type,
+                                     :addressing_type => addressing_type })
+    end
+    
+      # Launch new EC2 instances. Returns a list of launched instances or an exception.
+      #
+      # lparams and their default values:
+      #  :min_count       - 1 
+      #  :max_count       - 1
+      #  :user_data       - ''
+      #  :group_ids       - [] # == 'default'
+      #  :key_name        - nil
+      #  :instance_type   - DEFAULT_INSTACE_TYPE
+      #  :addressing_type - DEFAULT_ADDRESSING_TYPE
+      #
+      #  ec2.launch_instances('ami-e444444d', 'my_awesome_group', :user_data => "Woohoo!!!", \
+      #   :addressing_type => "public", :key_name => "my_awesome_key") #=>
+      #   [{:aws_image_id       => "ami-e444444d",
+      #     :aws_reason         => "",
+      #     :aws_state_code     => "0",
+      #     :aws_owner          => "000000000888",
+      #     :aws_instance_id    => "i-123f1234",
+      #     :aws_reservation_id => "r-aabbccdd",
+      #     :aws_state          => "pending",
+      #     :dns_name           => "",
+      #     :ssh_key_name       => "my_awesome_key",
+      #     :aws_groups         => ["default"],
+      #     :private_dns_name   => "",
+      #     :aws_instance_type  => "m1.small"}]
+      #
+    def launch_instances(image_id, lparams={})
+      defaults = {
+        :min_count       => 1,
+        :max_count       => 1,
+        :user_data       => '',
+        :group_ids       => [],
+        :key_name        => nil,
+        :instance_type   => DEFAULT_INSTANCE_TYPE,
+        :addressing_type => DEFAULT_ADDRESSING_TYPE
+      }
+      lparams = defaults.merge(lparams)
+      
+      
+      @logger.info("Launching instance of image #{image_id} for #{@aws_access_key_id}, " +
+                   "key: #{lparams[:key_name]}, groups: #{(lparams[:group_ids]||[]).to_a.join(',')}")
         # careful: keyName and securityGroups may be nil
-      params = hash_params('SecurityGroup', group_ids.to_a)
+      params = hash_params('SecurityGroup', lparams[:group_ids].to_a)
       params.update( {'ImageId'        => image_id,
-                      'MinCount'       => min_count.to_s,
-                      'MaxCount'       => max_count.to_s,
-                      'AddressingType' => addressing_type })
-      params['KeyName']  = key_name unless key_name.blank?
-      unless user_data.blank?
-        user_data.strip!
+                      'MinCount'       => lparams[:min_count].to_s,
+                      'MaxCount'       => lparams[:max_count].to_s,
+                      'AddressingType' => lparams[:addressing_type],
+                      'InstanceType'   => lparams[:instance_type] })
+      params['KeyName']  = lparams[:key_name] unless lparams[:key_name].blank?
+      unless lparams[:user_data].blank?
+        lparams[:user_data].strip!
           # Do not use CGI::escape(encode64(...)) as it is done in Amazons EC2 library.
           # Amazon 169.254.169.254 does not like escaped symbols!
           # And it doesn't like "\n" inside of encoded string! Grrr....
           # Otherwise, some of UserData symbols will be lost...
-        params['UserData'] = Base64.encode64(user_data).delete("\n") unless user_data.blank?
+        params['UserData'] = Base64.encode64(lparams[:user_data]).delete("\n") unless lparams[:user_data].blank?
       end
       link = generate_request("RunInstances", params)
         #debugger
@@ -979,6 +1040,7 @@ module RightAws
       attr_accessor :keyName
       attr_accessor :amiLaunchIndex
       attr_accessor :productCodes
+      attr_accessor :instanceType
     end
 
     class QEc2DescribeInstancesType
@@ -1029,6 +1091,7 @@ module RightAws
               @result << @reservation
             end
           when 'productCode'   ; (@instance.productCodes ||= []) << @text
+          when 'instanceType'  ; @instance.instanceType = @text
         end
       end
       def reset
@@ -1083,6 +1146,7 @@ module RightAws
             @reservation.instancesSet << @instance if @xmlpath == 'RunInstancesResponse/instancesSet'
           when 'RunInstancesResponse'; @result << @reservation
           when 'productCode'   ; (@instance.productCodes ||= []) << @text
+          when 'instanceType'  ; @instance.instanceType = @text
         end
       end
       def reset
