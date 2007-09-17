@@ -93,11 +93,9 @@ module RightAws
       #     :multi_thread => true|false           # Multi-threaded (connection per each thread): true or false(default)
       #     :logger       => Logger Object}       # Logger instance: logs to STDOUT if omitted }
       #
-    def initialize(aws_access_key_id=nil, aws_secret_access_key=nil, params={})
+    def initialize(aws_access_key_id, aws_secret_access_key, params={})
       @params = params
-      aws_access_key_id     ||= ENV['AWS_ACCESS_KEY_ID']
-      aws_secret_access_key ||= ENV['AWS_SECRET_ACCESS_KEY']
-     raise AwsError.new("AWS access keys are required to operate on S3") \
+      raise AwsError.new("AWS access keys are required to operate on S3") \
         if aws_access_key_id.blank? || aws_secret_access_key.blank?
 
 	# TODO TRB 6/19/07 - keys, basic params, and logger are all 
@@ -106,9 +104,9 @@ module RightAws
       @aws_access_key_id     = aws_access_key_id
       @aws_secret_access_key = aws_secret_access_key
         # params
-      @params[:server]       ||= ENV['S3_URL'] ? URI.parse(ENV['S3_URL']).host   : DEFAULT_HOST
-      @params[:port]         ||= ENV['S3_URL'] ? URI.parse(ENV['S3_URL']).port   : DEFAULT_PORT
-      @params[:protocol]     ||= ENV['S3_URL'] ? URI.parse(ENV['S3_URL']).scheme : DEFAULT_PROTOCOL
+      @params[:server]       ||= DEFAULT_HOST
+      @params[:port]         ||= DEFAULT_PORT
+      @params[:protocol]     ||= DEFAULT_PROTOCOL
       @params[:multi_thread] ||= defined?(AWS_DAEMON)
         # set logger
       @logger = @params[:logger]
