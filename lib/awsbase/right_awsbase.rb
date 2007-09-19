@@ -24,14 +24,14 @@
 # Test
 module RightAws
 
-  class AwsUtils
+  class AwsUtils #:nodoc:
     def self.sign(aws_secret_access_key, auth_string)
       Base64.encode64(OpenSSL::HMAC.digest(OpenSSL::Digest::Digest.new("sha1"), aws_secret_access_key, auth_string)).strip
     end
 
   end
 
-  class AwsBenchmarkingBlock
+  class AwsBenchmarkingBlock #:nodoc:
     attr_accessor :xml, :service
     def initialize
       # Benchmark::Tms instance for service (Ec2, S3, or SQS) access benchmarking.
@@ -90,7 +90,7 @@ module RightAws
       # Initial params hash
     attr_accessor :params
 
-    def init(service_info, aws_access_key_id, aws_secret_access_key, params={})
+    def init(service_info, aws_access_key_id, aws_secret_access_key, params={}) #:nodoc:
       @params = params
       raise AwsError.new("AWS access keys are required to operate on #{service_info[:name]}") \
         if aws_access_key_id.blank? || aws_secret_access_key.blank?
@@ -116,7 +116,7 @@ module RightAws
       @params[:multi_thread]
     end
 
-    def request_info_impl(connection, benchblock, request, parser, &block)
+    def request_info_impl(connection, benchblock, request, parser, &block) #:nodoc:
       @last_request  = request[:request]
       @last_response = nil
       response=nil
