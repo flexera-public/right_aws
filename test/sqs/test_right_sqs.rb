@@ -218,4 +218,21 @@ class TestSqs < Test::Unit::TestCase
     assert queue.delete(true)
   end
 
+  def test_27_set_amazon_problems
+    original_problems = RightAws::SqsInterface.amazon_problems
+    assert(original_problems.length > 0)
+    RightAws::SqsInterface.amazon_problems= original_problems << "A New Problem"
+    new_problems = RightAws::SqsInterface.amazon_problems
+    assert_equal(new_problems, original_problems)
+
+    RightAws::SqsInterface.amazon_problems= nil
+    assert_nil(RightAws::SqsInterface.amazon_problems)
+  end
+
+  def test_28_check_threading_model
+    assert(!@sqs.multi_thread)
+    newsqs = Rightscale::SqsInterface.new(TestCredentials.aws_access_key_id, TestCredentials.aws_secret_access_key, {:multi_thread => true})
+    assert(newsqs.multi_thread)
+  end
+
 end

@@ -23,7 +23,8 @@
 
 module RightAws
 
-  class S3Interface
+  class S3Interface < RightAwsBase
+    include RightAwsBaseInterface
     
     DEFAULT_HOST           = 's3.amazonaws.com'
     DEFAULT_PORT           = 443
@@ -33,53 +34,14 @@ module RightAws
     AMAZON_HEADER_PREFIX   = 'x-amz-'
     AMAZON_METADATA_PREFIX = 'x-amz-meta-'
 
-      # A list if Amazons problems we can handle by AWSErrorHandler.
-    @@amazon_problems = RightAws::AMAZON_PROBLEMS
-   
-	# TODO TRB 6/19/07 - all the below accessors are shared in the 
-	# three service gems.  See if is it reasonable to stick these
-	# in an interface class in right_awsbase that we can mixin
-	#
-	# Same for the benchmarking code - all three service gems have
-	# the same.  Break out into a helper class.  Also look at the 
-	# benchmarking fix as a good thing to move to common code.
- 
-      # Current aws_access_key_id
-    attr_reader :aws_access_key_id
-      # Last HTTP request object
-    attr_reader :last_request
-      # Last HTTP response object
-    attr_reader :last_response
-      # Last AWS errors list (used by AWSErrorHandler)
-    attr_accessor :last_errors
-      # Last AWS request id (used by AWSErrorHandler)
-    attr_accessor :last_request_id
-      # Logger object
-    attr_accessor :logger
-      # Initial params hash
-    attr_accessor :params
-    
-    @@bench_s3  = Benchmark::Tms.new()
-    @@bench_xml = Benchmark::Tms.new()
-
-      # Benchmark::Tms instance for S3 access benchmark.
-    def self.bench_s3;  @@bench_s3;  end  
-    
-      # Benchmark::Tms instance for XML parsing benchmark.
-    def self.bench_xml; @@bench_xml; end  # For benchmark puposes.
-
-      # Returns a list of Amazon service responses which are known to be transient problems. 
-      # We have to re-request if we get any of them, because the problem will probably disappear. 
-      # By default this method returns the same value as the AMAZON_PROBLEMS const.
-    def self.amazon_problems
-      @@amazon_problems
+    @@bench = AwsBenchmarkingBlock.new
+    def self.bench_xml
+      @@bench.xml
+    end
+    def self.bench_s3
+      @@bench.service
     end
 
-      # Sets the list of Amazon side problems.  Use in conjunction with the
-      # getter to append problems.
-    def self.amazon_problems=(problems_list)
-      @@amazon_problems = problems_list
-    end
 
       # Creates new RightS3 instance.
       #
@@ -94,39 +56,10 @@ module RightAws
       #     :logger       => Logger Object}       # Logger instance: logs to STDOUT if omitted }
       #
     def initialize(aws_access_key_id, aws_secret_access_key, params={})
-      @params = params
-      raise AwsError.new("AWS access keys are required to operate on S3") \
-        if aws_access_key_id.blank? || aws_secret_access_key.blank?
-
-	# TODO TRB 6/19/07 - keys, basic params, and logger are all 
-	# candidates to break out into a helper class common to all 
-	# service gems.  Stick the helper in right_awsbase
-      @aws_access_key_id     = aws_access_key_id
-      @aws_secret_access_key = aws_secret_access_key
-        # params
-      @params[:server]       ||= DEFAULT_HOST
-      @params[:port]         ||= DEFAULT_PORT
-      @params[:protocol]     ||= DEFAULT_PROTOCOL
-      @params[:multi_thread] ||= defined?(AWS_DAEMON)
-        # set logger
-      @logger = @params[:logger]
-      @logger = RAILS_DEFAULT_LOGGER if !@logger && defined?(RAILS_DEFAULT_LOGGER)
-      @logger = Logger.new(STDOUT)   if !@logger
-      @logger.info "New #{self.class.name} using #{@params[:multi_thread] ? 'multi' : 'single'}-threaded mode"
-      @error_handler = nil
+      init({:name=>'S3', :default_host => DEFAULT_HOST, :default_port => DEFAULT_PORT, :default_protocol => DEFAULT_PROTOCOL}, 
+           aws_access_key_id, aws_secret_access_key, params)
     end
 
-	# TODO TRB 6/19/07 - Service gem common method
-    def on_exception(options={:raise=>true, :log=>true}) # :nodoc:
-      RightAws::AwsError::on_aws_exception(self, options)
-    end
-
-	# TODO TRB 6/19/07 - Service gem common method
-
-      # Return the +true+ if this RightS3 instance works in multi_thread state and +false+ otherwise.
-    def multi_thread
-      @params[:multi_thread]
-    end
 
   #-----------------------------------------------------------------
   #      Requests
@@ -172,7 +105,7 @@ module RightAws
       headers.each      { |key, value| request[key.to_s] = value }
         #generate auth strings
       auth_string = canonical_string(request.method, request.path, request.to_hash)
-      signature   = Base64.encode64(OpenSSL::HMAC.digest(OpenSSL::Digest::Digest.new("sha1"), @aws_secret_access_key, auth_string)).strip
+      signature   = AwsUtils::sign(@aws_secret_access_key, auth_string)
         # set other headers
       request['Authorization'] = "AWS #{@aws_access_key_id}:#{signature}"
         # prepare output hash
@@ -184,59 +117,10 @@ module RightAws
 
       # Sends request to Amazon and parses the response.
       # Raises AwsError if any banana happened.
-      # TODO TRB 6/19/07: 
-      # request_info is a candidate to move to right_awsbase      
-      # because it currently appears (in identical form) in right_s3,
-      # right_ec2, and right_sqs
     def request_info(request, parser, &block) # :nodoc:
       thread = @params[:multi_thread] ? Thread.current : Thread.main
       thread[:s3_connection] ||= Rightscale::HttpConnection.new(:exception => RightAws::AwsError)
-      @last_request  = request[:request]
-      @last_response = nil
-      response=nil
-
-      if(block != nil)
-        @@bench_s3.add! do
-          responsehdr = thread[:s3_connection].request(request) do |response|
-            if response.is_a?(Net::HTTPSuccess)
-              @error_handler = nil
-              response.read_body(&block)
-            else
-              @error_handler = AWSErrorHandler.new(self, parser, @@amazon_problems) unless @error_handler
-              check_result   = @error_handler.check(request)
-              if check_result
-                @error_handler = nil
-                return check_result 
-              end
-              raise AwsError.new(@last_errors, @last_response.code, @last_request_id)
-            end
-          end
-          @@bench_xml.add! do
-            parser.parse(responsehdr)
-          end
-          return parser.result
-        end
-      else
-        @@bench_s3.add!{ response = thread[:s3_connection].request(request) }
-          # check response for errors...
-        @last_response = response
-        if response.is_a?(Net::HTTPSuccess)
-          @error_handler = nil
-          @@bench_xml.add! { parser.parse(response) }
-          return parser.result
-        else
-          @error_handler = AWSErrorHandler.new(self, parser, @@amazon_problems) unless @error_handler
-          check_result   = @error_handler.check(request)
-          if check_result
-            @error_handler = nil
-            return check_result 
-          end
-          raise AwsError.new(@last_errors, @last_response.code, @last_request_id)
-        end
-      end
-    rescue
-      @error_handler = nil
-      raise
+      request_info_impl(thread[:s3_connection], @@bench, request, parser, &block)
     end
 
 

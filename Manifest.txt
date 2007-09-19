@@ -15,8 +15,10 @@ test/ec2/test_helper.rb
 test/ec2/test_right_ec2.rb
 test/s3/test_helper.rb
 test/s3/test_right_s3.rb
+test/s3/test_right_s3_stubbed.rb
 test/sqs/test_helper.rb
 test/sqs/test_right_sqs.rb
 test/ts_right_aws.rb
 test/test_credentials.rb
+test/http_connection.rb
 

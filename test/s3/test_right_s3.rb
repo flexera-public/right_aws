@@ -25,7 +25,7 @@ class TestS3 < Test::Unit::TestCase
   end
 
   def test_03_list_empty_bucket
-    assert_equal 0, @s3.list_bucket(@bucket).size, "#{@bucket} must exist!"
+    assert_equal 0, @s3.list_bucket(@bucket).size, "#{@bucket} isn't empty, arrgh!"
   end
   
   def test_04_put
@@ -44,18 +44,38 @@ class TestS3 < Test::Unit::TestCase
   def test_06_head
     assert_equal 'Woohoo1!', @s3.head(@bucket,@key1)['x-amz-meta-family'], "x-amz-meta-family header must be equal to 'Woohoo1!'"
   end
+
+
+  def test_07_streaming_get
+    resp = String.new
+    assert_raise(Rightscale::AwsError) do 
+      @s3.get(@bucket, 'undefined/key') do |chunk|
+        resp += chunk
+      end
+    end
+
+    resp = String.new
+    data1 = @s3.get(@bucket, @key1) do |chunk|
+      resp += chunk
+    end
+    assert_equal RIGHT_OBJECT_TEXT, resp, "Object text must be equal to '#{RIGHT_OBJECT_TEXT}'"
+    assert_equal @s3.get_object(@bucket, @key1), resp, "Streaming iface must return same as non-streaming"
+    assert_equal 'Woohoo1!', data1[:headers]['x-amz-meta-family'], "x-amz-meta-family header must be equal to 'Woohoo1!'"
+  end
   
-  def test_07_delete_folder
+  def test_08_delete_folder
     assert_equal 1, @s3.delete_folder(@bucket, 'test').size, "Only one key(#{@key1}) must be deleted!"
   end
 
-  def test_08_delete_bucket
+
+  def test_09_delete_bucket
     assert_raise(Rightscale::AwsError) { @s3.delete_bucket(@bucket) }
     assert @s3.clear_bucket(@bucket), 'Clear_bucket fail'
     assert_equal 0, @s3.list_bucket(@bucket).size, 'Bucket must be empty'
     assert @s3.delete_bucket(@bucket)
     assert !@s3.list_all_my_buckets.map{|bucket| bucket[:name]}.include?(@bucket), "#{@bucket} must not exist"
   end
+
 
   #---------------------------
   # Rightscale::S3 classes
@@ -212,6 +232,16 @@ class TestS3 < Test::Unit::TestCase
     assert key1.delete
     assert !key1.exists?
   end
-  
+
+  def test_36_set_amazon_problems
+    original_problems = RightAws::S3Interface.amazon_problems
+    assert(original_problems.length > 0)
+    RightAws::S3Interface.amazon_problems= original_problems << "A New Problem"
+    new_problems = RightAws::S3Interface.amazon_problems
+    assert_equal(new_problems, original_problems)
+
+    RightAws::S3Interface.amazon_problems= nil
+    assert_nil(RightAws::S3Interface.amazon_problems)
+  end
 
 end

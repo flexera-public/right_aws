@@ -63,7 +63,8 @@ module RightAws
   # Error handling: all operations raise an RightAws::AwsError in case
   # of problems. Note that transient errors are automatically retried.
     
-  class Ec2
+  class Ec2 < RightAwsBase
+    include RightAwsBaseInterface
     
     SIGNATURE_VERSION = "1"
     # Amazon EC2 API version being used
@@ -75,43 +76,13 @@ module RightAws
     # Default addressing type (public=NAT, direct=no-NAT) used when launching instances.
     DEFAULT_ADDRESSING_TYPE =  'public'
     DNS_ADDRESSING_SET      = ['public','direct']
-    
-    # A list of Amazon problems we can handle by AWSErrorHandler.
-    @@amazon_problems = RightAws::AMAZON_PROBLEMS
-    
-    # Current aws_access_key_id
-    attr_reader :aws_access_key_id
-    # Last HTTP request object
-    attr_reader :last_request
-    # Last HTTP response object
-    attr_reader :last_response
-    # Last AWS errors list (used by AWSErrorHandler)
-    attr_accessor :last_errors
-    # Last AWS request id (used by AWSErrorHandler)
-    attr_accessor :last_request_id
-    # Logger object, used by this class to generate log messages
-    attr_accessor :logger
-    # Option params passed into new
-    attr_accessor :params
-    
-    @@bench_ec2 = Benchmark::Tms.new()
-    @@bench_xml = Benchmark::Tms.new()
-    
-    # Benchmark::Tms instance that accumulates time spent in requests to EC2.
-    def self.bench_ec2;  @@bench_ec2;  end
-    
-    # Benchmark::Tms instance that accumulates time spent in XML parsing.
-    def self.bench_xml; @@bench_xml; end
 
-    # Returns a list of Amazon service responses which are known to be transient errors.
-    # By default returns the same value as AMAZON_PROBLEMS const. See AWSErrorHandler.
-    def self.amazon_problems
-      @@amazon_problems
+    @@bench = AwsBenchmarkingBlock.new
+    def self.bench_xml
+      @@bench.xml
     end
-
-    # Sets the list of Amazon problems that are automatically retried. See AWSErrorHandler.
-    def self.amazon_problems=(problems_list)
-      @@amazon_problems = problems_list
+    def self.bench_ec2
+      @@bench.service
     end
     
     # Create a new handle to an EC2 account. All handles share the same per process or per thread
@@ -124,31 +95,10 @@ module RightAws
     # * <tt>:logger</tt>: for log messages, default: RAILS_DEFAULT_LOGGER else STDOUT
     #
     def initialize(aws_access_key_id, aws_secret_access_key, params={})
-      @params = params
-      raise AwsError.new("AWS access keys are required to operate on EC2") \
-        if aws_access_key_id.blank? || aws_secret_access_key.blank?
-      @aws_access_key_id     = aws_access_key_id
-      @aws_secret_access_key = aws_secret_access_key
-        # params
-      @params[:server]       ||= DEFAULT_HOST
-      @params[:port]         ||= DEFAULT_PORT
-      @params[:protocol]     ||= DEFAULT_PROTOCOL
-      @params[:multi_thread] ||= defined?(AWS_DAEMON)
-        # set logger
-      @logger = @params[:logger]
-      @logger = RAILS_DEFAULT_LOGGER if !@logger && defined?(RAILS_DEFAULT_LOGGER)
-      @logger = Logger.new(STDOUT)   if !@logger
-      @logger.info "New #{self.class.name} using #{@params[:multi_thread] ? 'multi' : 'single'}-threaded mode"
+      init({:name=>'EC2', :default_host => DEFAULT_HOST, :default_port => DEFAULT_PORT, :default_protocol => DEFAULT_PROTOCOL}, 
+           aws_access_key_id, aws_secret_access_key, params)
     end
 
-    def on_exception(options={:raise=>true, :log=>true}) # :nodoc:
-      AwsError::on_aws_exception(self, options)
-    end
-    
-      # Return +true+ if this RightEc2NativeQuery instance works in multi_thread mode and +false+ otherwise.
-    def multi_thread
-      @params[:multi_thread]
-    end
 
     def generate_request(action, param={}) #:nodoc:
       timestamp    = ( Time::now ).utc.strftime("%Y-%m-%dT%H:%M:%S.000Z")
@@ -159,7 +109,7 @@ module RightAws
                       "SignatureVersion"  => SIGNATURE_VERSION }
       request_hash.update(param)
       request_data   = request_hash.sort{|a,b| (a[0].to_s.downcase)<=>(b[0].to_s.downcase)}.to_s
-      request_hash.update('Signature' => Base64.encode64( OpenSSL::HMAC.digest( OpenSSL::Digest::Digest.new( "sha1" ), @aws_secret_access_key, request_data)).strip)
+      request_hash.update('Signature' =>  AwsUtils::sign(@aws_secret_access_key, request_data))
       request_params = request_hash.to_a.collect{|key,val| key + "=" + CGI::escape(val) }.join("&")
       request        = Net::HTTP::Get.new("/?#{request_params}")
         # prepare output hash
@@ -174,29 +124,7 @@ module RightAws
     def request_info(request, parser)  #:nodoc:
       thread = @params[:multi_thread] ? Thread.current : Thread.main
       thread[:ec2_connection] ||= Rightscale::HttpConnection.new(:exception => AwsError)
-      @last_request  = request[:request]
-      @last_response = nil
-      response=nil
-      
-      @@bench_ec2.add!{ response = thread[:ec2_connection].request(request) }
-        # check response for errors...
-      @last_response = response
-      if response.is_a?(Net::HTTPSuccess)
-        @error_handler = nil
-        @@bench_xml.add! { parser.parse(response) }
-        return parser.result
-      else
-        @error_handler = AWSErrorHandler.new(self, parser, @@amazon_problems) unless @error_handler
-        check_result   = @error_handler.check(request)
-        if check_result
-          @error_handler = nil
-          return check_result 
-        end
-        raise AwsError.new(@last_errors, @last_response.code, @last_request_id)
-      end
-    rescue
-      @error_handler = nil
-      raise
+      request_info_impl(thread[:ec2_connection], @@bench, request, parser)
     end
 
 

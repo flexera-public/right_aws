@@ -24,9 +24,30 @@
 # Test
 module RightAws
 
-  # Text, if found in an error message returned by AWS, indicates that this may be a transient
-  # error. Transient errors are automatically retried with exponential back-off.
-  AMAZON_PROBLEMS = [ 'internal service error', 
+  class AwsUtils
+    def self.sign(aws_secret_access_key, auth_string)
+      Base64.encode64(OpenSSL::HMAC.digest(OpenSSL::Digest::Digest.new("sha1"), aws_secret_access_key, auth_string)).strip
+    end
+
+  end
+
+  class AwsBenchmarkingBlock
+    attr_accessor :xml, :service
+    def initialize
+      # Benchmark::Tms instance for service (Ec2, S3, or SQS) access benchmarking.
+      @service = Benchmark::Tms.new()
+      # Benchmark::Tms instance for XML parsing benchmarking.
+      @xml = Benchmark::Tms.new()
+    end
+  end
+
+  class RightAwsBase
+
+    # Amazon HTTP Error handling
+
+    # Text, if found in an error message returned by AWS, indicates that this may be a transient
+    # error. Transient errors are automatically retried with exponential back-off.
+    AMAZON_PROBLEMS = [ 'internal service error', 
                       'is currently unavailable', 
                       'no response from', 
                       'Please try again',
@@ -36,12 +57,141 @@ module RightAws
                       'This application is not currently available',
                       'InsufficientInstanceCapacity'
                     ]
+    @@amazon_problems = AMAZON_PROBLEMS
+      # Returns a list of Amazon service responses which are known to be transient problems. 
+      # We have to re-request if we get any of them, because the problem will probably disappear. 
+      # By default this method returns the same value as the AMAZON_PROBLEMS const.
+    def self.amazon_problems
+      @@amazon_problems
+    end
+    
+      # Sets the list of Amazon side problems.  Use in conjunction with the
+      # getter to append problems.
+    def self.amazon_problems=(problems_list)
+      @@amazon_problems = problems_list
+    end
+
+  end
+
+  module RightAwsBaseInterface
+
+      # Current aws_access_key_id
+    attr_reader :aws_access_key_id
+      # Last HTTP request object
+    attr_reader :last_request
+      # Last HTTP response object
+    attr_reader :last_response
+      # Last AWS errors list (used by AWSErrorHandler)
+    attr_accessor :last_errors
+      # Last AWS request id (used by AWSErrorHandler)
+    attr_accessor :last_request_id
+      # Logger object
+    attr_accessor :logger
+      # Initial params hash
+    attr_accessor :params
+
+    def init(service_info, aws_access_key_id, aws_secret_access_key, params={})
+      @params = params
+      raise AwsError.new("AWS access keys are required to operate on #{service_info[:name]}") \
+        if aws_access_key_id.blank? || aws_secret_access_key.blank?
+      @aws_access_key_id     = aws_access_key_id
+      @aws_secret_access_key = aws_secret_access_key
+      @params[:server]       ||= service_info[:default_host]
+      @params[:port]         ||= service_info[:default_port]
+      @params[:protocol]     ||= service_info[:default_protocol]
+      @params[:multi_thread] ||= defined?(AWS_DAEMON)
+      @logger = @params[:logger]
+      @logger = RAILS_DEFAULT_LOGGER if !@logger && defined?(RAILS_DEFAULT_LOGGER)
+      @logger = Logger.new(STDOUT)   if !@logger
+      @logger.info "New #{self.class.name} using #{@params[:multi_thread] ? 'multi' : 'single'}-threaded mode"
+      @error_handler = nil
+    end
+
+    def on_exception(options={:raise=>true, :log=>true}) # :nodoc:
+      AwsError::on_aws_exception(self, options)
+    end
+    
+      # Return +true+ if this instance works in multi_thread mode and +false+ otherwise.
+    def multi_thread
+      @params[:multi_thread]
+    end
+
+    def request_info_impl(connection, benchblock, request, parser, &block)
+      @last_request  = request[:request]
+      @last_response = nil
+      response=nil
+      blockexception = nil
+
+      if(block != nil)
+        # TRB 9/17/07 Careful - because we are passing in blocks, we get a situation where
+        # an exception may get thrown in the block body (which is high-level
+        # code either here or in the application) but gets caught in the
+        # low-level code of HttpConnection.  The solution is not to let any
+        # exception escape the block that we pass to HttpConnection::request.
+        # Exceptions can originate from code directly in the block, or from user
+        # code called in the other block which is passed to response.read_body.
+        benchblock.service.add! do
+          responsehdr = connection.request(request) do |response|
+          #########
+            begin
+              @last_response = response
+              if response.is_a?(Net::HTTPSuccess)
+                @error_handler = nil
+                response.read_body(&block)
+              else
+                @error_handler = AWSErrorHandler.new(self, parser, self.class.amazon_problems) unless @error_handler
+                check_result   = @error_handler.check(request)
+                if check_result
+                  @error_handler = nil
+                  return check_result 
+                end
+                raise AwsError.new(@last_errors, @last_response.code, @last_request_id)
+              end
+            rescue Exception => e
+              blockexception = e
+            end
+          end
+          #########
+
+          #OK, now we are out of the block passed to the lower level
+          if(blockexception)
+            raise blockexception
+          end
+          benchblock.xml.add! do
+            parser.parse(responsehdr)
+          end
+          return parser.result
+        end
+      else
+        benchblock.service.add!{ response = connection.request(request) }
+          # check response for errors...
+        @last_response = response
+        if response.is_a?(Net::HTTPSuccess)
+          @error_handler = nil
+          benchblock.xml.add! { parser.parse(response) }
+          return parser.result
+        else
+          @error_handler = AWSErrorHandler.new(self, parser, self.class.amazon_problems) unless @error_handler
+          check_result   = @error_handler.check(request)
+          if check_result
+            @error_handler = nil
+            return check_result 
+          end
+          raise AwsError.new(@last_errors, @last_response.code, @last_request_id)
+        end
+      end
+    rescue
+      @error_handler = nil
+      raise
+    end
+
+  end
+
 
   # Exception class to signal any Amazon errors. All errors occuring during calls to Amazon's
   # web services raise this type of error.
   # Attribute inherited by RuntimeError:
   #  message    - the text of the error, generally as returned by AWS in its XML response.
-
   class AwsError < RuntimeError
     
     # either an array of errors where each item is itself an array of [code, message]),
