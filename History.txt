@@ -47,4 +47,20 @@ r1581 | tve | 2007-08-24 16:21:45 -0700 (Fri, 24 Aug 2007) | 1 line
 Improved RightAws documentation
 ------------------------------------------------------------------------
 
+== 1.3.0 / 2007-09-26
+------------------------------------------------------------------------
+r1754 | todd | 2007-09-19 13:48:34 -0700 (Wed, 19 Sep 2007) | 6 lines
+
+(#487, #488) Consolidate a lot of code that was repeated in three places.
+Fix error handling path when using streaming GET interfaces with S3.
+Also add a stub for RightHttpConnection which
+allows more control over the unit tests.  Expand the unit tests and coverage
+tests. 
+------------------------------------------------------------------------
+r1755 | todd | 2007-09-19 14:29:19 -0700 (Wed, 19 Sep 2007) | 2 lines
+
+(#487) RDoc fixes after code consolidation
+
+------------------------------------------------------------------------
+
 
