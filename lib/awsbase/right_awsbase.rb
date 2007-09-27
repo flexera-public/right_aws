@@ -384,7 +384,7 @@ module RightAws
         begin
           require 'xml/libxml' 
         rescue LoadError => e
-          @xml_lib = 'rexml'
+          @@xml_lib = @xml_lib = 'rexml'
           if @logger
             @logger.error e.inspect
             @logger.error e.backtrace
