@@ -55,9 +55,14 @@ module RightAws
       #     :multi_thread => true|false           # Multi-threaded (connection per each thread): true or false(default)
       #     :logger       => Logger Object}       # Logger instance: logs to STDOUT if omitted }
       #
-    def initialize(aws_access_key_id, aws_secret_access_key, params={})
-      init({:name=>'S3', :default_host => DEFAULT_HOST, :default_port => DEFAULT_PORT, :default_protocol => DEFAULT_PROTOCOL}, 
-           aws_access_key_id, aws_secret_access_key, params)
+    def initialize(aws_access_key_id=nil, aws_secret_access_key=nil, params={})
+      init({ :name             => 'S3', 
+             :default_host     => ENV['S3_URL'] ? URI.parse(ENV['S3_URL']).host   : DEFAULT_HOST, 
+             :default_port     => ENV['S3_URL'] ? URI.parse(ENV['S3_URL']).port   : DEFAULT_PORT, 
+             :default_protocol => ENV['S3_URL'] ? URI.parse(ENV['S3_URL']).scheme : DEFAULT_PROTOCOL }, 
+           aws_access_key_id     || ENV['AWS_ACCESS_KEY_ID'], 
+           aws_secret_access_key || ENV['AWS_SECRET_ACCESS_KEY'], 
+           params)
     end
 
 

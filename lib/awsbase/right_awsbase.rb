@@ -89,6 +89,8 @@ module RightAws
     attr_accessor :logger
       # Initial params hash
     attr_accessor :params
+      # RightHttpConnection instance
+    attr_reader :connection
 
     def init(service_info, aws_access_key_id, aws_secret_access_key, params={}) #:nodoc:
       @params = params
@@ -117,6 +119,7 @@ module RightAws
     end
 
     def request_info_impl(connection, benchblock, request, parser, &block) #:nodoc:
+      @connection    = connection
       @last_request  = request[:request]
       @last_response = nil
       response=nil
@@ -131,7 +134,7 @@ module RightAws
         # Exceptions can originate from code directly in the block, or from user
         # code called in the other block which is passed to response.read_body.
         benchblock.service.add! do
-          responsehdr = connection.request(request) do |response|
+          responsehdr = @connection.request(request) do |response|
           #########
             begin
               @last_response = response
@@ -139,7 +142,7 @@ module RightAws
                 @error_handler = nil
                 response.read_body(&block)
               else
-                @error_handler = AWSErrorHandler.new(self, parser, self.class.amazon_problems) unless @error_handler
+                @error_handler = AWSErrorHandler.new(self, parser, :errors_list => self.class.amazon_problems) unless @error_handler
                 check_result   = @error_handler.check(request)
                 if check_result
                   @error_handler = nil
@@ -163,7 +166,7 @@ module RightAws
           return parser.result
         end
       else
-        benchblock.service.add!{ response = connection.request(request) }
+        benchblock.service.add!{ response = @connection.request(request) }
           # check response for errors...
         @last_response = response
         if response.is_a?(Net::HTTPSuccess)
@@ -256,6 +259,8 @@ module RightAws
 
 
   class AWSErrorHandler
+    # 0-100 (%) 
+    DEFAULT_CLOSE_ON_4XX_PROBABILITY = 10     
     
     @@reiteration_start_delay = 0.2
     def self.reiteration_start_delay
@@ -273,20 +278,45 @@ module RightAws
       @@reiteration_time = reiteration_time
     end
     
-    def initialize(aws, parser,  errors_list=nil,  reiteration_time=nil) #:nodoc:
+    @@close_on_error = true 
+    def self.close_on_error 
+      @@close_on_error 
+    end 
+    def self.close_on_error=(close_on_error) 
+      @@close_on_error = close_on_error 
+    end 
+ 
+    @@close_on_4xx_probability = DEFAULT_CLOSE_ON_4XX_PROBABILITY 
+    def self.close_on_4xx_probability 
+      @@close_on_4xx_probability 
+    end 
+    def self.close_on_4xx_probability=(close_on_4xx_probability) 
+      @@close_on_4xx_probability = close_on_4xx_probability 
+    end 
+ 
+    # params: 
+    #  :reiteration_time 
+    #  :errors_list 
+    #  :close_on_error           = true | false 
+    #  :close_on_4xx_probability = 1-100 
+    def initialize(aws, parser, params={}) #:nodoc:     
       @aws           = aws              # Link to RightEc2 | RightSqs | RightS3 instance
       @parser        = parser           # parser to parse Amazon response
       @started_at    = Time.now
-      @stop_at       = @started_at  + (reiteration_time || @@reiteration_time)
-      @errors_list   = errors_list || []
+      @stop_at       = @started_at  + (params[:reiteration_time] || @@reiteration_time) 
+      @errors_list   = params[:errors_list] || [] 
       @reiteration_delay = @@reiteration_start_delay
       @retries       = 0
+      # close current HTTP(S) connection on 5xx, errors from list and 4xx errors 
+      @close_on_error           = params[:close_on_error].nil? ? @@close_on_error : params[:close_on_error] 
+      @close_on_4xx_probability = params[:close_on_4xx_probability] || @@close_on_4xx_probability       
     end
     
       # Returns false if 
     def check(request)  #:nodoc:
       result           = false
       error_found      = false
+      error_match      = nil
       last_errors_text = ''
       response         = @aws.last_response
         # log error
@@ -311,12 +341,20 @@ module RightAws
       @errors_list.each do |error_to_find|
         if last_errors_text[/#{error_to_find}/i]
           error_found = true
+          error_match = error_to_find
           @aws.logger.warn("##### Retry is needed, error pattern match: #{error_to_find} #####")
           break
         end
       end
         # check the time has gone from the first error come
       if error_found
+        # Close the connection to the server and recreate a new one. 
+        # It may have a chance that one server is a semi-down and reconnection 
+        # will help us to connect to the other server 
+        if @close_on_error 
+          @aws.connection.finish "#{self.class.name}: error match to pattern '#{error_match}'" 
+        end 
+                 
         if (Time.now < @stop_at)
           @retries += 1
           @aws.logger.warn("##### Retry ##{@retries} is being performed. Sleeping for #{@reiteration_delay} sec. Whole time: #{Time.now-@started_at} sec ####")
@@ -326,6 +364,16 @@ module RightAws
           result = @aws.request_info(request, @parser)
         else
           @aws.logger.warn("##### Ooops, time is over... ####")
+        end 
+      # aha, this is unhandled error: 
+      elsif @close_on_error 
+        # Is this a 5xx error ? 
+        if @aws.last_response.code.to_s[/^5\d\d$/] 
+          @aws.connection.finish "#{self.class.name}: code: #{@aws.last_response.code}: '#{@aws.last_response.message}'" 
+        # Is this a 4xxx error ? 
+        elsif @aws.last_response.code.to_s[/^4\d\d$/] && @close_on_4xx_probability > rand(100) 
+          @aws.connection.finish "#{self.class.name}: code: #{@aws.last_response.code}: '#{@aws.last_response.message}', " + 
+                                 "probability: #{@close_on_4xx_probability}%"           
         end
       end
       result
@@ -336,8 +384,36 @@ module RightAws
 
   #-----------------------------------------------------------------
 
+  class RightSaxParserCallback 
+    def self.include_callback 
+      include XML::SaxParser::Callbacks       
+    end 
+    def initialize(right_aws_parser) 
+      @right_aws_parser = right_aws_parser 
+    end 
+    def on_start_element(name, attr_hash) 
+      @right_aws_parser.tag_start(name, attr_hash) 
+    end   
+    def on_characters(chars) 
+      @right_aws_parser.text(chars) 
+    end 
+    def on_end_element(name) 
+      @right_aws_parser.tag_end(name) 
+    end 
+    def on_start_document; end 
+    def on_comment(msg); end 
+    def on_processing_instruction(target, data); end 
+    def on_cdata_block(cdata); end 
+    def on_end_document; end 
+  end 
+ 
   class RightAWSParser  #:nodoc:
-    @@xml_lib = 'rexml' # xml library name: 'rexml' | 'libxml'
+      # default parsing library 
+    DEFAULT_XML_LIBRARY = 'rexml' 
+      # a list of supported parsers 
+    @@supported_xml_libs = [DEFAULT_XML_LIBRARY, 'libxml'] 
+     
+    @@xml_lib = DEFAULT_XML_LIBRARY # xml library name: 'rexml' | 'libxml' 
     def self.xml_lib
       @@xml_lib
     end
@@ -379,32 +455,41 @@ module RightAws
         # Get response body
       xml_text = xml_text.body unless xml_text.is_a?(String)
       @xml_lib = params[:xml_lib] || @xml_lib
+        # check that we had no problems with this library otherwise use default 
+      @xml_lib = DEFAULT_XML_LIBRARY unless @@supported_xml_libs.include?(@xml_lib)       
         # load xml library
       if @xml_lib=='libxml' && !defined?(XML::SaxParser)
         begin
-          require 'xml/libxml' 
+          require 'xml/libxml'
+          # is it new ? - Setup SaxParserCallback 
+          if XML::Parser::VERSION >= '0.5.1.0'
+            RightSaxParserCallback.include_callback 
+          end           
         rescue LoadError => e
-          @@xml_lib = @xml_lib = 'rexml'
+          @@supported_libs.delete(@xml_lib) 
+          @xml_lib = DEFAULT_XML_LIBRARY           
           if @logger
             @logger.error e.inspect
             @logger.error e.backtrace
-            @logger.info "Can not load 'libxml' library. 'Rexml' is used for parsing."
+            @logger.info "Can not load 'libxml' library. '#{DEFAULT_XML_LIBRARY}' is used for parsing." 
           end
         end
       end
         # Parse the xml text
       case @xml_lib
       when 'libxml'  
-        xml = XML::SaxParser.new
-        xml.string = xml_text
-        xml.on_start_element{|name, attr_hash| self.tag_start(name, attr_hash)}
-        xml.on_characters{   |text|            self.text(text)}
-        xml.on_end_element{  |name|            self.tag_end(name)}
+        xml        = XML::SaxParser.new 
+        xml.string = xml_text 
+        # check libxml-ruby version 
+        if XML::Parser::VERSION >= '0.5.1.0'
+          xml.callbacks = RightSaxParserCallback.new(self) 
+        else 
+          xml.on_start_element{|name, attr_hash| self.tag_start(name, attr_hash)} 
+          xml.on_characters{   |text|            self.text(text)} 
+          xml.on_end_element{  |name|            self.tag_end(name)} 
+        end 
         xml.parse
       else
-        if @logger && @xml_lib!='rexml'
-          @logger.info "RightAWSParser#parse: Unknown xml library ('#{@xml_lib}') is selected. The default 'rexml' is used."
-        end
         REXML::Document.parse_stream(xml_text, self)
       end
     end

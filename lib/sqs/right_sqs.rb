@@ -58,7 +58,7 @@ module RightAws
   class Sqs
     attr_reader :interface
     
-    def initialize(aws_access_key_id, aws_secret_access_key, params={})
+    def initialize(aws_access_key_id=nil, aws_secret_access_key=nil, params={})
       @interface = SqsInterface.new(aws_access_key_id, aws_secret_access_key, params)
     end
     

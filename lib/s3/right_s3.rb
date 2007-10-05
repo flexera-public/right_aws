@@ -41,7 +41,7 @@ module RightAws
     # Create a new handle to an S3 account. All handles share the same per process or per thread
     # HTTP connection to Amazon S3. Each handle is for a specific account.
     # The +params+ are passed through as-is to RightAws::S3Interface.new
-    def initialize(aws_access_key_id, aws_secret_access_key, params={})
+    def initialize(aws_access_key_id=nil, aws_secret_access_key=nil, params={})
       @interface = S3Interface.new(aws_access_key_id, aws_secret_access_key, params)
     end
     
