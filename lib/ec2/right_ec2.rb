@@ -148,18 +148,26 @@ module RightAws
   #-----------------------------------------------------------------
   #-----------------------------------------------------------------
 
-    def ec2_describe_images(type, list) #:nodoc:
+    def ec2_describe_images(type, list, &block) #:nodoc:
       link   = generate_request("DescribeImages", hash_params(type,list.to_a))
-      images = request_info(link, QEc2DescribeImagesParser.new(:logger => @logger))
-      images.collect! do |image|
-                    {:aws_id            => image.imageId,
-                     :aws_location      => image.imageLocation,
-                     :aws_owner         => image.imageOwnerId,
-                     :aws_state         => image.imageState.downcase,
-                     :aws_is_public     => image.isPublic,
-                     :aws_product_codes => image.productCodes}
+      # We do not want to break the logic of parsing hence will use a dummy parser to process all the standart 
+      # steps (errors checking etc). The dummy parser does nothig - just returns back the params it received.
+      # Then call the block (if it is) with the response. If the block returns +nil+ or +false+ then do not process
+      # real response parsing and exit with +nil+. Otherwise process parsing and return its result.
+      response, params = request_info(link, QEc2DummyParser.new)
+      if block
+        @@bench.xml.add! { return nil unless block.call(response) } 
       end
-      images
+      parser = QEc2DescribeImagesParser.new(:logger => @logger)
+      parser.parse(response, params)
+      parser.result.collect do |image|
+        { :aws_id            => image.imageId,
+          :aws_location      => image.imageLocation,
+          :aws_owner         => image.imageOwnerId,
+          :aws_state         => image.imageState.downcase,
+          :aws_is_public     => image.isPublic,
+          :aws_product_codes => image.productCodes }
+      end
     rescue Exception
       on_exception
     end
@@ -184,8 +192,8 @@ module RightAws
       #      :aws_location => "marcins_cool_public_images/ubuntu-6.10.manifest.xml",
       #      :aws_is_public => true}]
       #
-    def describe_images(list=[])
-      ec2_describe_images('ImageId', list)
+    def describe_images(list=[], &block)
+      ec2_describe_images('ImageId', list, &block)
     end
 
       #
@@ -194,8 +202,8 @@ module RightAws
       #  ec2.describe_images_by_owner('522821470517')
       #  ec2.describe_images_by_owner('self')
       #
-    def describe_images_by_owner(list)
-      ec2_describe_images('Owner', list)
+    def describe_images_by_owner(list, &block)
+      ec2_describe_images('Owner', list, &block)
     end
 
       #
@@ -204,8 +212,8 @@ module RightAws
       #  ec2.describe_images_by_executable_by('522821470517')
       #  ec2.describe_images_by_executable_by('self')
       #
-    def describe_images_by_executable_by(list)
-      ec2_describe_images('ExecutableBy', list)
+    def describe_images_by_executable_by(list, &block)
+      ec2_describe_images('ExecutableBy', list, &block)
     end
 
 
@@ -380,10 +388,15 @@ module RightAws
       #      :aws_instance_type  => "m1.small"}, 
       #       ..., {...}]
       #
-    def describe_instances(list=[])
-      link      = generate_request("DescribeInstances", hash_params('InstanceId',list.to_a))
-      instances = request_info(link, QEc2DescribeInstancesParser.new(:logger => @logger))
-      get_desc_instances(instances)
+    def describe_instances(list=[], &block)
+      link = generate_request("DescribeInstances", hash_params('InstanceId',list.to_a))
+      response, params = request_info(link, QEc2DummyParser.new)
+      if block
+        @@bench.xml.add! { return nil unless block.call(response) } 
+      end
+      parser = QEc2DescribeInstancesParser.new(:logger => @logger)
+      parser.parse(response, params)
+      get_desc_instances(parser.result)
     rescue Exception
       on_exception
     end
@@ -566,12 +579,17 @@ module RightAws
       #         {:to_port => "443", :protocol => "tcp",  :from_port => "443", :cidr_ips => "0.0.0.0/0"}]},
       #    ..., {...}]
       #
-    def describe_security_groups(list=[])
+    def describe_security_groups(list=[], &block)
       link   = generate_request("DescribeSecurityGroups", hash_params('GroupName',list.to_a))
-      groups = request_info(link, QEc2DescribeSecurityGroupsParser.new(:logger => @logger))
+      response, params = request_info(link, QEc2DummyParser.new)
+      if block
+        @@bench.xml.add! { return nil unless block.call(response) } 
+      end
+      parser = QEc2DescribeSecurityGroupsParser.new(:logger => @logger)
+      parser.parse(response, params)
       
       result = []     
-      groups.each do |item|
+      parser.result.each do |item|
         perms = []
         item.ipPermissions.each do |perm|
           perm.groups.each do |ngroup|
@@ -701,14 +719,18 @@ module RightAws
       #     {:aws_fingerprint=> "1e:29:30:47:58:6d:7b:8c:9f:08:11:20:3c:44:52:69:74:80:97:08", :aws_key_name=>"key-2"},
       #      ..., {...} ]
       #
-    def describe_key_pairs(list=[])
-      link   = generate_request("DescribeKeyPairs", hash_params('KeyName',list.to_a))
-      result = request_info(link, QEc2DescribeKeyPairParser.new(:logger => @logger))
-      result.collect! do |key|
-          {:aws_key_name    => key.keyName,
-           :aws_fingerprint => key.keyFingerprint }
+    def describe_key_pairs(list=[], &block)
+      link = generate_request("DescribeKeyPairs", hash_params('KeyName',list.to_a))
+      response, params = request_info(link, QEc2DummyParser.new)
+      if block
+        @@bench.xml.add! { return nil unless block.call(response) } 
       end
-      result   
+      parser = QEc2DescribeKeyPairParser.new(:logger => @logger)
+      parser.parse(response, params)
+      parser.result.collect do |key|
+        { :aws_key_name    => key.keyName,
+          :aws_fingerprint => key.keyFingerprint }
+      end
     rescue Exception
       on_exception
     end
@@ -1144,4 +1166,17 @@ module RightAws
 
   end
 
+  #-----------------------------------------------------------------
+  #      PARSERS: Console
+  #-----------------------------------------------------------------
+  
+    # Dummy parser - does nothing
+    # Returns the original params back
+    class QEc2DummyParser  # :nodoc:
+      attr_accessor :result
+      def parse(response, params={})
+        @result = [response, params]
+      end
+    end
+  
 end

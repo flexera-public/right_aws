@@ -174,7 +174,7 @@ module RightAws
           benchblock.xml.add! { parser.parse(response) }
           return parser.result
         else
-          @error_handler = AWSErrorHandler.new(self, parser, self.class.amazon_problems) unless @error_handler
+          @error_handler = AWSErrorHandler.new(self, parser, :errors_list => self.class.amazon_problems) unless @error_handler
           check_result   = @error_handler.check(request)
           if check_result
             @error_handler = nil
