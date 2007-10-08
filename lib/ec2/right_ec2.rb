@@ -156,10 +156,10 @@ module RightAws
       # real response parsing and exit with +nil+. Otherwise process parsing and return its result.
       response, params = request_info(link, QEc2DummyParser.new)
       if block
-        @@bench.xml.add! { return nil unless block.call(response) } 
+        return nil unless block.call(response)
       end
       parser = QEc2DescribeImagesParser.new(:logger => @logger)
-      parser.parse(response, params)
+      @@bench.xml.add!{ parser.parse(response, params) }
       parser.result.collect do |image|
         { :aws_id            => image.imageId,
           :aws_location      => image.imageLocation,
@@ -392,10 +392,10 @@ module RightAws
       link = generate_request("DescribeInstances", hash_params('InstanceId',list.to_a))
       response, params = request_info(link, QEc2DummyParser.new)
       if block
-        @@bench.xml.add! { return nil unless block.call(response) } 
+        return nil unless block.call(response)
       end
       parser = QEc2DescribeInstancesParser.new(:logger => @logger)
-      parser.parse(response, params)
+      @@bench.xml.add!{ parser.parse(response, params) }
       get_desc_instances(parser.result)
     rescue Exception
       on_exception
@@ -583,10 +583,10 @@ module RightAws
       link   = generate_request("DescribeSecurityGroups", hash_params('GroupName',list.to_a))
       response, params = request_info(link, QEc2DummyParser.new)
       if block
-        @@bench.xml.add! { return nil unless block.call(response) } 
+        return nil unless block.call(response)
       end
       parser = QEc2DescribeSecurityGroupsParser.new(:logger => @logger)
-      parser.parse(response, params)
+      @@bench.xml.add!{ parser.parse(response, params) }
       
       result = []     
       parser.result.each do |item|
@@ -723,10 +723,10 @@ module RightAws
       link = generate_request("DescribeKeyPairs", hash_params('KeyName',list.to_a))
       response, params = request_info(link, QEc2DummyParser.new)
       if block
-        @@bench.xml.add! { return nil unless block.call(response) } 
+        return nil unless block.call(response)
       end
       parser = QEc2DescribeKeyPairParser.new(:logger => @logger)
-      parser.parse(response, params)
+      @@bench.xml.add!{ parser.parse(response, params) }
       parser.result.collect do |key|
         { :aws_key_name    => key.keyName,
           :aws_fingerprint => key.keyFingerprint }
