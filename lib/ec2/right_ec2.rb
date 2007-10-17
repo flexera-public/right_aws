@@ -78,8 +78,8 @@ module RightAws
     DNS_ADDRESSING_SET      = ['public','direct']
     
     # Default EC2 instance type (platform) 
-	  DEFAULT_INSTANCE_TYPE   =  'm1.small' 
-	  INSTANCE_TYPES          = ['m1.small','m1.large','m1.xlarge'] 
+    DEFAULT_INSTANCE_TYPE   =  'm1.small' 
+    INSTANCE_TYPES          = ['m1.small','m1.large','m1.xlarge'] 
     
     @@bench = AwsBenchmarkingBlock.new
     def self.bench_xml
@@ -87,6 +87,12 @@ module RightAws
     end
     def self.bench_ec2
       @@bench.service
+    end
+    
+     # Current API version (sometimes we have to check it outside the GEM).
+    @@api = ENV['EC2_API_VERSION'] || API_VERSION
+    def self.api 
+      @@api
     end
     
     # Create a new handle to an EC2 account. All handles share the same per process or per thread
@@ -113,7 +119,7 @@ module RightAws
       timestamp    = ( Time::now ).utc.strftime("%Y-%m-%dT%H:%M:%S.000Z")
       request_hash = {"Action"            => action,
                       "AWSAccessKeyId"    => @aws_access_key_id,
-                      "Version"           => API_VERSION,
+                      "Version"           => @@api,
                       "Timestamp"         => timestamp,
                       "SignatureVersion"  => SIGNATURE_VERSION }
       request_hash.update(param)
@@ -191,6 +197,17 @@ module RightAws
       #      :aws_state => "available",
       #      :aws_location => "marcins_cool_public_images/ubuntu-6.10.manifest.xml",
       #      :aws_is_public => true}]
+      #
+      # If a block is given then yields a respose before parsing. 
+      # If the block returns +false+ or +nil+ the response is not parsed
+      # and describe_images returns +nil+.
+      # 
+      #  images = ec2.describe_images do |response|
+      #    # Compare the response to the previous. If they are the same skip parsing - nothing
+      #    # has changed at Amazon. Skpping the parsing will save us a lots of time for the big
+      #    # responses.
+      #    response.body == previous_response_body ? false : true
+      #  end
       #
     def describe_images(list=[], &block)
       ec2_describe_images('ImageId', list, &block)
@@ -388,6 +405,17 @@ module RightAws
       #      :aws_instance_type  => "m1.small"}, 
       #       ..., {...}]
       #
+      # If a block is given then yields a respose before parsing. 
+      # If the block returns +false+ or +nil+ the response is not parsed
+      # and describe_instances returns +nil+.
+      # 
+      #  instances = ec2.describe_instances do |response|
+      #    # Compare the response to the previous. If they are the same skip parsing - nothing
+      #    # has changed at Amazon. Skpping the parsing will save us a lots of time for the big
+      #    # responses.
+      #    response.body == previous_response_body ? false : true
+      #  end
+      #
     def describe_instances(list=[], &block)
       link = generate_request("DescribeInstances", hash_params('InstanceId',list.to_a))
       response, params = request_info(link, QEc2DummyParser.new)
@@ -442,31 +470,31 @@ module RightAws
     
      
       # Launch new EC2 instances. Returns a list of launched instances or an exception. 
- 	    # 
- 	    # lparams and their default values: 
- 	    #  :min_count       - 1  
- 	    #  :max_count       - 1 
- 	    #  :user_data       - '' 
- 	    #  :group_ids       - [] # == 'default' 
- 	    #  :key_name        - nil 
- 	    #  :instance_type   - DEFAULT_INSTACE_TYPE 
- 	    #  :addressing_type - DEFAULT_ADDRESSING_TYPE 
- 	    # 
- 	    #  ec2.launch_instances('ami-e444444d', 'my_awesome_group', :user_data => "Woohoo!!!", \ 
- 	    #   :addressing_type => "public", :key_name => "my_awesome_key") #=> 
- 	    #   [{:aws_image_id       => "ami-e444444d", 
- 	    #     :aws_reason         => "", 
- 	    #     :aws_state_code     => "0", 
- 	    #     :aws_owner          => "000000000888", 
- 	    #     :aws_instance_id    => "i-123f1234", 
- 	    #     :aws_reservation_id => "r-aabbccdd", 
- 	    #     :aws_state          => "pending", 
- 	    #     :dns_name           => "", 
- 	    #     :ssh_key_name       => "my_awesome_key", 
- 	    #     :aws_groups         => ["default"], 
- 	    #     :private_dns_name   => "", 
- 	    #     :aws_instance_type  => "m1.small"}] 
- 	    #     
+      # 
+      # lparams and their default values: 
+      #  :min_count       - 1  
+      #  :max_count       - 1 
+      #  :user_data       - '' 
+      #  :group_ids       - [] # == 'default' 
+      #  :key_name        - nil 
+      #  :instance_type   - DEFAULT_INSTACE_TYPE 
+      #  :addressing_type - DEFAULT_ADDRESSING_TYPE 
+      # 
+      #  ec2.launch_instances('ami-e444444d', 'my_awesome_group', :user_data => "Woohoo!!!", \ 
+      #   :addressing_type => "public", :key_name => "my_awesome_key") #=> 
+      #   [{:aws_image_id       => "ami-e444444d", 
+      #     :aws_reason         => "", 
+      #     :aws_state_code     => "0", 
+      #     :aws_owner          => "000000000888", 
+      #     :aws_instance_id    => "i-123f1234", 
+      #     :aws_reservation_id => "r-aabbccdd", 
+      #     :aws_state          => "pending", 
+      #     :dns_name           => "", 
+      #     :ssh_key_name       => "my_awesome_key", 
+      #     :aws_groups         => ["default"], 
+      #     :private_dns_name   => "", 
+      #     :aws_instance_type  => "m1.small"}] 
+      #     
     def launch_instances(image_id, lparams={}) 
       defaults = { 
         :min_count       => 1, 
@@ -486,12 +514,11 @@ module RightAws
       params.update( {'ImageId'        => image_id,
                       'MinCount'       => lparams[:min_count].to_s, 
                       'MaxCount'       => lparams[:max_count].to_s, 
-                      'AddressingType' => lparams[:addressing_type], 
-                      'InstanceType'   => lparams[:instance_type] }) 
-      params['KeyName']  = lparams[:key_name] unless lparams[:key_name].blank? 
+                      'AddressingType' => lparams[:addressing_type] }) 
+      params['InstanceType'] = lparams[:instance_type]
+      params['KeyName']      = lparams[:key_name] unless lparams[:key_name].blank? 
       unless lparams[:user_data].blank? 
         lparams[:user_data].strip! 
-        user_data.strip!
           # Do not use CGI::escape(encode64(...)) as it is done in Amazons EC2 library.
           # Amazon 169.254.169.254 does not like escaped symbols!
           # And it doesn't like "\n" inside of encoded string! Grrr....
@@ -578,6 +605,17 @@ module RightAws
       #         {:to_port => "80",  :protocol => "tcp",  :from_port => "80",  :cidr_ips => "0.0.0.0/0"},
       #         {:to_port => "443", :protocol => "tcp",  :from_port => "443", :cidr_ips => "0.0.0.0/0"}]},
       #    ..., {...}]
+      #
+      # If a block is given then yields a respose before parsing. 
+      # If the block returns +false+ or +nil+ the response is not parsed
+      # and describe_security_groups returns +nil+.
+      # 
+      #  groups = ec2.describe_security_groups do |response|
+      #    # Compare the response to the previous. If they are the same skip parsing - nothing
+      #    # has changed at Amazon. Skpping the parsing will save us a lots of time for the big
+      #    # responses.
+      #    response.body == previous_response_body ? false : true
+      #  end
       #
     def describe_security_groups(list=[], &block)
       link   = generate_request("DescribeSecurityGroups", hash_params('GroupName',list.to_a))
@@ -719,6 +757,17 @@ module RightAws
       #     {:aws_fingerprint=> "1e:29:30:47:58:6d:7b:8c:9f:08:11:20:3c:44:52:69:74:80:97:08", :aws_key_name=>"key-2"},
       #      ..., {...} ]
       #
+      # If a block is given then yields a respose before parsing. 
+      # If the block returns +false+ or +nil+ the response is not parsed
+      # and describe_key_pairs returns +nil+.
+      # 
+      #  keys = ec2.describe_key_pairs do |response|
+      #    # Compare the response to the previous. If they are the same skip parsing - nothing
+      #    # has changed at Amazon. Skpping the parsing will save us a lots of time for the big
+      #    # responses.
+      #    response.body == previous_response_body ? false : true
+      #  end
+      #
     def describe_key_pairs(list=[], &block)
       link = generate_request("DescribeKeyPairs", hash_params('KeyName',list.to_a))
       response, params = request_info(link, QEc2DummyParser.new)
@@ -772,7 +821,7 @@ module RightAws
   #      PARSERS: Boolean Response Parser
   #-----------------------------------------------------------------
     
-  class RightBoolResponseParser < RightAWSParser
+  class RightBoolResponseParser < RightAWSParser #:nodoc:
     def tagend(name)
       @result = @text=='true' ? true : false if name == 'return'
     end
@@ -782,16 +831,16 @@ module RightAws
   #      PARSERS: Key Pair
   #-----------------------------------------------------------------
 
-    class QEc2DescribeKeyPairType
+    class QEc2DescribeKeyPairType #:nodoc:
       attr_accessor :keyName 
       attr_accessor :keyFingerprint
     end
 
-    class QEc2CreateKeyPairType < QEc2DescribeKeyPairType
+    class QEc2CreateKeyPairType < QEc2DescribeKeyPairType #:nodoc:
       attr_accessor :keyMaterial
     end
 
-    class QEc2DescribeKeyPairParser < RightAWSParser
+    class QEc2DescribeKeyPairParser < RightAWSParser #:nodoc:
       def tagstart(name, attributes)
         @item = QEc2DescribeKeyPairType.new if name == 'item'
       end
@@ -807,7 +856,7 @@ module RightAws
       end
     end
 
-    class QEc2CreateKeyPairParser < RightAWSParser
+    class QEc2CreateKeyPairParser < RightAWSParser #:nodoc:
       def tagstart(name, attributes)
         @result = QEc2CreateKeyPairType.new if !@result
       end
@@ -824,12 +873,12 @@ module RightAws
   #      PARSERS: Security Groups
   #-----------------------------------------------------------------
 
-    class QEc2UserIdGroupPairType
+    class QEc2UserIdGroupPairType #:nodoc:
       attr_accessor :userId
       attr_accessor :groupName
     end
 
-    class QEc2IpPermissionType
+    class QEc2IpPermissionType #:nodoc:
       attr_accessor :ipProtocol
       attr_accessor :fromPort
       attr_accessor :toPort
@@ -837,7 +886,7 @@ module RightAws
       attr_accessor :ipRanges
     end
 
-    class QEc2SecurityGroupItemType
+    class QEc2SecurityGroupItemType #:nodoc:
       attr_accessor :groupName
       attr_accessor :groupDescription
       attr_accessor :ownerId
@@ -845,7 +894,7 @@ module RightAws
     end
 
 
-    class QEc2DescribeSecurityGroupsParser < RightAWSParser
+    class QEc2DescribeSecurityGroupsParser < RightAWSParser #:nodoc:
       def tagstart(name, attributes)
         case name
           when 'item' 
@@ -895,7 +944,7 @@ module RightAws
   #      PARSERS: Images
   #-----------------------------------------------------------------
 
-    class QEc2DescribeImagesResponseItemType
+    class QEc2DescribeImagesResponseItemType #:nodoc:
       attr_accessor :imageId 
       attr_accessor :imageState 
       attr_accessor :imageLocation
@@ -904,7 +953,7 @@ module RightAws
       attr_accessor :productCodes
     end
 
-    class QEc2DescribeImagesParser < RightAWSParser
+    class QEc2DescribeImagesParser < RightAWSParser #:nodoc:
       def tagstart(name, attributes)
         if name == 'item' && @xmlpath[%r{.*/imagesSet$}]
           @image = QEc2DescribeImagesResponseItemType.new 
@@ -926,7 +975,7 @@ module RightAws
       end
     end
 
-    class QEc2RegisterImageParser < RightAWSParser
+    class QEc2RegisterImageParser < RightAWSParser #:nodoc:
       def tagend(name)
         @result = @text if name == 'imageId'
       end
@@ -936,18 +985,18 @@ module RightAws
   #      PARSERS: Image Attribute
   #-----------------------------------------------------------------
 
-    class QEc2LaunchPermissionItemType
+    class QEc2LaunchPermissionItemType #:nodoc:
       attr_accessor :groups
       attr_accessor :userIds
     end
     
-    class QEc2DescribeImageAttributeType
+    class QEc2DescribeImageAttributeType #:nodoc:
       attr_accessor :imageId 
       attr_accessor :launchPermission
       attr_accessor :productCodes
     end
 
-    class QEc2DescribeImageAttributeParser < RightAWSParser
+    class QEc2DescribeImageAttributeParser < RightAWSParser #:nodoc:
       def tagstart(name, attributes)
         case name
           when 'launchPermission'
@@ -979,12 +1028,12 @@ module RightAws
   #      PARSERS: Instances
   #-----------------------------------------------------------------
 
-    class QEc2InstanceStateType
+    class QEc2InstanceStateType #:nodoc:
       attr_accessor :code
       attr_accessor :name
     end
 
-    class QEc2RunningInstancesItemType
+    class QEc2RunningInstancesItemType #:nodoc:
       attr_accessor :instanceId
       attr_accessor :imageId
       attr_accessor :instanceState
@@ -997,14 +1046,14 @@ module RightAws
       attr_accessor :instanceType
     end
 
-    class QEc2DescribeInstancesType
+    class QEc2DescribeInstancesType #:nodoc:
       attr_accessor :reservationId
       attr_accessor :ownerId
       attr_accessor :groupSet
       attr_accessor :instancesSet 
     end
 
-    class QEc2DescribeInstancesParser < RightAWSParser
+    class QEc2DescribeInstancesParser < RightAWSParser #:nodoc:
       def tagstart(name, attributes)
         case name
           when 'item'
@@ -1053,7 +1102,7 @@ module RightAws
       end
     end
 
-    class QEc2ConfirmProductInstanceParser < RightAWSParser
+    class QEc2ConfirmProductInstanceParser < RightAWSParser #:nodoc:
       def tagend(name)
         @result = @text if name == 'ownerId'
       end
@@ -1062,7 +1111,7 @@ module RightAws
       end
     end
 
-    class QEc2RunInstancesParser < RightAWSParser
+    class QEc2RunInstancesParser < RightAWSParser #:nodoc:
       def tagstart(name, attributes)
         case name
           when 'RunInstancesResponse'
@@ -1108,13 +1157,13 @@ module RightAws
       end
     end
 
-    class QEc2TerminateInstancesResponseInfoType
+    class QEc2TerminateInstancesResponseInfoType #:nodoc:
       attr_accessor :instanceId
       attr_accessor :shutdownState
       attr_accessor :previousState
     end
 
-    class QEc2TerminateInstancesParser < RightAWSParser
+    class QEc2TerminateInstancesParser < RightAWSParser #:nodoc:
       def tagstart(name, attributes)
         if name == 'item'
           @instance = QEc2TerminateInstancesResponseInfoType.new 
@@ -1145,13 +1194,13 @@ module RightAws
   #      PARSERS: Console
   #-----------------------------------------------------------------
 
-    class QEc2GetConsoleOutputResponseType
+    class QEc2GetConsoleOutputResponseType #:nodoc:
       attr_accessor :instanceId
       attr_accessor :timestamp
       attr_accessor :output
     end
 
-    class QEc2GetConsoleOutputParser < RightAWSParser
+    class QEc2GetConsoleOutputParser < RightAWSParser #:nodoc:
       def tagend(name)
         case name
         when 'instanceId' ; @result.instanceId = @text
@@ -1167,7 +1216,7 @@ module RightAws
   end
 
   #-----------------------------------------------------------------
-  #      PARSERS: Console
+  #      PARSERS: Fake
   #-----------------------------------------------------------------
   
     # Dummy parser - does nothing

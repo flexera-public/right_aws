@@ -1,66 +1,68 @@
-== 1.1.0 / 2007-08-10
+== 1.1.0 2007-08-10
 Initial release.
 
-== 1.2.0 / 2007-09-12
-------------------------------------------------------------------------
-r1718 | todd | 2007-09-12 15:34:37 -0700 (Wed, 12 Sep 2007) | 3 lines
+== 1.2.0 2007-09-12
 
-(#458) Extensive documentation review, rework, and expansion.  Also added
-coverage analysis to the test suite using RCov.
+* r1718, todd, 2007-09-12 15:34:37
+  * # 458, Extensive documentation review, rework, and expansion.  Also added 
+    coverage analysis to the test suite using RCov.
 
-------------------------------------------------------------------------
-r1690 | todd | 2007-09-07 15:23:11 -0700 (Fri, 07 Sep 2007) | 2 lines
+* r1690, todd, 2007-09-07 15:23:11
+  * # 447, Add support.rb to manifest
 
-(#447) Add support.rb to manifest
+* r1688, todd, 2007-09-07 13:57:39
+  * # 447, Use Active Support if available, but don't require it.  Load our own
+    extensions if it's not present.  This keeps us from overloading ActiveSupport if
+    a user's already using it.
 
-------------------------------------------------------------------------
-r1688 | todd | 2007-09-07 13:57:39 -0700 (Fri, 07 Sep 2007) | 4 lines
+* r1687, todd, 2007-09-07 11:36:43
+  * # 447, Removed dependency on activesupport
 
-#(447)  Use Active Support if available, but don't require it.  Load our own
-extensions if it's not present.  This keeps us from overloading ActiveSupport if
-a user's already using it.
+* r1676, konstantin, 2007-09-06 01:27:09
+  * paid AMIs, small fix
 
-------------------------------------------------------------------------
-r1687 | todd | 2007-09-07 11:36:43 -0700 (Fri, 07 Sep 2007) | 2 lines
+* r1667, konstantin, 2007-09-05 12:58:10
+  * # 427, paid AMI support for ec2_instances
 
-(#447) Removed dependency on activesupport
+* r1658, konstantin, 2007-09-05 01:02:25
+  * params improvements for ec2.describe_xxx, now ones can use a String as well as an Array.
 
-------------------------------------------------------------------------
-r1676 | konstantin | 2007-09-06 01:27:09 -0700 (Thu, 06 Sep 2007) | 1 line
+* r1653, konstantin, 2007-09-04 12:31:19
+  * libxml and paid AMI support added
 
-paid AMIs, small fix
-------------------------------------------------------------------------
-r1667 | konstantin | 2007-09-05 12:58:10 -0700 (Wed, 05 Sep 2007) | 1 line
+* r1581, tve, 2007-08-24 16:21:45
+  * Improved RightAws documentation
 
-#427, Gems,  paid AMI support for ec2_instances
-------------------------------------------------------------------------
-r1658 | konstantin | 2007-09-05 01:02:25 -0700 (Wed, 05 Sep 2007) | 1 line
+== 1.3.0 2007-09-26
 
-RightGems: a couple of params improvements, now ones can use a String as well as an Array.
-------------------------------------------------------------------------
-r1653 | konstantin | 2007-09-04 12:31:19 -0700 (Tue, 04 Sep 2007) | 1 line
+* r1754, todd, 2007-09-19 13:48:34
+  * # 487, # 488, Consolidate a lot of code that was repeated in three places.
+    Fix error handling path when using streaming GET interfaces with S3.
+    Also add a stub for RightHttpConnection which allows more control over the
+    unit tests.  Expand the unit tests and coverage tests. 
 
-Right gems: libxml and paid AMI support added
-------------------------------------------------------------------------
-r1581 | tve | 2007-08-24 16:21:45 -0700 (Fri, 24 Aug 2007) | 1 line
+* r1755, todd, 2007-09-19 14:29:19
+  * # 487, RDoc fixes after code consolidation
 
-Improved RightAws documentation
-------------------------------------------------------------------------
+* r1866, konstantin, 2007-10-05 06:17:36
+  * # 220, close connection on HTTP 5xx/4xx errors
 
-== 1.3.0 / 2007-09-26
-------------------------------------------------------------------------
-r1754 | todd | 2007-09-19 13:48:34 -0700 (Wed, 19 Sep 2007) | 6 lines
+== 1.4.0 2007-10-10
 
-(#487, #488) Consolidate a lot of code that was repeated in three places.
-Fix error handling path when using streaming GET interfaces with S3.
-Also add a stub for RightHttpConnection which
-allows more control over the unit tests.  Expand the unit tests and coverage
-tests. 
-------------------------------------------------------------------------
-r1755 | todd | 2007-09-19 14:29:19 -0700 (Wed, 19 Sep 2007) | 2 lines
+* r1868, konstantin, 2007-10-05 06:38:37
+  * # 220, inst_type branch merge into 1.3.0 release
 
-(#487) RDoc fixes after code consolidation
+* r1869, konstantin, 2007-10-05 07:32:34
+  * right_http_connection 1.1.1 requirements fixed
 
-------------------------------------------------------------------------
+* r1879, konstantin, 2007-10-07 02:11:24
+  * # 524, blocks added to ec2_describe_xxx to support aws_cache
 
+* r1924, konstantin, 2007-10-12 11:35:06
+  * # 536, user_data bug fix 
 
+* r1929, tve,  2007-10-15 00:00:11
+  * Fix libxml/rexml selection bug
+
+* r1938, konstantin, 2007-10-16 10:53:56
+  * instance type support is set to default 

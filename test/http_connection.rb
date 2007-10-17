@@ -23,6 +23,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 # Stub extension/redefinition of RightHttpConnection for testing purposes.
 require 'net/http'
+require 'rubygems'
 require 'right_http_connection'
 
 module Net
@@ -33,7 +34,8 @@ module Net
     end
 
     def body
-      @mymsg ? @mymsg : real_body
+      # defined?() helps us to get rid of a bunch of 'warnings'
+      (defined?(@mymsg) && @mymsg) ? @mymsg : real_body
     end
   end
 end

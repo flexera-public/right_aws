@@ -43,6 +43,10 @@ module RightAws
       @@bench.service
     end
 
+    @@api = API_VERSION
+    def self.api 
+      @@api
+    end
 
       # Creates a new SqsInterface instance.
       #

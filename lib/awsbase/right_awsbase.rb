@@ -384,7 +384,7 @@ module RightAws
 
   #-----------------------------------------------------------------
 
-  class RightSaxParserCallback 
+  class RightSaxParserCallback #:nodoc:
     def self.include_callback 
       include XML::SaxParser::Callbacks       
     end 
@@ -466,7 +466,7 @@ module RightAws
             RightSaxParserCallback.include_callback 
           end           
         rescue LoadError => e
-          @@supported_libs.delete(@xml_lib) 
+          @@supported_xml_libs.delete(@xml_lib) 
           @xml_lib = DEFAULT_XML_LIBRARY           
           if @logger
             @logger.error e.inspect

@@ -13,6 +13,24 @@ class TestSqs < Test::Unit::TestCase
     @s = Rightscale::Sqs.new(TestCredentials.aws_access_key_id, TestCredentials.aws_secret_access_key)
   end
   
+  # Wait for the queue to appears in the queues list.
+  # Amazon needs some time to after the queue creation to place
+  # it to the accessible queues list. If we dont want to get
+  # the additional faults then wait a bit...
+  def wait_for_queue_url(queue_name)
+    queue_url = nil
+    until queue_url
+      queue_url = @sqs.queue_url_by_name(queue_name)
+      unless queue_url
+        print '-' 
+        STDOUT.flush
+        sleep 1
+      end
+    end
+    queue_url
+  end
+  
+  
   #---------------------------
   # Rightscale::SqsInterface
   #---------------------------
@@ -23,6 +41,7 @@ class TestSqs < Test::Unit::TestCase
   end
 
   def test_02_list_queues
+    wait_for_queue_url(@queue_name)
     queues = @sqs.list_queues('right_')
     assert queues.size>0, 'Must more that 0 queues in list'
   end
@@ -31,14 +50,14 @@ class TestSqs < Test::Unit::TestCase
     queue_url = @sqs.queue_url_by_name(@queue_name)
     assert queue_url[/http.*#{@queue_name}/], "#{@queue_name} must exist!"
     assert @sqs.set_queue_attributes(queue_url, 'VisibilityTimeout', 111), 'Set_queue_attributes fail'
-    sleep 10 # Amazon needs some time to change attribute
+    sleep 20 # Amazon needs some time to change attribute
     assert_equal '111', @sqs.get_queue_attributes(queue_url)['VisibilityTimeout'], 'New VisibilityTimeout must be equal to 111'
   end
   
   def test_04_set_and_get_visibility_timeout
     queue_url = @sqs.queue_url_by_name(@queue_name)
     assert @sqs.set_visibility_timeout(queue_url, 222), 'Set_visibility_timeout fail'
-    sleep 10 # Amazon needs some time to change attribute
+    sleep 20 # Amazon needs some time to change attribute
     assert_equal 222, @sqs.get_visibility_timeout(queue_url), 'Get_visibility_timeout must return to 222'
   end
   
@@ -103,6 +122,7 @@ class TestSqs < Test::Unit::TestCase
     queue  = @s.queue("#{@queue_name}_20", true)
       # check that it is created
     assert queue.is_a?(Rightscale::Sqs::Queue)
+    wait_for_queue_url(@queue_name)
       # check that amount of queues has increased
     assert_equal queues_size + 1, @s.queues.size
       # delete queue
@@ -114,10 +134,10 @@ class TestSqs < Test::Unit::TestCase
     queue = Rightscale::Sqs::Queue.create(@s, "#{@queue_name}_21", true)
       # check that it is created
     assert queue.is_a?(Rightscale::Sqs::Queue)
+    wait_for_queue_url(@queue_name)
   end
   
   def test_22_queue_attributes
-    sleep 10
     queue = Rightscale::Sqs::Queue.create(@s, "#{@queue_name}_21", false)
       # get a list of attrinutes
     attributes = queue.get_attribute
@@ -127,7 +147,7 @@ class TestSqs < Test::Unit::TestCase
       # set attribute
     assert queue.set_attribute('VisibilityTimeout', v)
       # wait a bit
-    sleep 10
+    sleep 20
       # check that attribute has changed
     assert_equal v, queue.get_attribute('VisibilityTimeout')
       # get queue visibility timeout
@@ -219,14 +239,14 @@ class TestSqs < Test::Unit::TestCase
   end
 
   def test_27_set_amazon_problems
-    original_problems = RightAws::SqsInterface.amazon_problems
+    original_problems = Rightscale::SqsInterface.amazon_problems
     assert(original_problems.length > 0)
-    RightAws::SqsInterface.amazon_problems= original_problems << "A New Problem"
-    new_problems = RightAws::SqsInterface.amazon_problems
+    Rightscale::SqsInterface.amazon_problems= original_problems << "A New Problem"
+    new_problems = Rightscale::SqsInterface.amazon_problems
     assert_equal(new_problems, original_problems)
 
-    RightAws::SqsInterface.amazon_problems= nil
-    assert_nil(RightAws::SqsInterface.amazon_problems)
+    Rightscale::SqsInterface.amazon_problems= nil
+    assert_nil(Rightscale::SqsInterface.amazon_problems)
   end
 
   def test_28_check_threading_model
