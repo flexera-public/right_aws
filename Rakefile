@@ -1,0 +1,62 @@
+# -*- ruby -*-
+
+require 'rubygems'
+require 'hoe'
+require "rake/testtask"
+require 'rcov/rcovtask'
+$: << File.dirname(__FILE__)
+require 'lib/right_aws.rb'
+
+testglobs =     ["test/ts_right_aws.rb"]
+
+Hoe.new('right_aws', RightAws::VERSION::STRING) do |p|
+  p.rubyforge_name = 'rightaws'
+  p.author = 'RightScale, Inc.'
+  p.email = 'support@rightscale.com'
+  p.summary = 'Interface classes for the Amazon EC2, SQS, and S3 Web Services'
+  p.description = p.paragraphs_of('README.txt', 2..5).join("\n\n")
+  p.url = p.paragraphs_of('README.txt', 0).first.split(/\n/)[1..-1]
+  p.changes = p.paragraphs_of('History.txt', 0..1).join("\n\n")
+  p.remote_rdoc_dir = "/right_aws_gem_doc"
+  p.extra_deps = [['right_http_connection','>= 1.2.0']]
+  p.test_globs = testglobs 
+end
+
+desc "Analyze code coverage of the unit tests."
+Rcov::RcovTask.new do |t|
+  t.test_files = FileList[testglobs]
+  #t.verbose = true     # uncomment to see the executed command
+end
+ 
+desc "Test just the SQS interface"
+task :testsqs do
+  require 'test/test_credentials'
+  require 'test/http_connection'
+  TestCredentials.get_credentials
+  require 'test/sqs/test_right_sqs.rb'
+end
+
+desc "Test just the S3 interface"
+task :tests3 do
+  require 'test/test_credentials'
+  require 'test/http_connection'
+  TestCredentials.get_credentials
+  require 'test/s3/test_right_s3.rb'
+end
+
+desc "Test just the S3 interface using local stubs"
+task :tests3local do
+  require 'test/test_credentials'
+  require 'test/http_connection'
+  TestCredentials.get_credentials
+  require 'test/s3/test_right_s3_stubbed.rb'
+end
+
+desc "Test just the EC2 interface"
+task :testec2 do
+  require 'test/test_credentials'
+  TestCredentials.get_credentials
+  require 'test/ec2/test_right_ec2.rb'
+end
+
+# vim: syntax=Ruby
