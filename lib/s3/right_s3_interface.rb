@@ -124,7 +124,7 @@ module RightAws
       # Raises AwsError if any banana happened.
     def request_info(request, parser, &block) # :nodoc:
       thread = @params[:multi_thread] ? Thread.current : Thread.main
-      thread[:s3_connection] ||= Rightscale::HttpConnection.new(:exception => RightAws::AwsError)
+      thread[:s3_connection] ||= Rightscale::HttpConnection.new(:exception => RightAws::AwsError, :logger => @logger)
       request_info_impl(thread[:s3_connection], @@bench, request, parser, &block)
     end
 

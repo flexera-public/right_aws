@@ -1,10 +1,7 @@
-# If ActiveSupport is present, then great - require it and use it.  But we
-# don't want a dependency on it, so if it's not present, define the few
+# If ActiveSupport is loaded, then great - use it.  But we don't 
+# want a dependency on it, so if it's not present, define the few
 # extensions that we want to use...
-begin
-  require 'rubygems'
-  require 'active_support'
-rescue LoadError => e
+unless defined? ActiveSupport::CoreExtensions
   # These are ActiveSupport-;like extensions to do a few handy things in the gems
   # Derived from ActiveSupport, so the AS copyright notice applies:
   #

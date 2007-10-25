@@ -66,3 +66,9 @@ Initial release.
 
 * r1938, konstantin, 2007-10-16 10:53:56
   * instance type support is set to default 
+
+== 1.4.3 2007-10-25
+
+* r1983, konstantin, 2007-10-25 22:33:00 +0400
+  * ActiveSupport requirements, removed (thanks to Toby)
+  * HttpConnection alwais logs to stdout, fixed (thanks to Toby)
