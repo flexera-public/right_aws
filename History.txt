@@ -70,5 +70,5 @@ Initial release.
 == 1.4.3 2007-10-25
 
 * r1983, konstantin, 2007-10-25 22:33:00 +0400
-  * ActiveSupport requirements, removed (thanks to Toby)
-  * HttpConnection alwais logs to stdout, fixed (thanks to Toby)
+  * Fixed ActiveSupport requirement bug (thanks to Toby)
+  * Fixed HttpConnection logging to stdout bug (thanks to Toby)
