@@ -72,3 +72,9 @@ Initial release.
 * r1983, konstantin, 2007-10-25 22:33:00 +0400
   * Fixed ActiveSupport requirement bug (thanks to Toby)
   * Fixed HttpConnection logging to stdout bug (thanks to Toby)
+
+== NEXT
+
+* r1999, tve, 2007-11-01 00:07:00 -0700
+  * Fixed escaping issue affecting key names in S3 gem
+  * Fixed duplicate marker in S3 incremental bucket listing
