@@ -94,6 +94,7 @@ module RightAws
     end
 
       # Generates request hash for REST API.
+      # Assumes that headers[:url] is URL encoded (use CGI::escape)
     def generate_rest_request(method, headers)  # :nodoc:
       path = headers[:url]
       path = "/#{path}" unless path[/^\//]
@@ -104,7 +105,7 @@ module RightAws
       headers['content-type'] ||= ''
       headers['date']           = Time.now.httpdate
         # create request
-      request      = "Net::HTTP::#{method.capitalize}".constantize.new(URI::escape(CGI::unescape(path)))
+      request      = "Net::HTTP::#{method.capitalize}".constantize.new(path)
       request.body = data if data
         # set request headers and meta headers
       headers.each      { |key, value| request[key.to_s] = value }
@@ -220,7 +221,7 @@ module RightAws
     #     ]
     #   }
     def incrementally_list_bucket(bucket, options={}, headers={}, &block)
-      internal_options = options.dup
+      internal_options = options.symbolize_keys
       begin 
         internal_bucket = bucket.dup
         internal_bucket  += '?'+internal_options.map{|k, v| "#{k.to_s}=#{CGI::escape v.to_s}"}.join('&') unless internal_options.blank?
@@ -229,11 +230,11 @@ module RightAws
         there_are_more_keys = response[:is_truncated]
         if(there_are_more_keys)
           if(response[:next_marker])
-            internal_options['marker'] = response[:next_marker]
+            internal_options[:marker] = response[:next_marker]
           else 
-            internal_options['marker'] = response[:contents].last[:key]
+            internal_options[:marker] = response[:contents].last[:key]
           end
-          internal_options['max-keys'] ? (internal_options['max-keys'] -= response[:contents].length) : nil 
+          internal_options[:'max-keys'] ? (internal_options[:'max-keys'] -= response[:contents].length) : nil 
         end
         yield response
       end while there_are_more_keys 

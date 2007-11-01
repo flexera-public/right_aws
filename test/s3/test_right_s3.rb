@@ -7,8 +7,9 @@ class TestS3 < Test::Unit::TestCase
   def setup
     @s3     = Rightscale::S3Interface.new(TestCredentials.aws_access_key_id, TestCredentials.aws_secret_access_key)
     @bucket = 'right_s3_awesome_test_bucket'
-    @key1   = 'test/woohoo1'
+    @key1   = 'test/woohoo1/'
     @key2   = 'test1/key/woohoo2'
+    @key3   = 'test2/A%B@C_D&E?F+G=H"I'
     @s      = Rightscale::S3.new(TestCredentials.aws_access_key_id, TestCredentials.aws_secret_access_key)
   end
 
@@ -31,6 +32,7 @@ class TestS3 < Test::Unit::TestCase
   def test_04_put
     assert @s3.put(@bucket, @key1, RIGHT_OBJECT_TEXT, 'x-amz-meta-family'=>'Woohoo1!'), 'Put bucket fail'
     assert @s3.put(@bucket, @key2, RIGHT_OBJECT_TEXT, 'x-amz-meta-family'=>'Woohoo2!'), 'Put bucket fail'
+    assert @s3.put(@bucket, @key3, RIGHT_OBJECT_TEXT, 'x-amz-meta-family'=>'Woohoo3!'), 'Put bucket fail'
   end
   
   def test_05_get_and_get_object
@@ -39,6 +41,7 @@ class TestS3 < Test::Unit::TestCase
     assert_equal RIGHT_OBJECT_TEXT, data1[:object], "Object text must be equal to '#{RIGHT_OBJECT_TEXT}'"
     assert_equal RIGHT_OBJECT_TEXT, @s3.get_object(@bucket, @key1), "Get_object text must return '#{RIGHT_OBJECT_TEXT}'"
     assert_equal 'Woohoo1!', data1[:headers]['x-amz-meta-family'], "x-amz-meta-family header must be equal to 'Woohoo1!'"
+    assert_equal RIGHT_OBJECT_TEXT, @s3.get_object(@bucket, @key3), "Get_object text must return '#{RIGHT_OBJECT_TEXT}'"
   end
   
   def test_06_head
@@ -63,12 +66,20 @@ class TestS3 < Test::Unit::TestCase
     assert_equal 'Woohoo1!', data1[:headers]['x-amz-meta-family'], "x-amz-meta-family header must be equal to 'Woohoo1!'"
   end
   
-  def test_08_delete_folder
+  def test_08_keys
+    keys = @s3.list_bucket(@bucket).map{|b| b[:key]}
+    assert_equal keys.size, 3, "There should be 3 keys"
+    assert(keys.include? @key1)
+    assert(keys.include? @key2)
+    assert(keys.include? @key3)
+  end
+  
+  def test_09_delete_folder
     assert_equal 1, @s3.delete_folder(@bucket, 'test').size, "Only one key(#{@key1}) must be deleted!"
   end
 
 
-  def test_09_delete_bucket
+  def test_10_delete_bucket
     assert_raise(Rightscale::AwsError) { @s3.delete_bucket(@bucket) }
     assert @s3.clear_bucket(@bucket), 'Clear_bucket fail'
     assert_equal 0, @s3.list_bucket(@bucket).size, 'Bucket must be empty'
@@ -98,11 +109,11 @@ class TestS3 < Test::Unit::TestCase
     assert @s.buckets.map{|b| b.name}.include?(@bucket)
     assert bucket.keys.empty?
       # put data
-    assert bucket.put(@key1, RIGHT_OBJECT_TEXT, {'family'=>'123456'})
+    assert bucket.put(@key3, RIGHT_OBJECT_TEXT, {'family'=>'123456'})
       # get data and compare
-    assert_equal RIGHT_OBJECT_TEXT, bucket.get(@key1)
+    assert_equal RIGHT_OBJECT_TEXT, bucket.get(@key3)
       # get key object
-    key = bucket.key(@key1, true)
+    key = bucket.key(@key3, true)
     assert_equal Rightscale::S3::Key, key.class
     assert       key.exists?
     assert_equal '123456', key.meta_headers['family']
@@ -111,10 +122,10 @@ class TestS3 < Test::Unit::TestCase
   def test_22_keys
     bucket = Rightscale::S3::Bucket.create(@s, @bucket, false)
       # create first key
-    key1 = Rightscale::S3::Key.create(bucket, @key1)
-    key1.refresh
-    assert key1.exists?
-    assert_equal '123456', key1.meta_headers['family']
+    key3 = Rightscale::S3::Key.create(bucket, @key3)
+    key3.refresh
+    assert key3.exists?
+    assert_equal '123456', key3.meta_headers['family']
       # create second key
     key2 = Rightscale::S3::Key.create(bucket, @key2)
     assert !key2.refresh
