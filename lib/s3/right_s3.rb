@@ -569,13 +569,15 @@ module RightAws
         # Create a new Grantee instance. 
         # Grantee +id+ must exist on S3. If +action+ == :refresh, then retrieve
         # permissions from S3 and update @perms. If +action+ == :apply, then apply
-        # perms to +thing+ at S3. The default action is :refresh.
+        # perms to +thing+ at S3. If +action+ == :apply_and_refresh then it performs.
+        # both the actions. This is used for the new grantees that had no perms to 
+        # this thing before. The default action is :refresh.
         #
         #  bucket = s3.bucket('my_awesome_bucket', true, 'public-read')
         #  grantee1 = RightAws::S3::Grantee.new(bucket, 'a123b...223c', FULL_CONTROL)
         #    ...
         #  grantee2 = RightAws::S3::Grantee.new(bucket, 'abcde...asdf', [FULL_CONTROL, READ], :apply)
-        #
+        #  grantee3 = RightAws::S3::Grantee.new(bucket, 'aaaaa...aaaa', 'READ', :apply_and_refresh)  
         #
       def initialize(thing, id, perms=[], action=:refresh, name=nil)
         @thing = thing
@@ -583,9 +585,18 @@ module RightAws
         @name  = name
         @perms = perms.to_a
         case action
-          when :apply;   apply
-          when :refresh; refresh
+          when :apply:             apply
+          when :refresh:           refresh
+          when :apply_and_refresh: apply; refresh
         end
+      end
+      
+        # Return +true+ if the grantee has any permissions to the thing.
+      def exists?
+        self.class.grantees(@thing).each do |grantee|
+          return true if @id == grantee.id
+        end
+        false
       end
       
         # Return Grantee type (+String+): "Group" or "CanonicalUser".
@@ -603,11 +614,16 @@ module RightAws
         # See http://docs.amazonwebservices.com/AmazonS3/2006-03-01/UsingPermissions.html .
         # Returns +true+. 
         #
-        #  grantee.grant('FULL_CONTROL') #=> true
-        #
-      def grant(permission)
-        return true if @perms.include?(permission)
-        @perms += permission.to_a
+        #  grantee.grant('FULL_CONTROL')                  #=> true
+        #  grantee.grant('FULL_CONTROL','WRITE','READ')   #=> true
+        #  grantee.grant(['WRITE_ACP','READ','READ_ACP']) #=> true
+        #  
+      def grant(*permissions)
+        permissions.flatten!
+        old_perms = @perms.dup
+        @perms   += permissions
+        @perms.uniq!
+        return true if @perms == old_perms
         apply
       end
       
@@ -617,11 +633,16 @@ module RightAws
         # Default value is 'FULL_CONTROL'. 
         # Returns +true+.
         #
-        #  grantee.revoke #=> true
+        #  grantee.revoke('READ')                   #=> true
+        #  grantee.revoke('FULL_CONTROL','WRITE')   #=> true
+        #  grantee.revoke(['READ_ACP','WRITE_ACP']) #=> true
         #
-      def revoke(permission)
-        return true unless @perms.include?(permission)
-        @perms -= permission.to_a
+      def revoke(*permissions)
+        permissions.flatten!
+        old_perms = @perms.dup
+        @perms   -= permissions
+        @perms.uniq!
+        return true if @perms == old_perms
         apply
       end
      
@@ -664,10 +685,13 @@ module RightAws
         #  grantee.apply #=> true
         #
       def apply
+        @perms.uniq!
         owner, grantees = self.class.owner_and_grantees(@thing)
-        grantees.map! do |grantee|
-          grantee.id == @id ? self : grantee
-        end
+        # walk through all the grantees and replace the data for the current one and ...
+        grantees.map! { |grantee| grantee.id == @id ? self : grantee }
+        # ... if this grantee is not known - add this bad boy to a list
+        grantees << self unless grantees.include?(self)
+        # set permissions
         self.class.put_acl(@thing, owner, grantees)
       end
 

@@ -4,6 +4,7 @@ README.txt
 Rakefile
 lib/right_aws.rb
 lib/awsbase/benchmark_fix.rb
+lib/awsbase/net_fix.rb
 lib/awsbase/support.rb
 lib/awsbase/right_awsbase.rb
 lib/ec2/right_ec2.rb

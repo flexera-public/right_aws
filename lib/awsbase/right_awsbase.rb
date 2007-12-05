@@ -23,7 +23,8 @@
 
 # Test
 module RightAws
-
+  require 'md5'
+  
   class AwsUtils #:nodoc:
     def self.sign(aws_secret_access_key, auth_string)
       Base64.encode64(OpenSSL::HMAC.digest(OpenSSL::Digest::Digest.new("sha1"), aws_secret_access_key, auth_string)).strip
@@ -41,6 +42,9 @@ module RightAws
     end
   end
 
+  class AwsNoChange < RuntimeError
+  end
+  
   class RightAwsBase
 
     # Amazon HTTP Error handling
@@ -70,11 +74,18 @@ module RightAws
     def self.amazon_problems=(problems_list)
       @@amazon_problems = problems_list
     end
-
+    
   end
 
   module RightAwsBaseInterface
-
+    @@caching = false
+    def self.caching
+      @@caching
+    end
+    def self.caching=(caching)
+      @@caching = caching
+    end
+    
       # Current aws_access_key_id
     attr_reader :aws_access_key_id
       # Last HTTP request object
@@ -91,6 +102,8 @@ module RightAws
     attr_accessor :params
       # RightHttpConnection instance
     attr_reader :connection
+      # Cache
+    attr_reader :cache
 
     def init(service_info, aws_access_key_id, aws_secret_access_key, params={}) #:nodoc:
       @params = params
@@ -107,9 +120,51 @@ module RightAws
       @logger = Logger.new(STDOUT)   if !@logger
       @logger.info "New #{self.class.name} using #{@params[:multi_thread] ? 'multi' : 'single'}-threaded mode"
       @error_handler = nil
+      @cache = {}
     end
 
+    # Returns +true+ if the describe_xxx responses are being cached 
+    def caching?
+      @params.key?(:cache) ? @params[:cache] : @@caching
+    end
+    
+    # Check if the aws function response hits the cache or not.
+    # If the cache hits:
+    # - raises an +AwsNoChange+ exception if +do_raise+ == +:raise+.
+    # - returnes parsed response from the cache if it exists or +true+ otherwise.
+    # If the cache miss or the caching is off then returns +false+.
+    def cache_hits?(function, response, do_raise=:raise)
+      result = false
+      if caching?
+        function     = function.to_sym
+        response_md5 = MD5.md5(response).to_s
+        # well, the response is new, reset cache data
+        unless @cache[function] && @cache[function][:response_md5] == response_md5
+          update_cache(function, {:response_md5 => response_md5, 
+                                  :timestamp    => Time.now, 
+                                  :hits         => 0, 
+                                  :parsed       => nil})
+        else
+          # aha, cache hits, update the data and throw an exception if needed
+          @cache[function][:hits] += 1
+          if do_raise == :raise
+            raise(AwsNoChange, "Cache hit: #{function} response has not changed since "+
+                               "#{@cache[function][:timestamp].strftime('%Y-%m-%d %H:%M:%S')}, "+
+                               "hits: #{@cache[function][:hits]}.")
+          else
+            result = @cache[function][:parsed] || true
+          end
+        end
+      end
+      result
+    end
+    
+    def update_cache(function, hash)
+      (@cache[function.to_sym] ||= {}).merge!(hash) if caching?
+    end
+    
     def on_exception(options={:raise=>true, :log=>true}) # :nodoc:
+      raise if $!.is_a?(AwsNoChange)
       AwsError::on_aws_exception(self, options)
     end
     
@@ -253,7 +308,7 @@ module RightAws
     # Used to force logging.
     def self.system_error?(e)
  	    !e.is_a?(self) || e.message =~ /InternalError|InsufficientInstanceCapacity|Unavailable/
- 	  end
+    end
 
   end
 
@@ -316,21 +371,40 @@ module RightAws
     def check(request)  #:nodoc:
       result           = false
       error_found      = false
+      redirect_detected= false
       error_match      = nil
       last_errors_text = ''
       response         = @aws.last_response
-        # log error
+      # log error
       request_text_data = "#{request[:server]}:#{request[:port]}#{request[:request].path}"
-      @aws.logger.warn("##### #{@aws.class.name} returned an error: #{response.code} #{response.message}\n#{response.body} #####")
-      @aws.logger.warn("##### #{@aws.class.name} request: #{request_text_data} ####")
+      # is this a redirect?
+      # yes!
+      if response.is_a?(Net::HTTPRedirection)
+        redirect_detected = true 
+      else
+        # no, it's an error ...
+        @aws.logger.warn("##### #{@aws.class.name} returned an error: #{response.code} #{response.message}\n#{response.body} #####")
+        @aws.logger.warn("##### #{@aws.class.name} request: #{request_text_data} ####")
+      end
         # Check response body: if it is an Amazon XML document or not:
-      if response.body && response.body[/<\?xml/]         # ... it is a xml document
+      if redirect_detected || (response.body && response.body[/<\?xml/])   # ... it is a xml document
         @aws.class.bench_xml.add! do
           error_parser = RightErrorResponseParser.new
           error_parser.parse(response)
           @aws.last_errors     = error_parser.errors
           @aws.last_request_id = error_parser.requestID
           last_errors_text     = @aws.last_errors.flatten.join("\n")
+          # on redirect :
+          if redirect_detected
+            location = response['location']
+            # ... log intormation and ...
+            @aws.logger.info("##### #{@aws.class.name} redirect requested: #{response.code} #{response.message} #####")
+            @aws.logger.info("##### New location: #{location} #####")
+            # ... fix the connection data
+            request[:server]   = URI.parse(location).host
+            request[:protocol] = URI.parse(location).scheme
+            request[:port]     = URI.parse(location).port
+          end
         end
       else                               # ... it is not a xml document(probably just a html page?)
         @aws.last_errors     = [[response.code, "#{response.message} (#{request_text_data})"]]
@@ -338,29 +412,34 @@ module RightAws
         last_errors_text     = response.message
       end
         # now - check the error
-      @errors_list.each do |error_to_find|
-        if last_errors_text[/#{error_to_find}/i]
-          error_found = true
-          error_match = error_to_find
-          @aws.logger.warn("##### Retry is needed, error pattern match: #{error_to_find} #####")
-          break
+      unless redirect_detected
+        @errors_list.each do |error_to_find|
+          if last_errors_text[/#{error_to_find}/i]
+            error_found = true
+            error_match = error_to_find
+            @aws.logger.warn("##### Retry is needed, error pattern match: #{error_to_find} #####")
+            break
+          end
         end
       end
         # check the time has gone from the first error come
-      if error_found
+      if redirect_detected || error_found
         # Close the connection to the server and recreate a new one. 
         # It may have a chance that one server is a semi-down and reconnection 
         # will help us to connect to the other server 
-        if @close_on_error 
+        if !redirect_detected && @close_on_error
           @aws.connection.finish "#{self.class.name}: error match to pattern '#{error_match}'" 
         end 
                  
         if (Time.now < @stop_at)
           @retries += 1
-          @aws.logger.warn("##### Retry ##{@retries} is being performed. Sleeping for #{@reiteration_delay} sec. Whole time: #{Time.now-@started_at} sec ####")
-          sleep @reiteration_delay
-          
-          @reiteration_delay *= 2
+          unless redirect_detected
+            @aws.logger.warn("##### Retry ##{@retries} is being performed. Sleeping for #{@reiteration_delay} sec. Whole time: #{Time.now-@started_at} sec ####")
+            sleep @reiteration_delay 
+            @reiteration_delay *= 2
+          else
+            @aws.logger.info("##### Retry ##{@retries} is being performed due to a redirect.  ####")
+          end
           result = @aws.request_info(request, @parser)
         else
           @aws.logger.warn("##### Ooops, time is over... ####")
@@ -516,14 +595,27 @@ module RightAws
   #      PARSERS: Errors
   #-----------------------------------------------------------------
 
+#<Error>
+#  <Code>TemporaryRedirect</Code>
+#  <Message>Please re-send this request to the specified temporary endpoint. Continue to use the original request endpoint for future requests.</Message>
+#  <RequestId>FD8D5026D1C5ABA3</RequestId>
+#  <Endpoint>bucket-for-k.s3-external-3.amazonaws.com</Endpoint>
+#  <HostId>ItJy8xPFPli1fq/JR3DzQd3iDvFCRqi1LTRmunEdM1Uf6ZtW2r2kfGPWhRE1vtaU</HostId>
+#  <Bucket>bucket-for-k</Bucket>
+#</Error>
+
   class RightErrorResponseParser < RightAWSParser #:nodoc:
     attr_accessor :errors  # array of hashes: error/message
     attr_accessor :requestID
+#    attr_accessor :endpoint, :host_id, :bucket
     def tagend(name)
       case name
         when 'RequestID' ; @requestID = @text
         when 'Code'      ; @code      = @text
         when 'Message'   ; @message   = @text
+#       when 'Endpoint'  ; @endpoint  = @text
+#       when 'HostId'    ; @host_id   = @text
+#       when 'Bucket'    ; @bucket    = @text
         when 'Error'     ; @errors   << [ @code, @message ]
       end
     end
@@ -531,5 +623,5 @@ module RightAws
       @errors = []
     end
   end
-  
+
 end

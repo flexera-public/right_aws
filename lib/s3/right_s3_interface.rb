@@ -24,6 +24,9 @@
 module RightAws
 
   class S3Interface < RightAwsBase
+    
+    USE_100_CONTINUE_PUT_SIZE = 1_000_000
+    
     include RightAwsBaseInterface
     
     DEFAULT_HOST           = 's3.amazonaws.com'
@@ -93,11 +96,37 @@ module RightAws
       out_string
     end
 
+    def is_dns_bucket?(bucket_name)
+      bucket_name = bucket_name.to_s
+      return nil unless (3..63) === bucket_name.size
+      bucket_name.split('.').each do |component|
+        return nil unless component[/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/]
+      end
+      true
+    end
+    
       # Generates request hash for REST API.
       # Assumes that headers[:url] is URL encoded (use CGI::escape)
     def generate_rest_request(method, headers)  # :nodoc:
-      path = headers[:url]
-      path = "/#{path}" unless path[/^\//]
+      # default server to use
+      server = @params[:server]
+      # fix path
+      path_to_sign = headers[:url]
+      path_to_sign = "/#{path_to_sign}" unless path_to_sign[/^\//]
+      # extract bucket name and check it's dns compartibility
+      bucket_name = path_to_sign[%r{^/([^/]*)}] && $1.to_s
+      # select request model
+      if is_dns_bucket?(bucket_name)
+        # remove bucket from the path
+        path = path_to_sign.sub("/#{bucket_name}",'')
+        path = "/#{path}" unless path[/^\//]
+        # and add it to a server name
+        server = "#{bucket_name}.#{server}"
+        # add a trailing slash to a bucket for signing
+        path_to_sign += '/' if path_to_sign[%r{^/#{bucket_name}$}]
+      else
+        path = path_to_sign
+      end
       data = headers[:data]
         # remove unset(==optional) and symbolyc keys
       headers.each{ |key, value| headers.delete(key) if (value.nil? || key.is_a?(Symbol)) }
@@ -110,17 +139,17 @@ module RightAws
         # set request headers and meta headers
       headers.each      { |key, value| request[key.to_s] = value }
         #generate auth strings
-      auth_string = canonical_string(request.method, request.path, request.to_hash)
+      auth_string = canonical_string(request.method, path_to_sign, request.to_hash)
       signature   = AwsUtils::sign(@aws_secret_access_key, auth_string)
         # set other headers
       request['Authorization'] = "AWS #{@aws_access_key_id}:#{signature}"
         # prepare output hash
       { :request  => request, 
-        :server   => @params[:server],
+        :server   => server,
         :port     => @params[:port],
         :protocol => @params[:protocol] }
-    end
-
+      end
+      
       # Sends request to Amazon and parses the response.
       # Raises AwsError if any banana happened.
     def request_info(request, parser, &block) # :nodoc:
@@ -150,10 +179,15 @@ module RightAws
       #  s3.create_bucket('my_awesome_bucket') #=> true
       #
     def create_bucket(bucket, headers={})
-      req_hash = generate_rest_request('PUT', headers.merge(:url=>bucket))
+      data = nil
+      if headers[:location]
+        data = "<CreateBucketConfiguration><LocationConstraint>#{headers[:location].upcase}</LocationConstraint></CreateBucketConfiguration>"
+      end
+      req_hash = generate_rest_request('PUT', headers.merge(:url=>bucket, :data => data))
       request_info(req_hash, S3TrueParser.new)
-    rescue
-      on_exception
+    rescue Exception => e
+        # if the bucket exists AWS returns an error for the location constraint interface. Drop it
+      e.is_a?(RightAws::AwsError) && e.message.include?('BucketAlreadyOwnedByYou') ? true  : on_exception
     end
     
       # Deletes new bucket. Bucket must be empty! Returns +true+ or an exception.
@@ -243,12 +277,50 @@ module RightAws
       on_exception
     end
     
-      # Saves object to Amazon. Returns +true+  or an exception. 
-      # Any header starting with AMAZON_METADATA_PREFIX is considered user metadata. It will be stored with the object and returned when you retrieve the object. The total size of the HTTP request, not including the body, must be less than 4 KB.
-      #    
+      # Saves object to Amazon. Returns +true+  or an exception.
+      # Any header starting with AMAZON_METADATA_PREFIX is considered
+      # user metadata. It will be stored with the object and returned
+      # when you retrieve the object. The total size of the HTTP
+      # request, not including the body, must be less than 4 KB.
+      #
       #  s3.put('my_awesome_bucket', 'log/curent/1.log', 'Ola-la!', 'x-amz-meta-family'=>'Woho556!') #=> true
       #
+      # This method is capable of 'streaming' uploads; that is, it can upload
+      # data from a file or other IO object without first reading all the data
+      # into memory.  This is most useful for large PUTs - it is difficult to read
+      # a 2 GB file entirely into memory before sending it to S3.
+      # To stream an upload, pass an object that responds to 'read' (like the read
+      # method of IO) and to either 'lstat' or 'size'.  For files, this means
+      # streaming is enabled by simply making the call:
+      #
+      #  s3.put(bucket_name, 'S3keyname.forthisfile',  File.open('localfilename.dat'))
+      #
+      # If the IO object you wish to stream from responds to the read method but
+      # doesn't implement lstat or size, you can extend the object dynamically
+      # to implement these methods, or define your own class which defines these
+      # methods.  Be sure that your class returns 'nil' from read() after having
+      # read 'size' bytes. Otherwise S3 will drop the socket after
+      # 'Content-Length' bytes have been uploaded, and HttpConnection will
+      # interpret this as an error. 
+      #    
+      # Note: This method does not yet support very large PUTs, where very large
+      # is > 2 GB. This is due to the underlying Net::HTTP library, which does
+      # not send Expect: 100-Continue headers for these large requests.  
+      # 
+      # For Win32 users: Files and IO objects should be opened in binary mode.  If
+      # a text mode IO object is passed to PUT, it will be converted to binary
+      # mode.
+      #
     def put(bucket, key, data=nil, headers={})
+      # On Windows, if someone opens a file in text mode, we must reset it so
+      # to binary mode for streaming to work properly
+      if(data.respond_to?(:binmode))
+        data.binmode
+      end
+      if (data.respond_to?(:lstat) && data.lstat.size >= USE_100_CONTINUE_PUT_SIZE) ||
+         (data.respond_to?(:size)  && data.size       >= USE_100_CONTINUE_PUT_SIZE)
+        headers['expect'] = '100-continue'
+      end
       req_hash = generate_rest_request('PUT', headers.merge(:url=>"#{bucket}/#{CGI::escape key}", :data=>data))
       request_info(req_hash, S3TrueParser.new)
     rescue

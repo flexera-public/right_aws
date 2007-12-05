@@ -173,9 +173,10 @@ class TestS3 < Test::Unit::TestCase
   
   def test_32_grant_revoke_drop
     bucket = Rightscale::S3::Bucket.create(@s, @bucket, false)
-    grantees = bucket.grantees
-      # Take one of grantees
-    grantee = grantees[0]
+      # Take 'AllUsers' grantee 
+    grantee = Rightscale::S3::Grantee.new(bucket,'http://acs.amazonaws.com/groups/global/AllUsers')
+      # Check exists?
+    assert grantee.exists?
       # Add grant as String
     assert grantee.grant('WRITE')
       # Add grants as Array
@@ -188,8 +189,19 @@ class TestS3 < Test::Unit::TestCase
     grantee.perms -= ['READ_ACP']
     grantee.apply
     assert_equal 2, grantee.perms.size
+      # Check grantee removal if it has no permissions
+    assert grantee.perms = []
+    assert grantee.apply
+    assert !grantee.exists?
+      # Check multiple perms assignment
+    assert grantee.grant 'FULL_CONTROL', 'READ', 'WRITE'
+    assert_equal ['FULL_CONTROL','READ','WRITE'].sort, grantee.perms.sort
+      # Check multiple perms removal
+    assert grantee.revoke 'FULL_CONTROL', 'WRITE'
+    assert_equal ['READ'], grantee.perms
       # check 'Drop' method
     assert grantee.drop
+    assert !grantee.exists?
     assert_equal 1, bucket.grantees.size
       # Delete bucket
     bucket.delete(true)

@@ -154,19 +154,18 @@ module RightAws
   #-----------------------------------------------------------------
   #-----------------------------------------------------------------
 
-    def ec2_describe_images(type, list, &block) #:nodoc:
+    def ec2_describe_images(type, list) #:nodoc:
       link   = generate_request("DescribeImages", hash_params(type,list.to_a))
       # We do not want to break the logic of parsing hence will use a dummy parser to process all the standart 
       # steps (errors checking etc). The dummy parser does nothig - just returns back the params it received.
-      # Then call the block (if it is) with the response. If the block returns +nil+ or +false+ then do not process
-      # real response parsing and exit with +nil+. Otherwise process parsing and return its result.
+      # If the caching is enabled and hit then throw  AwsNoChange. 
+      # P.S. caching works for the whole images list only! (when the list param is blank)
       response, params = request_info(link, QEc2DummyParser.new)
-      if block
-        return nil unless block.call(response)
-      end
+      # if cache is ON and hits then throws AwsNoChange 
+      cache_hits?(:describe_images, response.body) if list.blank?
       parser = QEc2DescribeImagesParser.new(:logger => @logger)
       @@bench.xml.add!{ parser.parse(response, params) }
-      parser.result.collect do |image|
+      result = parser.result.collect do |image|
         { :aws_id            => image.imageId,
           :aws_location      => image.imageLocation,
           :aws_owner         => image.imageOwnerId,
@@ -174,6 +173,9 @@ module RightAws
           :aws_is_public     => image.isPublic,
           :aws_product_codes => image.productCodes }
       end
+      # put parsed data into cache if the caching is ON
+      update_cache(:describe_images, :parsed => result) if list.blank?
+      result
     rescue Exception
       on_exception
     end
@@ -198,19 +200,8 @@ module RightAws
       #      :aws_location => "marcins_cool_public_images/ubuntu-6.10.manifest.xml",
       #      :aws_is_public => true}]
       #
-      # If a block is given then yields a respose before parsing. 
-      # If the block returns +false+ or +nil+ the response is not parsed
-      # and describe_images returns +nil+.
-      # 
-      #  images = ec2.describe_images do |response|
-      #    # Compare the response to the previous. If they are the same skip parsing - nothing
-      #    # has changed at Amazon. Skpping the parsing will save us a lots of time for the big
-      #    # responses.
-      #    response.body == previous_response_body ? false : true
-      #  end
-      #
-    def describe_images(list=[], &block)
-      ec2_describe_images('ImageId', list, &block)
+    def describe_images(list=[])
+      ec2_describe_images('ImageId', list)
     end
 
       #
@@ -219,8 +210,8 @@ module RightAws
       #  ec2.describe_images_by_owner('522821470517')
       #  ec2.describe_images_by_owner('self')
       #
-    def describe_images_by_owner(list, &block)
-      ec2_describe_images('Owner', list, &block)
+    def describe_images_by_owner(list)
+      ec2_describe_images('Owner', list)
     end
 
       #
@@ -229,8 +220,8 @@ module RightAws
       #  ec2.describe_images_by_executable_by('522821470517')
       #  ec2.describe_images_by_executable_by('self')
       #
-    def describe_images_by_executable_by(list, &block)
-      ec2_describe_images('ExecutableBy', list, &block)
+    def describe_images_by_executable_by(list)
+      ec2_describe_images('ExecutableBy', list)
     end
 
 
@@ -405,26 +396,17 @@ module RightAws
       #      :aws_instance_type  => "m1.small"}, 
       #       ..., {...}]
       #
-      # If a block is given then yields a respose before parsing. 
-      # If the block returns +false+ or +nil+ the response is not parsed
-      # and describe_instances returns +nil+.
-      # 
-      #  instances = ec2.describe_instances do |response|
-      #    # Compare the response to the previous. If they are the same skip parsing - nothing
-      #    # has changed at Amazon. Skpping the parsing will save us a lots of time for the big
-      #    # responses.
-      #    response.body == previous_response_body ? false : true
-      #  end
-      #
-    def describe_instances(list=[], &block)
+    def describe_instances(list=[])
       link = generate_request("DescribeInstances", hash_params('InstanceId',list.to_a))
       response, params = request_info(link, QEc2DummyParser.new)
-      if block
-        return nil unless block.call(response)
-      end
+      # check cache
+      cache_hits?(:describe_instances, response.body) if list.blank?
       parser = QEc2DescribeInstancesParser.new(:logger => @logger)
       @@bench.xml.add!{ parser.parse(response, params) }
-      get_desc_instances(parser.result)
+      result = get_desc_instances(parser.result)
+      # update parsed data
+      update_cache(:describe_instances, :parsed => result) if list.blank?
+      result
     rescue Exception
       on_exception
     end
@@ -606,23 +588,11 @@ module RightAws
       #         {:to_port => "443", :protocol => "tcp",  :from_port => "443", :cidr_ips => "0.0.0.0/0"}]},
       #    ..., {...}]
       #
-      # If a block is given then yields a respose before parsing. 
-      # If the block returns +false+ or +nil+ the response is not parsed
-      # and describe_security_groups returns +nil+.
-      # 
-      #  groups = ec2.describe_security_groups do |response|
-      #    # Compare the response to the previous. If they are the same skip parsing - nothing
-      #    # has changed at Amazon. Skpping the parsing will save us a lots of time for the big
-      #    # responses.
-      #    response.body == previous_response_body ? false : true
-      #  end
-      #
-    def describe_security_groups(list=[], &block)
+    def describe_security_groups(list=[])
       link   = generate_request("DescribeSecurityGroups", hash_params('GroupName',list.to_a))
       response, params = request_info(link, QEc2DummyParser.new)
-      if block
-        return nil unless block.call(response)
-      end
+      # check cache
+      cache_hits?(:describe_security_groups, response.body) if list.blank?
       parser = QEc2DescribeSecurityGroupsParser.new(:logger => @logger)
       @@bench.xml.add!{ parser.parse(response, params) }
       
@@ -654,7 +624,9 @@ module RightAws
                    :aws_group_name  => item.groupName, 
                    :aws_description => item.groupDescription,
                    :aws_perms       => perms}
-      end  
+      end
+      # update parsed data
+      update_cache(:describe_security_groups, :parsed => result) if list.blank?
       result
     rescue Exception
       on_exception
@@ -757,29 +729,20 @@ module RightAws
       #     {:aws_fingerprint=> "1e:29:30:47:58:6d:7b:8c:9f:08:11:20:3c:44:52:69:74:80:97:08", :aws_key_name=>"key-2"},
       #      ..., {...} ]
       #
-      # If a block is given then yields a respose before parsing. 
-      # If the block returns +false+ or +nil+ the response is not parsed
-      # and describe_key_pairs returns +nil+.
-      # 
-      #  keys = ec2.describe_key_pairs do |response|
-      #    # Compare the response to the previous. If they are the same skip parsing - nothing
-      #    # has changed at Amazon. Skpping the parsing will save us a lots of time for the big
-      #    # responses.
-      #    response.body == previous_response_body ? false : true
-      #  end
-      #
-    def describe_key_pairs(list=[], &block)
+    def describe_key_pairs(list=[])
       link = generate_request("DescribeKeyPairs", hash_params('KeyName',list.to_a))
       response, params = request_info(link, QEc2DummyParser.new)
-      if block
-        return nil unless block.call(response)
-      end
+      # check cache
+      cache_hits?(:describe_key_pairs, response.body) if list.blank?
       parser = QEc2DescribeKeyPairParser.new(:logger => @logger)
       @@bench.xml.add!{ parser.parse(response, params) }
-      parser.result.collect do |key|
+      result = parser.result.collect do |key|
         { :aws_key_name    => key.keyName,
           :aws_fingerprint => key.keyFingerprint }
       end
+      # update parsed data
+      update_cache(:describe_key_pairs, :parsed => result) if list.blank?
+      result
     rescue Exception
       on_exception
     end
