@@ -91,8 +91,10 @@ module RightAws
         # ignore everything after the question mark...
       out_string << path.gsub(/\?.*$/, '')
        # ...unless there is an acl or torrent parameter
-      out_string << '?acl'    if path[/[&?]acl($|&|=)/]
-      out_string << '?torrent'if path[/[&?]torrent($|&|=)/]
+      out_string << '?acl'      if path[/[&?]acl($|&|=)/]
+      out_string << '?torrent'  if path[/[&?]torrent($|&|=)/]
+      out_string << '?location' if path[/[&?]location($|&|=)/]
+#      out_string << '?logging'  if path[/[&?]logging($|&|=)/]  # this one is beta, no support for now
       out_string
     end
 
@@ -114,16 +116,16 @@ module RightAws
       path_to_sign = headers[:url]
       path_to_sign = "/#{path_to_sign}" unless path_to_sign[/^\//]
       # extract bucket name and check it's dns compartibility
-      bucket_name = path_to_sign[%r{^/([^/]*)}] && $1.to_s
+      path_to_sign[%r{^/([a-z0-9._-]*)(/[^?]*)?(\?.+)?}i]
+      bucket_name, key_path, params_list = $1, $2, $3
       # select request model
       if is_dns_bucket?(bucket_name)
-        # remove bucket from the path
-        path = path_to_sign.sub("/#{bucket_name}",'')
-        path = "/#{path}" unless path[/^\//]
-        # and add it to a server name
+        # add backet to a server name
         server = "#{bucket_name}.#{server}"
-        # add a trailing slash to a bucket for signing
-        path_to_sign += '/' if path_to_sign[%r{^/#{bucket_name}$}]
+        # remove bucket from the path
+        path = "#{key_path || '/'}#{params_list}"
+        # refactor the path (add '/' before params_list if the key is empty)
+        path_to_sign = "/#{bucket_name}#{path}"
       else
         path = path_to_sign
       end
@@ -176,18 +178,36 @@ module RightAws
     
       # Creates new bucket. Returns +true+ or an exception.
       #
-      #  s3.create_bucket('my_awesome_bucket') #=> true
+      #  # create a bucket at American server
+      #  s3.create_bucket('my-awesome-bucket-us') #=> true
+      #  # create a bucket at European server
+      #  s3.create_bucket('my-awesome-bucket-eu', :location => :eu) #=> true
       #
     def create_bucket(bucket, headers={})
       data = nil
-      if headers[:location]
-        data = "<CreateBucketConfiguration><LocationConstraint>#{headers[:location].upcase}</LocationConstraint></CreateBucketConfiguration>"
+      unless headers[:location].blank?
+        data = "<CreateBucketConfiguration><LocationConstraint>#{headers[:location].to_s.upcase}</LocationConstraint></CreateBucketConfiguration>"
       end
       req_hash = generate_rest_request('PUT', headers.merge(:url=>bucket, :data => data))
       request_info(req_hash, S3TrueParser.new)
     rescue Exception => e
         # if the bucket exists AWS returns an error for the location constraint interface. Drop it
       e.is_a?(RightAws::AwsError) && e.message.include?('BucketAlreadyOwnedByYou') ? true  : on_exception
+    end
+    
+      # Retrieve bucket location
+      # 
+      #  s3.create_bucket('my-awesome-bucket-us')        #=> true
+      #  puts s3.bucket_location('my-awesome-bucket-us') #=> '' (Amazon's default value assumed)
+      #
+      #  s3.create_bucket('my-awesome-bucket-eu', :location => :eu) #=> true
+      #  puts s3.bucket_location('my-awesome-bucket-eu')            #=> 'EU'
+      #
+    def bucket_location(bucket, headers={})
+      req_hash = generate_rest_request('GET', headers.merge(:url=>"#{bucket}?location"))
+      request_info(req_hash, S3BucketLocationParser.new)
+    rescue
+      on_exception
     end
     
       # Deletes new bucket. Bucket must be empty! Returns +true+ or an exception.
@@ -543,8 +563,25 @@ module RightAws
 
       # Generates link for QUERY API
     def generate_link(method, headers={}, expires=nil) #:nodoc:
-      path = headers[:url]
-      path = "/#{path}" unless path[/^\//]
+      # default server to use
+      server = @params[:server]
+      # fix path
+      path_to_sign = headers[:url]
+      path_to_sign = "/#{path_to_sign}" unless path_to_sign[/^\//]
+      # extract bucket name and check it's dns compartibility
+      path_to_sign[%r{^/([a-z0-9._-]*)(/[^?]*)?(\?.+)?}i]
+      bucket_name, key_path, params_list = $1, $2, $3
+      # select request model
+      if is_dns_bucket?(bucket_name)
+        # add backet to a server name
+        server = "#{bucket_name}.#{server}"
+        # remove bucket from the path
+        path = "#{key_path || '/'}#{params_list}"
+        # refactor the path (add '/' before params_list if the key is empty)
+        path_to_sign = "/#{bucket_name}#{path}"
+      else
+        path = path_to_sign
+      end
        # expiration time
       expires ||= DEFAULT_EXPIRES_AFTER
       expires   = Time.now.utc.since(expires) if expires.is_a?(Fixnum) && (expires<1.year)
@@ -552,12 +589,12 @@ module RightAws
         # remove unset(==optional) and symbolyc keys
       headers.each{ |key, value| headers.delete(key) if (value.nil? || key.is_a?(Symbol)) }
         #generate auth strings
-      auth_string = canonical_string(method, path, headers, expires)
+      auth_string = canonical_string(method, path_to_sign, headers, expires)
       signature   = CGI::escape(Base64.encode64(OpenSSL::HMAC.digest(OpenSSL::Digest::Digest.new("sha1"), @aws_secret_access_key, auth_string)).strip)
         # path building
       addon = "Signature=#{signature}&Expires=#{expires}&AWSAccessKeyId=#{@aws_access_key_id}"
       path += path[/\?/] ? "&#{addon}" : "?#{addon}"
-      "#{@params[:protocol]}://#{@params[:server]}:#{@params[:port]}#{path}"
+      "#{@params[:protocol]}://#{server}:#{@params[:port]}#{path}"
     rescue
       on_exception
     end
@@ -780,6 +817,48 @@ module RightAws
       end
     end
 
+    class S3BucketLocationParser < RightAWSParser # :nodoc:
+      def reset
+        @result = ''
+      end
+      def tagend(name)
+        @result = @text if name == 'LocationConstraint'
+      end
+    end
+
+    class S3AclParser < RightAWSParser  # :nodoc:
+      def reset
+        @result          = {:grantees=>[], :owner=>{}}
+        @current_grantee = {}
+      end
+      def tagstart(name, attributes)
+        @current_grantee = { :attributes => attributes } if name=='Grantee'
+      end
+      def tagend(name)
+        case name
+            # service info
+          when 'ID'
+            if @xmlpath == 'AccessControlPolicy/Owner'
+              @result[:owner][:id] = @text
+            else
+              @current_grantee[:id] = @text
+            end
+          when 'DisplayName'
+            if @xmlpath == 'AccessControlPolicy/Owner'
+              @result[:owner][:display_name] = @text
+            else
+              @current_grantee[:display_name] = @text
+            end
+          when 'URI'
+            @current_grantee[:uri] = @text
+          when 'Permission'
+            @current_grantee[:permissions] = @text
+          when 'Grant'
+            @result[:grantees] << @current_grantee
+        end
+      end
+    end
+    
     #-----------------------------------------------------------------
     #      PARSERS: Non XML
     #-----------------------------------------------------------------
@@ -817,40 +896,6 @@ module RightAws
     class S3HttpResponseHeadParser < S3HttpResponseParser  # :nodoc:
       def parse(response)
         @result = headers_to_string(response.to_hash)
-      end
-    end
-
-
-    class S3AclParser < RightAWSParser  # :nodoc:
-      def reset
-        @result          = {:grantees=>[], :owner=>{}}
-        @current_grantee = {}
-      end
-      def tagstart(name, attributes)
-        @current_grantee = { :attributes => attributes } if name=='Grantee'
-      end
-      def tagend(name)
-        case name
-            # service info
-          when 'ID'
-            if @xmlpath == 'AccessControlPolicy/Owner'
-              @result[:owner][:id] = @text
-            else
-              @current_grantee[:id] = @text
-            end
-          when 'DisplayName'
-            if @xmlpath == 'AccessControlPolicy/Owner'
-              @result[:owner][:display_name] = @text
-            else
-              @current_grantee[:display_name] = @text
-            end
-          when 'URI'
-            @current_grantee[:uri] = @text
-          when 'Permission'
-            @current_grantee[:permissions] = @text
-          when 'Grant'
-            @result[:grantees] << @current_grantee
-        end
       end
     end
     

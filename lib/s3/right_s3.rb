@@ -34,7 +34,19 @@ module RightAws
   #
   # Error handling: all operations raise an RightAws::AwsError in case
   # of problems. Note that transient errors are automatically retried.
-    
+  #
+  # It is a good way to use domain naming style getting a name for the buckets. 
+  # See http://docs.amazonwebservices.com/AmazonS3/2006-03-01/UsingBucket.html
+  # about the naming convention for the buckets. This case they can be accessed using a virtual domains.
+  # 
+  # Let assume you have 3 buckets: 'awesome-bucket', 'awesome_bucket' and 'AWEsomE-bucket'.
+  # The first ones objects can be accessed as: http:// awesome-bucket.s3.amazonaws.com/key/object
+  # 
+  # But the rest have to be accessed as:
+  # http:// s3.amazonaws.com/awesome_bucket/key/object and  http:// s3.amazonaws.com/AWEsomE-bucket/key/object
+  #  
+  # See: http://docs.amazonwebservices.com/AmazonS3/2006-03-01/VirtualHosting.html for better explanation.
+  #
   class S3
     attr_reader :interface
     
@@ -60,22 +72,24 @@ module RightAws
     
     # Retrieve an individual bucket.
     # If the bucket does not exist and +create+ is set, a new bucket
-    # is created on S3.  The +create+ parameter has no effect if
-    # the bucket alrady exists. 
+    # is created on S3. Launching this method with +create+=+true+ may
+    # affect on the bucket's ACL if the bucket already exists.
     # Returns a RightAws::S3::Bucket instance or +nil+ if the bucket does not exist 
     # and +create+ is not set.
     #
     #  s3 = RightAws::S3.new(aws_access_key_id, aws_secret_access_key)
-    #  bucket1 = s3.bucket('my_awesome_bucket')
+    #  bucket1 = s3.bucket('my_awesome_bucket_1')
     #  bucket1.keys  #=> exception here if the bucket does not exists
     #   ...
-    #  bucket2 = s3.bucket('my_awesome_bucket', true)
+    #  bucket2 = s3.bucket('my_awesome_bucket_2', true)
     #  bucket2.keys  #=> list of keys
-    #
+    #  # create a bucket at the European location with public read access
+    #  bucket3 = s3.bucket('my-awesome-bucket-3', true, 'public-read', :location => :eu)
+    #  
     #  see http://docs.amazonwebservices.com/AmazonS3/2006-03-01/RESTAccessPolicy.html
     #  (section: Canned Access Policies)
     #
-    def bucket(name, create=true, perms=nil, headers={})
+    def bucket(name, create=false, perms=nil, headers={})
       headers['x-amz-acl'] = perms if perms
       @interface.create_bucket(name, headers) if create
       buckets.each { |bucket| return bucket if bucket.name == name }
@@ -86,28 +100,33 @@ module RightAws
     class Bucket
       attr_reader :s3, :name, :owner, :creation_date
       
-        # Create a Bucket instance.
+      # Create a Bucket instance.
       # If the bucket does not exist and +create+ is set, a new bucket
-      # is created on S3.  The +create+ parameter has no effect if
-      # the bucket alrady exists. 
+      # is created on S3. Launching this method with +create+=+true+ may
+      # affect on the bucket's ACL if the bucket already exists.
       # Returns Bucket instance or +nil+ if the bucket does not exist 
       # and +create+ is not set.
-        #
-        #  s3 = RightAws::S3.new(aws_access_key_id, aws_secret_access_key)
-        #   ...
-        #  bucket1 = RightAws::S3::Bucket.create(s3, 'my_awesome_bucket')
-        #  bucket1.keys  #=> exception here if the bucket does not exists
-        #   ...
-        #  bucket2 = RightAws::S3::Bucket.create(s3, 'my_awesome_bucket', true)
-        #  bucket2.keys  #=> list of keys
-        #
-      def self.create(s3, name, create=true, perms=nil, headers={}) 
+      #
+      #  s3 = RightAws::S3.new(aws_access_key_id, aws_secret_access_key)
+      #   ...
+      #  bucket1 = RightAws::S3::Bucket.create(s3, 'my_awesome_bucket_1')
+      #  bucket1.keys  #=> exception here if the bucket does not exists
+      #   ...
+      #  bucket2 = RightAws::S3::Bucket.create(s3, 'my_awesome_bucket_2', true)
+      #  bucket2.keys  #=> list of keys
+      #  # create a bucket at the European location with public read access
+      #  bucket3 = RightAws::S3::Bucket.create(s3,'my-awesome-bucket-3', true, 'public-read', :location => :eu)
+      #  
+      #  see http://docs.amazonwebservices.com/AmazonS3/2006-03-01/RESTAccessPolicy.html
+      #  (section: Canned Access Policies)
+      #
+      def self.create(s3, name, create=false, perms=nil, headers={}) 
         s3.bucket(name, create, perms, headers)
       end
 
 
         # Create a bucket instance. In normal use this method should
-	# not be called directly.
+        # not be called directly.
         # Use RightAws::S3::Bucket.create or RightAws::S3.bucket instead. 
       def initialize(s3, name, creation_date=nil, owner=nil)
         @s3    = s3
@@ -136,6 +155,11 @@ module RightAws
       def public_link
         params = @s3.interface.params
         "#{params[:protocol]}://#{params[:server]}:#{params[:port]}/#{full_name}"
+      end
+      
+        # Returns the bucket location
+      def location
+        @location ||= @s3.interface.bucket_location(@name)
       end
 
         # Retrieve a group of keys from Amazon. 

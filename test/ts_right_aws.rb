@@ -9,4 +9,4 @@ require 'ec2/test_right_ec2.rb'
 require 's3/test_right_s3.rb'
 require 's3/test_right_s3_stubbed.rb'
 require 'sqs/test_right_sqs.rb'
-
+require 'sdb/test_right_sdb.rb'

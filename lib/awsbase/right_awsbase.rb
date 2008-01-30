@@ -397,7 +397,7 @@ module RightAws
           # on redirect :
           if redirect_detected
             location = response['location']
-            # ... log intormation and ...
+            # ... log information and ...
             @aws.logger.info("##### #{@aws.class.name} redirect requested: #{response.code} #{response.message} #####")
             @aws.logger.info("##### New location: #{location} #####")
             # ... fix the connection data

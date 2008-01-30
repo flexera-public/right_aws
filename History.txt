@@ -88,3 +88,25 @@ Initial release.
   * RightAwsBaseInterface: caching implemented.
     (The Ec2 functions are being cached: describe_images, describe_instances, 
     describe_security_groups and describe_key_pairs)
+
+== 1.4.5
+== 1.4.6
+*r 2619, konstantin, 01-17-08 16:18:36  +0300
+  * S3 Location constraints support added.
+  * Fixed bug with trailing '/' in the bucket name for 'EU' located buckets
+  * Added: S3Interface#bucket_location, S3::Bucket#location
+
+== 1.4.7
+*r 2622, konstantin, 01-18-08 13:52:20  +0300
+  * Virtual domains doc added
+  * S3 Query API fixed to support virtual domains.
+
+== 1.4.8
+*r 2650, konstantin, 01-24-08 11:12:00  +0300
+  * net_fix.rb moved to right_http_connection
+
+== 1.5.0
+*r ????, konstantin, 02-30-08 15:42:00  +0300
+  * SDB support added.
+  * RightAws::S3::bucket and RightAws::S3::Bucket.create methods behaviour 
+    changed: param +create+ is set to +false+ by default.
