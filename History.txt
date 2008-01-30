@@ -106,7 +106,7 @@ Initial release.
   * net_fix.rb moved to right_http_connection
 
 == 1.5.0
-*r ????, konstantin, 02-30-08 15:42:00  +0300
+*r 2688, konstantin, 02-30-08 15:42:00  +0300
   * SDB support added.
   * RightAws::S3::bucket and RightAws::S3::Bucket.create methods behaviour 
     changed: param +create+ is set to +false+ by default.
