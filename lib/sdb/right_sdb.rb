@@ -39,13 +39,14 @@ module RightAws
     # Returns an array of +Domain+ instances.
     # 
     #  sdb = RightAws::Sdb.new
-    #  puts sdb.domains #=> "family \n friends"
+    #  puts sdb.domains #=> "family\nfriends"
     # 
     #  # list domains by 2
     #  sdb.domains(2) do |domains|
     #    puts domains         #=> "family\nfriends"
     #    puts sdb.next_token  #=> "ZmFtaWx5"
-    #    true                 # block must return true (or any other not a "nil/false" value) to continue listing !
+    #    # set sdb.next_token to +nil+ to break the block execution
+    #    # sdb.next_token = nil
     #  end
     #
     def domains(max_number_of_domains=nil, next_token=nil, &block)
@@ -57,7 +58,12 @@ module RightAws
         new_domains  = query_result[:domains].map { |name| Domain.new(self, name)}
         domains     += new_domains
         @next_token  = query_result[:next_token]
-        break unless block && block.call(new_domains) && @next_token
+        if block 
+          block.call new_domains
+          break unless @next_token
+        else
+          break
+        end
       end while true
       domains
     end
@@ -105,7 +111,8 @@ module RightAws
       #  domain.query(["[?=?]","cat","clew"], 10) do |items|
       #    puts items.inspect  # 10 items per iteration
       #    puts domain.next_token  #=> "rO0AB...uLn="
-      #    true
+      #    # set domain.next_token to +nil+ to break the block execution
+      #    # domain.next_token = nil
       #  end
       #
       def query(query_expression=nil, max_number_of_items = nil, next_token = nil, &block)
@@ -118,7 +125,12 @@ module RightAws
           new_items.map! { |name| self.item(name) }
           items += new_items
           @next_token = query_result[:next_token]
-          break unless block && block.call(new_items) && @next_token
+          if block 
+            block.call new_items
+            break unless @next_token
+          else
+            break
+          end
         end while true
         items
       end
