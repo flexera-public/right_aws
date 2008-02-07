@@ -44,7 +44,6 @@ require 's3/right_s3'
 require 'sqs/right_sqs_interface'
 require 'sqs/right_sqs'
 require 'sdb/right_sdb_interface'
-require 'sdb/right_sdb'
 
 
 module RightAws #:nodoc:

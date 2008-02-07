@@ -9,11 +9,9 @@ class TestSdb < Test::Unit::TestCase
     @attr   = { 'Jon' => %w{beer car} }
     # Interface instance
     @sdb    = Rightscale::SdbInterface.new(TestCredentials.aws_access_key_id, TestCredentials.aws_secret_access_key)
-    # Sdb instance
-    @s      = Rightscale::Sdb.new(TestCredentials.aws_access_key_id, TestCredentials.aws_secret_access_key)
   end
 
-  SDB_DELAY = 3
+  SDB_DELAY = 2
   
   def wait(delay, msg='')
     print "waiting #{delay} seconds #{msg}"
@@ -126,6 +124,5 @@ class TestSdb < Test::Unit::TestCase
     # check that domain does not exist
     assert !@sdb.list_domains[:domains].include?(@domain)
   end
-
 
 end
