@@ -304,7 +304,7 @@ module RightAws
     #  # request all attributes
     #  sdb.get_attributes('family', 'toys') # => { :attributes => {"cat"    => ["clew", "Jons_socks", "mouse"] },
     #                                                              "Silvia" => ["beetle", "rolling_pin", "kids"],
-    #                                                              "Jon"    => ["vacuum_cleaner", "hammer, spade"]},
+    #                                                              "Jon"    => ["vacuum_cleaner", "hammer", "spade"]},
     #                                              :box_usage  => "0.0000093222",
     #                                              :request_id => "81273d21-000-1111-b3f9-512d91d29ac8" }
     #  
@@ -313,7 +313,7 @@ module RightAws
     #                                                     :box_usage  => "0.0000093222",
     #                                                     :request_id => "81273d21-001-1111-b3f9-512d91d29ac8" }
     #
-    # see: http://docs.amazonwebservices.com/AmazonSimpleDB/2007-11-07/DeveloperGuide/SDB_API_PutAttributes.html
+    # see: http://docs.amazonwebservices.com/AmazonSimpleDB/2007-11-07/DeveloperGuide/SDB_API_GetAttributes.html
     #
     def get_attributes(domain_name, item_name, attribute_name=nil)
       link = generate_request("GetAttributes", 'DomainName'    => domain_name,
@@ -382,7 +382,7 @@ module RightAws
     #
     # see: http://docs.amazonwebservices.com/AmazonSimpleDB/2007-11-07/DeveloperGuide/SDB_API_Query.html
     #
-    def query(domain_name, query_expression = nil, max_number_of_items = nil, next_token = nil, &block)
+    def query(domain_name, query_expression = nil, max_number_of_items = nil, next_token = nil)
       query_expression = query_expression_from_array(query_expression) if query_expression.is_a?(Array)
       #
       request_params = { 'DomainName'       => domain_name,
@@ -464,15 +464,6 @@ module RightAws
       end
     end
 
-    # Dummy parser - does nothing
-    # Returns the original params back
-    class QSdbDummyParser  # :nodoc:
-      attr_accessor :result
-      def parse(response, params={})
-        @result = response
-      end
-    end
-  
   end
   
 end

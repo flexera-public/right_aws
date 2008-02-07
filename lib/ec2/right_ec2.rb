@@ -370,7 +370,8 @@ module RightAws
                      :aws_image_id       => instance.imageId,
                      :aws_reason         => reason,
                      :aws_product_codes  => instance.productCodes,
-                     :aws_instance_type  => instance.instanceType}
+                     :aws_instance_type  => instance.instanceType,
+                     :aws_launch_time    => instance.launchTime}
         end
       end
       result
@@ -393,7 +394,8 @@ module RightAws
       #      :ssh_key_name       => "staging",
       #      :aws_groups         => ["default"],
       #      :private_dns_name   => "domU-12-34-67-89-01-C9.usma2.compute.amazonaws.com",
-      #      :aws_instance_type  => "m1.small"}, 
+      #      :aws_instance_type  => "m1.small",
+      #      :aws_launch_time    => "2008-1-1T00:00:00.000Z"},
       #       ..., {...}]
       #
     def describe_instances(list=[])
@@ -436,7 +438,8 @@ module RightAws
       #     :ssh_key_name       => "my_awesome_key",
       #     :aws_groups         => ["my_awesome_group"],
       #     :private_dns_name   => "",
-      #     :aws_instance_type  => "m1.small"}]
+      #     :aws_instance_type  => "m1.small",
+      #     :aws_launch_time    => "2008-1-1T00:00:00.000Z"}]
       #
     def run_instances(image_id, min_count, max_count, group_ids, key_name, user_data='',  
                       addressing_type = DEFAULT_ADDRESSING_TYPE,  
@@ -475,7 +478,8 @@ module RightAws
       #     :ssh_key_name       => "my_awesome_key", 
       #     :aws_groups         => ["default"], 
       #     :private_dns_name   => "", 
-      #     :aws_instance_type  => "m1.small"}] 
+      #     :aws_instance_type  => "m1.small",
+      #     :aws_launch_time    => "2008-1-1T00:00:00.000Z"}] 
       #     
     def launch_instances(image_id, lparams={}) 
       defaults = { 
@@ -1007,6 +1011,7 @@ module RightAws
       attr_accessor :amiLaunchIndex
       attr_accessor :productCodes
       attr_accessor :instanceType
+      attr_accessor :launchTime
     end
 
     class QEc2DescribeInstancesType #:nodoc:
@@ -1058,6 +1063,7 @@ module RightAws
             end
           when 'productCode'   ; (@instance.productCodes ||= []) << @text
           when 'instanceType'  ; @instance.instanceType = @text
+	  when 'launchTime'    ; @instance.launchTime = @text
         end
       end
       def reset
@@ -1113,6 +1119,7 @@ module RightAws
           when 'RunInstancesResponse'; @result << @reservation
           when 'productCode'   ; (@instance.productCodes ||= []) << @text
           when 'instanceType'  ; @instance.instanceType = @text
+	  when 'launchTime'    ; @instance.launchTime = @text
         end
       end
       def reset

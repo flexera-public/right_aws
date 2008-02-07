@@ -23,10 +23,10 @@
 
 module RightAws
   
-  
   class Sdb
     
-    attr_reader :interface
+    attr_reader   :interface
+    attr_accessor :next_token
     
     # Create a new handle to an Sdb account. All handles share the same per process or per thread
     # HTTP connection to Amazon Sdb. Each handle is for a specific account.
@@ -39,429 +39,342 @@ module RightAws
     # Returns an array of +Domain+ instances.
     # 
     #  sdb = RightAws::Sdb.new
-    #  puts sdb.domains #=> 'family \n friends'
+    #  puts sdb.domains #=> "family \n friends"
     # 
-    #  # list domains by 10
-    #  sdb.domains(10) do |domains|
-    #    puts domains #=> 'family \n friends'
-    #    true         # block must return true (or any other not a 'nil/false' value) to continue listing !
+    #  # list domains by 2
+    #  sdb.domains(2) do |domains|
+    #    puts domains         #=> "family\nfriends"
+    #    puts sdb.next_token  #=> "ZmFtaWx5"
+    #    true                 # block must return true (or any other not a "nil/false" value) to continue listing !
     #  end
     #
     def domains(max_number_of_domains=nil, next_token=nil, &block)
+      @next_token = next_token
       domains = []
       # request domains list
       begin
-        query_result = @interface.list_domains(max_number_of_domains, next_token)
-        new_domains  = query_result[:domains].map { |name| Domain.new(self, name, false)}
+        query_result = @interface.list_domains(max_number_of_domains, @next_token)
+        new_domains  = query_result[:domains].map { |name| Domain.new(self, name)}
         domains     += new_domains
-        next_token   = query_result[:next_token]
-        break unless block && block.call(new_domains) && next_token
+        @next_token  = query_result[:next_token]
+        break unless block && block.call(new_domains) && @next_token
       end while true
       domains
     end
-
+  
     
     class Domain
-      attr_reader :sdb
-      attr_reader :name
-      
-      # Create a new Domain instance.
-      # 
-      # Creates a domain at SDB if +create+ param is set.
-      # 
-      #  sdb = RightAws::Sdb.new
-      #  puts sdb.domains                                         #=> 'family \n friends'
-      #  domain1 = RightAws::Sdb::Domain.new(sdb, 'co-workers')   #=> #<RightAws::Sdb::Domain:0xb7795984 ...
-      #  puts sdb.domains                                         #=> 'family \n friends \n co-workers'
-      #  # skip domain creation at Amazon
-      #  domain2 = RightAws::Sdb::Domain.new(sdb, 'girls', false) #=> #<RightAws::Sdb::Domain:0xb7900984 ...
-      #  puts sdb.domains                                         #=> 'family \n friends \n co-workers'
-      # 
-      def initialize(sdb, name, create=true)
+      attr_reader   :sdb
+      attr_reader   :name
+      attr_accessor :next_token
+
+      # Create new domain instance.
+      #  
+      #  sdb    = RightAws::Sdb.new
+      #  domain = RightAws::Sdb::Domain.new(sdb, "family")
+      #  domain.query( ["[?=?]", "Jon", "beer"] )
+      #
+      def initialize(sdb, name)
         @sdb  = sdb
         @name = name
-        @sdb.interface.create_domain(@name) if create
       end
 
-      def to_s
-        @name
-      end
-      
-      # Create new Item instance. 
-      # 
-      # Creates new item with a set of passed attributes or retrieves this attributes
-      # from SDB if +attributes+ == :reload.
-      # 
-      # see Item#new for +attributes+ description and Item#reload warning.
-      # 
-      #  sdb = RightAws::Sdb.new
-      #  # get domain 'family'
-      #  domain = sdb.domains.find{|d| d.name == 'family' }
+      # Create an Item instance.
       #  
-      #  # create new attribute in memory ...
-      #  new_item1 = domain.item('food', {:dog => ['bones', 'meat'], :cat => ['mice', 'birds']})
-      #  puts domain.query  #=> ''
-      #  # ... and store them at SDB
-      #  new_item1.put
-      #  puts domain.query  #=> 'food'
-      #  
-      #  # create new attribute in memory and store them at SDB
-      #  new_item2 = domain.item('house', {:dog => ['box'], :cat => ['basket']}, :replace)
-      #  puts domain.query  #=> 'food \n house'
+      #  item = domain.item("toys")
+      #  puts item.attributes #=> {}
+      #  item.load
+      #  puts item.attributes #=> { "cat"    => ["Jons_socks", "clew", "mouse"], 
+      #                             "Silvia" => ["beetle", "kids", "rolling_pin"] }
       #
-      #  # create an instance of the Item already stored at SDB
-      #  existent_item = domain.item('house', :reload)
-      #  existent_item.attributes.each do |a|
-      #    puts "#{a.name} = #{a.values.join(',')}"   # => 'cat = basket \n dog = box'
+      def item(name, attributes={})
+        Item.new(self, name, attributes)
+      end
+
+      # Perform a query on SDB.
+      #
+      #  item = domain.query(["[?=?]","cat","clew"]).first
+      #  puts item.inspect             #=> #<RightAws::Sdb::Item:0xb76fddf0 ... >
+      #  puts item.attributes.inspect  #=> {}
+      #  item.load
+      #  puts item.attributes.inspect  #=> { "cat"    => ["Jons_socks", "clew", "mouse"], 
+      #                                      "Silvia" => ["beetle", "kids", "rolling_pin"], 
+      #                                      "Jon"    => ["hammer", "spade", "vacuum_cleaner"] }
+      #  
+      #  # a block usage for huge query output:
+      #  domain.query(["[?=?]","cat","clew"], 10) do |items|
+      #    puts items.inspect  # 10 items per iteration
+      #    puts domain.next_token  #=> "rO0AB...uLn="
+      #    true
       #  end
       #
-      def item(item_name, attributes=:reload, store=:skip_store)
-        Item.new(self, item_name, attributes, store)
-      end
-      
-      # Create new Attribute instance.
-      #
-      # Creates new attribute with a set of passed values or retrieves these values
-      # from SDB if +values+ == :reload.
-      #
-      #  sdb = RightAws::Sdb.new
-      #  # get domain 'family'
-      #  domain = sdb.domains.find{|d| d.name == 'family' }
-      #  
-      #  # retrieve already exsistent attribute from SDB
-      #  attr1 = domain.attribute('food', 'dog')
-      #  puts attr1.values.join(',') #=> 'bones,meat'
-      #  
-      #  # create a new attribute  ...
-      #  attr2 = domain.attribute('food', 'Jon', ['beef','ham'])
-      #  # and store it at SDB
-      #  attr2.put
-      #  
-      #  # get a list of attributes from SDB and print it
-      #  domain.item('food').attributes.each do |a|
-      #    puts "#{a.name} = #{a.values.join(',')}"   # => 'cat = basket \n dog = box \n Jon = beef,ham'
-      #  end
-      #
-      def attribute(item, attribute_name, values=:reload)
-        item = Item.new(self, item, []) unless item.is_a?(Item)
-        Attribute.new(item, attribute_name, values)
-      end
-      
-      
-      # Perform a query on Domain instance.
-      #
-      # Returns a list of Item instances matched the query. 
-      # To reduce the system load the items are initialized with empty attributes.
-      # To get the correct list of attributes use item.reload or set +reload+ param to :reload.
-      # 
-      #  sdb = RightAws::Sdb.new
-      #  # get domain 'family'
-      #  domain = sdb.domains.find{|d| d.name == 'family' }
-      #  # get a full list of items
-      #  all_items = domain.query
-      #  puts all_items.map(&:name)  #=> ['house, toys, food']
-      #  
-      #  # custom query (dont forget to escale single quotes and backslashes)
-      #  query = "['dog'='Jon\\'s boot']"
-      #  puts domain.query(query).first.name #=> ['family']
-      #  
-      #  # custom query with auto escaping
-      #  query = [ "[?=?]", "dog", "Jon's boot" ]
-      #  puts domain.query(query).first.name #=> 'family'
-      #
-      # read more about the queries: http://docs.amazonwebservices.com/AmazonSimpleDB/2007-11-07/DeveloperGuide/SDB_API_Query.html
-      #
-      def query(query_expression=nil, reload=:skip_reload,  max_number_of_items = nil, next_token = nil, &block)
+      def query(query_expression=nil, max_number_of_items = nil, next_token = nil, &block)
+        @next_token = next_token
         items = []
         # request items
         begin
-          query_result  = @sdb.interface.query( @name, query_expression, max_number_of_items, next_token)
+          query_result  = @sdb.interface.query( @name, query_expression, max_number_of_items, @next_token)
           new_items  = query_result[:items]
-          new_items.map! do |i| 
-            item = self.item(i, {})
-            item.reload if reload && reload != :skip_reload
-            item
-          end
+          new_items.map! { |name| self.item(name) }
           items += new_items
-          next_token = query_result[:next_token]
-          break unless block && block.call(new_items) && next_token
+          @next_token = query_result[:next_token]
+          break unless block && block.call(new_items) && @next_token
         end while true
         items
       end
       
-      # Delete domain.
-      #
-      def delete
-        @sdb.interface.delete_domain(@name)
+      def to_s
+        @name
       end
-      
     end
 
     
     class Item
-      attr_reader :name
-      attr_reader :domain
-      attr_reader :attributes
+      attr_accessor :name
+      attr_accessor :attributes 
 
-      # Create a new Item instance.
-      # 
-      # Loads all attributes from SDB if +attributes+ param set to +:reload+.
-      # Otherwise initialises the instance attributes list with passed +attributes+
-      # param ( +attributes+ is a hash of :name => :values ).
-      # To force the attributes upload their values from SDB pass +attributes+ as 
-      # an array of attributes names.
-      # 
-      # see Item#reload warning.
-      # 
-      #  sdb = RightAws::Sdb.new
-      #  domain = RightAws::Sdb::Domain.new(sdb, 'co-workers')   #=> #<RightAws::Sdb::Domain:0xb7795984 ...
-      #  
-      #  # create a new Item instance 'house' with  attributes (and store to SDB)
-      #  attributes = {:dog => ['box', 'hole'], :cat => ['basket','rug']}
-      #  item1 = RightAws::Sdb::Item.new(domain, 'house', attributes, :replace) #=> #<RightAws::Sdb::Item:0xb77c9068...
-      #  
-      #  # create an item but store it later
-      #  item2 = RightAws::Sdb::Item.new(domain, 'house', attributes) #=> #<RightAws::Sdb::Item:0xb77c9111...
-      #  # ... do something... 
-      #  # store attributes from the in memory list. Use item2.replace to replace the SDB attributes 
-      #  # by new values
-      #  item2.put
-      #  
-      #  # load already existent item from SDB
-      #  item3 = RightAws::Sdb::Item.new(domain, 'awesome')
+      # Create new Item instance.
+      # +Attributes+ is a hash: { attribute1 => values1, ..., attributeN => valuesN }.
       #
-      def initialize(domain, name, attributes=:reload, store=:skip_store)
-        @domain     = domain
-        @name       = name
-        @attributes = []
-        if attributes == :reload 
-          reload
-        else 
-          attributes.each do |name, values|
-            create_attribute(name, values, store)
-          end
-        end
+      #  sdb    = RightAws::Sdb.new
+      #  domain = RightAws::Sdb::Domain.new(sdb, "family")
+      #  item   = RightAws::Sdb::Item.new(domain, "toys")
+      #  puts item.attributes.inspect #=> {}
+      #  item.load
+      #  puts item.attributes.inspect #=> { "cat"    => ["Jons_socks", "clew", "mouse"], 
+      #                                     "Silvia" => ["beetle", "kids", "rolling_pin"], 
+      #                                     "Jon"    => ["hammer", "spade", "vacuum_cleaner"] }
+      #                                     
+      #  # create a new (not existent at SDB) item
+      #  item2 = RightAws::Sdb::Item.new(domain, "toys", "booble" => ["buble","boble"])
+      #  puts item2.attributes.inspect #=> {"booble" => ["buble","boble"]}
+      #  item2.save
+      #  # check SDB was updated
+      #  item2.load  #=> { "booble" => ["buble","boble"] }
+      #
+      def initialize(domain, name, attributes={})
+        @domain = domain
+        @name   = name
+        @attributes = attributes
       end
-      
-      def to_s
-        @name
+
+      # Get in-memory attribute.
+      #
+      #  puts item.attributes.inspect #=> { "cat"    => ["Jons_socks", "clew", "mouse"], 
+      #                                     "Silvia" => ["beetle", "kids", "rolling_pin"], 
+      #                                     "Jon"    => ["hammer", "spade", "vacuum_cleaner"] }
+      #  puts item["cat"].inspect     #=> ["Jons_socks", "clew", "mouse"]
+      #  puts item["dog"].inspect     #=> nil
+      #
+      def [](attribute)
+        @attributes[attribute]
       end
-      
-      # Reload data from SDB. 
+
+      # Set in-memory attribute.
       # 
-      # Updates in memory list with the latest data from SDB.
-      # Warning: this action retrieves all item's attributes from SDB. 
-      # Make sure you have enough memory and time to process this!
-      # Returns the new list of attributes.
+      #  puts item["cat"].inspect  #=> ["Jons_socks", "clew", "mouse"]
+      #  puts item["dog"].inspect  #=> nil
+      #  item["cat"] = ["Whiskas", "chicken"]
+      #  item["dog"] = "Pedigree"
+      #  puts item["cat"].inspect  #=> ["Whiskas", "chicken"]
+      #  puts item["dog"].inspect  #=> ["Pedigree"]
       #
-      #  sdb = RightAws::Sdb.new
-      #  domain = RightAws::Sdb::Domain.new(sdb, 'co-workers')   #=> #<RightAws::Sdb::Domain:0xb7795984 ...
-      #  
-      #  # create a new Item instance with empty list
-      #  item1 = RightAws::Sdb::Item.new(domain, 'house', {})
-      #  # load attributes from SDB
-      #  item1.reload
-      #
-      def reload
-        @attributes = []
+      def []=(attribute, values)
+        @attributes[attribute] = values.to_a
+      end
+
+      # Load attributes from SDB. Replaces in-memory attributes.
+      # 
+      #  item = RightAws::Sdb::Item.new(domain, "toys", { "winki" => ["pinki"], "booble" => ["buble","boble"] } )
+      #  puts item.attributes.inspect #=> { "winki"  => ["pinki"], 
+      #                                     "booble" => ["buble","boble"] }
+      #  item.load                    #=> { "cat"    => ["Jons_socks", "clew", "mouse"], 
+      #                                     "Silvia" => ["beetle", "kids", "rolling_pin"], 
+      #                                     "Jon"    => ["hammer", "spade", "vacuum_cleaner"] }
+      def load
+        @attributes = {}
         @domain.sdb.interface.get_attributes(@domain.name, @name)[:attributes].each do |attribute, values|
-          Attribute.new(self, attribute, values)
+          @attributes[attribute]= values
         end
         @attributes
       end
       
-      # Find attribute by name.
-      # Returns the Attribute instance from in memory list.
-      def attribute(attribute_name)
-        @attributes.find{ |a| a.name == attribute_name }
-      end
-
-      # Create new attribute.
+      # Load a set of attributes from SDB. Adds the loaded list to in-memory data.
+      # +Attributes+ is an array or comma separated list of attributes names.
+      # Returns a hash of loaded attributes.
       # 
-      # Creates new attribute (replaces if the attribute with this name already exists), 
-      # adds attribute to in memory list and store it to SDB (if +store+ param is set to :replace or :put).
-      # If +values+ == :reload (or == nil) then the attribute will auto load it's values from SDB.
+      # This is not the best method to get a bunch of attributes because
+      # a web service call is being performed for every attribute.
+      # 
+      #  item = RightAws::Sdb::Item.new(domain, "toys", { "winki"  => ["pinki"], 
+      #                                                   "booble" => ["buble","boble"],
+      #                                                   "Jon"    => ["beer", "girls"] } )
+      #  item.load_attributes("cat", "Jon")  #=> { "cat"    => ["Jons_socks", "clew", "mouse"], 
+      #                                            "Jon"    => ["hammer", "spade", "vacuum_cleaner"] }
+      #  # "winki" and "booble" are in-memory attributes that are not saved yet
+      #  puts item.attributes.inspect        #=> { "winki"  => ["pinki"], 
+      #                                            "booble" => ["buble","boble"],
+      #                                            "cat"    => ["Jons_socks", "clew", "mouse"], 
+      #                                            "Jon"    => ["hammer", "spade", "vacuum_cleaner"] }
       #
-      def create_attribute(name, values, store = :skip_store)
-        # find or create attribute
-        attr = attribute(name) || Attribute.new(self, name, [])
-        # update it's  values
-        if !values || values == :reload
-          attr.reload
-        else
-          attr.values = values.to_a
-          # store to SDB (if need)
-          case store
-          when nil, false, :skip_store : # do nothing
-          when :put                    : attr.put
-          else                           attr.replace
+      def load_attributes(*attributes)
+        result = {}
+        attributes.flatten!
+        attributes.uniq.each do |attribute|
+          values = @domain.sdb.interface.get_attributes(@domain.name, @name, attribute)[:attributes][attribute]
+          if values
+            @attributes[attribute] = result[attribute] = values
+          else
+            @attributes.delete(attribute)
           end
         end
-        attr
+        result
       end
       
-      # Put in memory attributes values to SDB.
-      # Returns the list of stored attributes.
-      def put
-        @attributes.each { |attribute| attribute.put }
-        @attributes
-      end
-      
-      # Replace  the attributes from in memory list by new values.
-      # The other attributes at SDB (that are not in a memory list) are not affected.
-      # I.e. for each attribute from the list the replace method is being performed.
-      # Returns the list of replaced attributes.
-      def replace
-        @attributes.each { |attribute| attribute.replace }
-        @attributes
-      end
-      
-      # Delete all attributes from item.
-      # Returns an empty list.
+      # Store in-memory attributes to SDB.
+      # Adds the attributes values to already stored at SDB.
       #
-      #  puts item.attributes.inspect #=> [#<RightAws::Sdb::Attribute:0xb7795984 ...>, ... ]
-      #  item.clear                   #=> []
-      #  # check
-      #  item.reload                  #=> []
+      #  item.save #=> a hash of saved attributes
+      #
+      def save
+        @attributes = uniq_values(@attributes)
+        @domain.sdb.interface.put_attributes(@domain.name, @name, @attributes)
+        @attributes
+      end
+       
+      # Save specified attributes.
+      # +Attributes+ is a hash: { attribute1 => values1, ..., attributeN => valuesN }.
+      # Returns a hash of saved attributes.
+      #
+      #  item = RightAws::Sdb::Item.new(domain, "toys", { "winki"  => ["pinki"], 
+      #                                                   "booble" => ["buble","boble"],
+      #                                                   "Jon"    => ["beer", "girls"] } )
+      #  item.save_attributes("Jon" => ["friends", "car"] ) #=> "Jon" => ["friends", "car"]
+      #  # "beer" and "girls" are in memory only, but "friends" and "car" are stored on SDB.
+      #  puts item["Jon"].inspect                           #=> ["beer", "girls", "friends", "car"]
+      #
+      def save_attributes(attributes)
+        attributes = uniq_values(attributes)
+        @domain.sdb.interface.put_attributes(@domain.name, @name, attributes)
+        attributes.each do |attribute, values|
+          @attributes[attribute] ||= []
+          @attributes[attribute] += values
+          @attributes[attribute].uniq!
+        end
+        attributes
+      end
+
+      # Store in-memory attributes to SDB.
+      # Replaces the attributes values already stored at SDB by in-memory data.
+      # Returns a hash of stored attributes. 
+      # 
+      #  item = RightAws::Sdb::Item.new(domain, "toys" )
+      #  item.load     #=> { "winki"  => ["pinki"], 
+      #                      "booble" => ["buble","boble"] }
+      #  item.attributes = { "winki" => ["botinki"], "cat" => ["mice"] }
+      #  item.replace  #=> { "winki"  => ["botinki"], 
+      #                      "cat"    => ["mice"]}
+      #  # "cat" was added, "winki"  - replaced, "booble" - not affected
+      #  item.load     #=> { "booble" => ["buble","boble"], 
+      #                      "cat"    => ["mice"],
+      #                      "winki"  => ["botinki"] }
+      #
+      def replace
+        @attributes = uniq_values(@attributes)
+        @domain.sdb.interface.put_attributes(@domain.name, @name, @attributes, :replace)
+        @attributes
+      end
+
+      # Replace the attributes.
+      # +Attributes+ is a hash: { attribute1 => values1, ..., attributeN => valuesN }.
+      # Replaces the attributes at SDB by the given values.
+      # The other in-memory attributes are not being saved.
+      # Returns a hash of stored attributes.
+      #
+      #  item = RightAws::Sdb::Item.new(domain, "toys" )
+      #  item.load    #=> { "winki"  => ["pinki"], 
+      #                     "booble" => ["buble","boble"] }
+      #  item.replace_attributes("booble"=>["oops"]) #=> {"booble" => ["oops"]}
+      #  # check SDB updated
+      #  item.load    #=> { "winki"  => ["pinki"], 
+      #                     "booble" => ["oops"] }
+      #
+      def replace_attributes(attributes)
+        attributes = uniq_values(attributes)
+        @domain.sdb.interface.put_attributes(@domain.name, @name, attributes, :replace)
+        attributes.each { |attribute, values| attributes[attribute] = values }
+        attributes
+      end
+      
+      # Remove specified values from corresponding attributes.
+      # +Attributes+ is a hash: { attribute1 => values1, ..., attributeN => valuesN }.
+      #
+      #  item = RightAws::Sdb::Item.new(domain, "toys" )
+      #  item.load    #=> { "winki"  => ["pinki"], 
+      #                     "booble" => ["buble","boble"] }
+      #  item.delete_values("booble" => ["boble"])  # => {"booble" => ["boble"]}
+      #  # check SDB was updated
+      #  item.load    #=> { "winki"  => ["pinki"], 
+      #                     "booble" => ["boble"] }
+      #
+      def delete_values(attributes)
+        attributes = uniq_values(attributes)
+        unless attributes.blank?
+          @domain.sdb.interface.delete_attributes(@domain.name, @name, attributes)
+          attributes.each { |attribute, values| @attributes[attribute] -= values }
+        end
+        attributes
+      end
+
+      # Removes specified attributes from the item.
+      # +Attributes+ is an array or comma separated list of attributes names.
+      # Returns the list of deleted attributes.
+      # 
+      #  item = RightAws::Sdb::Item.new(domain, "toys" )
+      #  item.load    #=> { "winki"  => ["pinki"], 
+      #                     "booble" => ["buble","boble"],
+      #                     "Jon"    => ["beer","girls"]  }
+      #  item.delete_attributes("booble", "Jon") #=> ["booble", "Jon"]
+      #  # check SDB was updated and "booble" and "Jon" was deleted
+      #  item.load    #=> { "winki" => ["pinki"] }
+      def delete_attributes(*attributes)
+        attributes = attributes.flatten!
+        unless attributes.blank?
+          @domain.sdb.interface.delete_attributes(@domain.name, @name, attributes)
+          attributes.each { |attribute| @attributes.delete(attribute) }
+        end
+        attributes
+      end
+      
+      # Delete the Item entirely from SDB.
+      # 
+      #  item = RightAws::Sdb::Item.new(domain, "toys" )
+      #  item.load   #=> { "winki"  => ["pinki"], 
+      #                    "booble" => ["buble","boble"],
+      #                    "Jon"    => ["beer","girls"]  }
+      #  item.delete
+      #  item.load   #=> {}
       #
       def delete
         @domain.sdb.interface.delete_attributes(@domain.name, @name)
-        @attributes = []
-      end
-      
-    end
-    
-    class Attribute
-      attr_reader   :name
-      attr_reader   :item
-      attr_accessor :values
-      
-      # Create a new Attribute instance.
-      # 
-      # Loads all values from SDB if +values+ param set to +:reload+.
-      # Otherwise initializes the values list with passed +values+
-      # param ( +values+ is an array ). Stores the values to SDB if 
-      # +store+ is to :replace or :put.
-      #
-      #  sdb    = RightAws::Sdb.new
-      #  domain = RightAws::Sdb::Domain.new(sdb, 'co-workers')   #=> #<RightAws::Sdb::Domain:0xb7795984 ...
-      #  item   = RightAws::Sdb::Item.new(domain, 'house', attributes, :replace) #=> #<RightAws::Sdb::Item:0xb77c9068...
-      #
-      #  attribute = RightAws::Sdb::Attribute.new(item, 'Jon', ['Willa', 'Palace', 'Kremlin'])
-      #
-      def initialize(item, name, values=:reload, store=:skip_store)
-        @item = item
-        @name = name
-        # remove the attribute from parent item if it has the same name 
-        @item.attributes.delete_if {|attr| attr.name == name }
-        @item.attributes << self
-        # set values
-        if values == :reload 
-          reload
-        else 
-          @values = values.to_a
-          case store
-          when nil, false, :skip_store : # do nothing
-          when :put                    : put
-          else                           replace
-          end
-        end
+        @attributes = {}
       end
       
       def to_s
         @name
       end
       
-      # Reload attribute's values from SDB.
-      # Replaces the in memory list with SDB values.
-      #
-      def reload
-        @values = @item.domain.sdb.interface.get_attributes(@item.domain.name, @item.name, @name)[:attributes][@name].to_a
-      end
-      
-      
-      # Returns +true+ if the attribute includes all the values from the list.
-      #
-      #  attribute.has? 'beer'
-      #  attribute.has? %w{beer car girls}
-      #
-      def has?(values)
-        values.to_a.uniq.each do |value|
-          return false unless @values.include?(value)
+    private    
+
+      def uniq_values(attributes=nil) # :nodoc:
+        attributes = attributes.dup
+        attributes.each do |attribute, values|
+          attributes[attribute] = values.to_a.uniq
+          attributes.delete(attribute) if values.blank?
         end
-        true
+        attributes
       end
-      
-      # Store in memory list of values or +values+ passed as param to SDB. 
-      # Returns a list of stored values.
-      # 
-      #  # show initial values
-      #  puts attribute.values.inspect       # => ['beer','pub']
-      #  attribute.put('girls')              # => ['girls']
-      #  # check (reload from sdb)
-      #  attribute.reload                    # => ['beer','pub','girls']
-      #
-      def put(values=nil)
-        if values
-          stored = values.to_a.uniq
-          @item.domain.sdb.interface.put_attributes(@item.domain.name, @item.name, @name => stored)
-          (@values += stored).uniq!
-          stored
-        else
-          @values.uniq!
-          @item.domain.sdb.interface.put_attributes(@item.domain.name, @item.name, @name => @values)
-          @values
-        end
-      end
-      
-      # Store in memory list of values or +values+ passed as param to sdb. 
-      # Returns a list of new values.
-      #
-      #  # show initial values
-      #  puts attribute.values.inspect       # => ['beer','pub']
-      #  attribute.replace('girls')          # => ['girls']
-      #  # check (reload from sdb)
-      #  attribute.reload                    # => ['girls']
-      #
-      def replace(values=nil)
-        @values = values.to_a if values
-        @values.uniq!
-        @item.domain.sdb.interface.put_attributes(@item.domain.name, @item.name, {@name => @values}, :replace)
-        @values
-      end
-      
-      # Delete a set of values (or all by deault) from attribute. 
-      # Returns the list of removed values.
-      #  
-      #  # show initial values
-      #  puts attribute.values.inspect       # => ['beer','pub','girls','car','vodka']
-      #  # delete two elements
-      #  attribute.delete(['beer', 'vodka']) # => ['beer', 'vodka']
-      #  # check the deletion
-      #  puts attribute.values.inspect       # => ['pub','girls','car']
-      #  attribute.reload                    # => ['pub','girls','car']
-      #  # delete one element
-      #  attribute.delete('car')             # => ['car']
-      #  # check the deletion
-      #  attribute.reload                    # => ['pub','girls']
-      #
-      def delete(values=nil)
-        # values to delete (all by default)
-        if values
-          # delete the values partialy
-          removed = values.to_a
-          @item.domain.sdb.interface.delete_attributes(@item.domain.name, @item.name, { @name => removed })
-          @values -= removed
-        else
-          # quick way to delete all the values
-          @item.domain.sdb.interface.delete_attributes(@item.domain.name, @item.name, [ @name ])
-          removed, @values = @values, []
-          # there are no values left -> remove from item attributes list 
-          @item.attributes.delete(self)
-        end
-        removed
-      end
-      
+
     end
-  end  
+  end
 end
