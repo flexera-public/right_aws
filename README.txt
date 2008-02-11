@@ -5,15 +5,16 @@ For information about RightScale, see http://www.rightscale.com
 
 == DESCRIPTION:
 
-The RightScale AWS gems have been designed to provide a robust, fast, and secure interface to Amazon EC2, Amazon, S3, and Amazon SQS. These gems have been used in production by RightScale since late 2006 and are being maintained to track enhancements made by Amazon. The RightScale AWS gems comprise:
+The RightScale AWS gems have been designed to provide a robust, fast, and secure interface to Amazon EC2, Amazon S3, Amazon SQS, and Amazon SDB. These gems have been used in production by RightScale since late 2006 and are being maintained to track enhancements made by Amazon. The RightScale AWS gems comprise:
 
 - RightAws::Ec2 -- interface to Amazon EC2 (Elastic Compute Cloud)
 - RightAws::S3 and RightAws::S3Interface -- interface to Amazon S3 (Simple Storage Service)
 - RightAws::Sqs and RightAws::SqsInterface -- interface to Amazon SQS (Simple Queue Service)
+- RightAws::SdbInterface -- interface to Amazon SDB (SimpleDB)
 
 == FEATURES:
 
-- Full programmmatic access to EC2, S3, and SQS.
+- Full programmmatic access to EC2, S3, SQS, and SDB.
 - Complete error handling: all operations check for errors and report complete
   error information by raising an AwsError.
 - Persistent HTTP connections with robust network-level retry layer using
@@ -47,7 +48,7 @@ threads, you may want or need an HTTP connection per thread to enable
 concurrent requests to AWS. The way this plays out in practice is:
 1. If you have a non-multithreaded Ruby program, use the non-multithreaded setting.
 2. If you have a multi-threaded Ruby program, use the multithreaded setting to enable
-   concurrent requests to S3 (or SQS, or EC2).
+   concurrent requests to S3 (or SQS, or SDB, or EC2).
 3. For running under Mongrel/Rails, use the non-multithreaded setting even though
    mongrel is multithreaded.  This is because only one Rails handler is invoked at
    time (i.e. it acts like a single-threaded program)
@@ -55,7 +56,7 @@ concurrent requests to AWS. The way this plays out in practice is:
 Note that due to limitations in the I/O of the Ruby interpreter you
 may not get the degree of parallelism you may expect with the multi-threaded setting.
 
-By default, EC2/S3/SQS interface instances are created in single-threaded mode.  Set
+By default, EC2/S3/SQS/SDB interface instances are created in single-threaded mode.  Set
 "params[:multi_thread]" to "true" in the initialization arguments to use
 multithreaded mode.
 
@@ -67,10 +68,22 @@ multithreaded mode.
   http://developer.amazonwebservices.com/connect/kbcategory.jspa?categoryID=48
 * For SQS read RightAws::Sqs and consult the Amazon SQS API documentation at
   http://developer.amazonwebservices.com/connect/kbcategory.jspa?categoryID=31
+* For SDB read RightAws::Sdb and consult the Amazon SDB API documentation at
+  http://developer.amazonwebservices.com/connect/kbcategory.jspa?categoryID=141
 
 == KNOWN ISSUES:
 
-- Amazon recently (8/07) changed the semantics of the SQS service.  A
+- 2/11/08: If you use RightAws in conjunction with attachment_fu, the
+  right_aws gem must be included (using the require statement) AFTER
+  attachment_fu.  If right_aws is loaded before attachment_fu, you'll
+  encounter errors similar to:
+
+  s3.amazonaws.com temporarily unavailable: (wrong number of arguments (5 for 4))
+
+  This is due to a conflict between the right_http_connection gem and another
+  gem required by attachment_fu.
+
+- 8/07: Amazon has changed the semantics of the SQS service.  A
   new queue may not be created within 60 seconds of the destruction of any
   older queue with the same name.  Certain methods of RightAws::Sqs and
   RightAws::SqsInterface will fail with the message:
@@ -91,7 +104,7 @@ sudo gem install
 
 == LICENSE:
 
-Copyright (c) 2007 RightScale, Inc. 
+Copyright (c) 2007-2008 RightScale, Inc. 
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
