@@ -80,6 +80,10 @@ multithreaded mode.
 
   s3.amazonaws.com temporarily unavailable: (wrong number of arguments (5 for 4))
 
+  or
+
+  'incompatible Net::HTTP monkey-patch'
+
   This is due to a conflict between the right_http_connection gem and another
   gem required by attachment_fu.
 
