@@ -42,6 +42,7 @@ require 'ec2/right_ec2'
 require 's3/right_s3_interface'
 require 's3/right_s3'
 require 'sqs/right_sqs_interface'
+require 'sqs/right_sqs_gen2_interface'
 require 'sqs/right_sqs'
 require 'sdb/right_sdb_interface'
 
@@ -49,7 +50,7 @@ require 'sdb/right_sdb_interface'
 module RightAws #:nodoc:
   module VERSION #:nodoc:
     MAJOR = 1
-    MINOR = 5
+    MINOR = 6
     TINY  = 0
 
     STRING = [MAJOR, MINOR, TINY].join('.')

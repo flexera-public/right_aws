@@ -30,6 +30,20 @@ module RightAws
       Base64.encode64(OpenSSL::HMAC.digest(OpenSSL::Digest::Digest.new("sha1"), aws_secret_access_key, auth_string)).strip
     end
 
+    # From Amazon's SQS Dev Guide, a brief description of how to escape:
+    # "URL encode the computed signature and other query parameters as specified in 
+    # RFC1738, section 2.2. In addition, because the + character is interpreted as a blank space 
+    # by Sun Java classes that perform URL decoding, make sure to encode the + character 
+    # although it is not required by RFC1738."
+    # Avoid using CGI::escape to escape URIs. 
+    # CGI::escape will escape characters in the protocol, host, and port
+    # sections of the URI.  Only target chars in the query
+    # string should be escaped.
+    def self.URLencode(raw)
+      e = URI.escape(raw)
+      e.gsub(/\+/, "%2b")
+    end
+
   end
 
   class AwsBenchmarkingBlock #:nodoc:
