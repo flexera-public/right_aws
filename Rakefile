@@ -36,6 +36,14 @@ task :testsqs do
   require 'test/sqs/test_right_sqs.rb'
 end
 
+desc "Test just the second generation SQS interface"
+task :testsqs2 do
+  require 'test/test_credentials'
+  require 'test/http_connection'
+  TestCredentials.get_credentials
+  require 'test/sqs/test_right_sqs_gen2.rb'
+end
+
 desc "Test just the S3 interface"
 task :tests3 do
   require 'test/test_credentials'

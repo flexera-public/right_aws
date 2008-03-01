@@ -23,6 +23,18 @@
 
 module RightAws
 
+  #
+  # Right::Aws::SqsGen2Interface - RightScale's low-level Amazon SQS interface
+  # for API version 2008-01-01 and later.
+  # For explanations of the semantics
+  # of each call, please refer to Amazon's documentation at
+  # http://developer.amazonwebservices.com/connect/kbcategory.jspa?categoryID=31
+  #
+  # This class provides a procedural interface to SQS.  Conceptually it is
+  # mostly a pass-through interface to SQS and its API is very similar to the
+  # bare SQS API.  For a somewhat higher-level and object-oriented interface, see
+  # RightAws::SqsGen2. 
+
   class SqsGen2Interface < RightAwsBase
     include RightAwsBaseInterface
     
@@ -54,7 +66,7 @@ module RightAws
     # Amazon's article "Migrating to Amazon SQS API version 2008-01-01" at:
     # http://developer.amazonwebservices.com/connect/entry.jspa?externalID=1148
     #
-    #  sqs = RightAws::SqsInterface.new('1E3GDYEOGFJPIT75KDT40','hgTHt68JY07JKUY08ftHYtERkjgtfERn57DFE379', {:multi_thread => true, :logger => Logger.new('/tmp/x.log')}) #=> <RightSqs:0xb7af6264>
+    #  sqs = RightAws::SqsGen2Interface.new('1E3GDYEOGFJPIT75KDT40','hgTHt68JY07JKUY08ftHYtERkjgtfERn57DFE379', {:multi_thread => true, :logger => Logger.new('/tmp/x.log')}) #=> <RightSqs:0xb7af6264>
     #  
     # Params is a hash:
     #
@@ -196,7 +208,7 @@ module RightAws
 
       # Sets queue attribute. Returns +true+ or an exception.
       #
-      # sqs.set_queue_attributes('http://queue.amazonaws.com/ZZ7XXXYYYBINS/my_awesome_queue', "VisibilityTimeout", 10) #=> true
+      #  sqs.set_queue_attributes('http://queue.amazonaws.com/ZZ7XXXYYYBINS/my_awesome_queue', "VisibilityTimeout", 10) #=> true
       #
       # From the SQS Dev Guide:
       # "Currently, you can set only the 
@@ -216,7 +228,7 @@ module RightAws
 
       # Retrieves a list of messages from queue. Returns an array of hashes in format: <tt>{:id=>'message_id', body=>'message_body'}</tt>
       #
-      #   sqs.receive_messages('http://queue.amazonaws.com/ZZ7XXXYYYBINS/my_awesome_queue',10, 5) #=>
+      #   sqs.receive_message('http://queue.amazonaws.com/ZZ7XXXYYYBINS/my_awesome_queue',10, 5) #=>
       #    [{"ReceiptHandle"=>"Euvo62...kw==", "MD5OfBody"=>"16af2171b5b83cfa35ce254966ba81e3", 
       #      "Body"=>"Goodbyte World!", "MessageId"=>"MUM4WlAyR...pYOTA="}, ..., {}]
       #
@@ -236,8 +248,8 @@ module RightAws
       # If successful, this call returns a hash containing key/value pairs for
       # "MessageId" and "MD5OfMessageBody":
       #
-      # sqs.send_message('http://queue.amazonaws.com/ZZ7XXXYYYBINS/my_awesome_queue', 'message_1') #=> "1234567890...0987654321"
-      # => {"MessageId"=>"MEs4M0JKNlRCRTBBSENaMjROTk58QVFRNzNEREhDVFlFOVJDQ1JKNjF8UTdBRllCUlJUMjhKMUI1WDJSWDE=", "MD5OfMessageBody"=>"16af2171b5b83cfa35ce254966ba81e3"}
+      #  sqs.send_message('http://queue.amazonaws.com/ZZ7XXXYYYBINS/my_awesome_queue', 'message_1') #=> "1234567890...0987654321"
+      #  => {"MessageId"=>"MEs4M0JKNlRCRTBBSENaMjROTk58QVFRNzNEREhDVFlFOVJDQ1JKNjF8UTdBRllCUlJUMjhKMUI1WDJSWDE=", "MD5OfMessageBody"=>"16af2171b5b83cfa35ce254966ba81e3"}
       #
       # On failure, send_message raises an exception.
       #
@@ -322,7 +334,7 @@ module RightAws
       #  sqs.clear_queue('http://queue.amazonaws.com/ZZ7XXXYYYBINS/my_awesome_queue') #=> true
       #
     def clear_queue(queue_url)
-      while (m = pop_messages(queue_url, 10)) ; end   # delete all messages in queue
+      while (pop_messages(queue_url, 10).length > 0) ; end   # delete all messages in queue
       true
     rescue
       on_exception
@@ -331,10 +343,11 @@ module RightAws
       # Pops (retrieves and deletes) up to 'number_of_messages' from queue. Returns an array of retrieved messages in format: <tt>[{:id=>'message_id', :body=>'message_body'}]</tt>.
       #
       #   sqs.pop_messages('http://queue.amazonaws.com/ZZ7XXXYYYBINS/my_awesome_queue', 3) #=>
-      #    [{:id=>"12345678904GEZX9746N|0N9ED344VK5Z3SV1DTM0|1RVYH4X3TJ0987654321", :body=>"message_1"}, ..., {}]
+      #   [{"ReceiptHandle"=>"Euvo62/...+Zw==", "MD5OfBody"=>"16af2...81e3", "Body"=>"Goodbyte World!", 
+      #   "MessageId"=>"MEZI...JSWDE="}, {...}, ... , {...} ]
       #
     def pop_messages(queue_url, number_of_messages=1)
-      messages = receive_messages(queue_url, number_of_messages)
+      messages = receive_message(queue_url, number_of_messages)
       messages.each do |message|
         delete_message(queue_url, message['ReceiptHandle'])
       end

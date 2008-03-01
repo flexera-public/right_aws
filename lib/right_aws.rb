@@ -42,8 +42,9 @@ require 'ec2/right_ec2'
 require 's3/right_s3_interface'
 require 's3/right_s3'
 require 'sqs/right_sqs_interface'
-require 'sqs/right_sqs_gen2_interface'
 require 'sqs/right_sqs'
+require 'sqs/right_sqs_gen2_interface'
+require 'sqs/right_sqs_gen2'
 require 'sdb/right_sdb_interface'
 
 

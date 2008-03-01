@@ -9,7 +9,8 @@ The RightScale AWS gems have been designed to provide a robust, fast, and secure
 
 - RightAws::Ec2 -- interface to Amazon EC2 (Elastic Compute Cloud)
 - RightAws::S3 and RightAws::S3Interface -- interface to Amazon S3 (Simple Storage Service)
-- RightAws::Sqs and RightAws::SqsInterface -- interface to Amazon SQS (Simple Queue Service)
+- RightAws::Sqs and RightAws::SqsInterface -- interface to first-generation Amazon SQS (Simple Queue Service) (API version 2007-05-01)
+- RightAws::SqsGen2 and RightAws::SqsGen2Interface -- interface to second-generation Amazon SQS (Simple Queue Service) (API version 2008-01-01)
 - RightAws::SdbInterface -- interface to Amazon SDB (SimpleDB)
 
 == FEATURES:
@@ -31,6 +32,8 @@ The RightScale AWS gems have been designed to provide a robust, fast, and secure
 - Support for streaming GETs from S3, and streaming PUTs to S3 if the data source is a file.
 - Support for single-threaded usage, multithreaded usage, as well as usage with multiple
   AWS accounts.
+- Support for both first- and second-generation SQS (API versions 2007-05-01
+  and 2008-01-01).  These versions of SQS are not compatible.
 - Test suite (requires AWS account to do "live" testing).
 
 == THREADING:
@@ -66,8 +69,14 @@ multithreaded mode.
   http://developer.amazonwebservices.com/connect/kbcategory.jspa?categoryID=87
 * For S3 read RightAws::S3 and consult the Amazon S3 API documentation at
   http://developer.amazonwebservices.com/connect/kbcategory.jspa?categoryID=48
-* For SQS read RightAws::Sqs and consult the Amazon SQS API documentation at
+* For first generation SQS read RightAws::Sqs and consult the Amazon SQS API documentation at
   http://developer.amazonwebservices.com/connect/kbcategory.jspa?categoryID=31
+* For second generation SQS read RightAws::SqsGen2, RightAws::SqsGen2Interface and consult the Amazon SQS API documentation at
+  http://developer.amazonwebservices.com/connect/entry.jspa?externalID=1214&categoryID=31 
+
+  Amazon's Migration Guide for moving from first to second generation SQS is
+  avalable at:
+  http://developer.amazonwebservices.com/connect/entry.jspa?externalID=1148
 * For SDB read RightAws::Sdb and consult the Amazon SDB API documentation at
   http://developer.amazonwebservices.com/connect/kbcategory.jspa?categoryID=141
 
