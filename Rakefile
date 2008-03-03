@@ -9,6 +9,18 @@ require 'lib/right_aws.rb'
 
 testglobs =     ["test/ts_right_aws.rb"]
 
+
+# Suppress Hoe's self-inclusion as a dependency for our Gem.  This also keeps
+# Rake & rubyforge out of the dependency list.  Users must manually install
+# these gems to run tests, etc.
+class Hoe
+  def extra_deps
+    @extra_deps.reject do |x|
+      Array(x).first == 'hoe'
+    end
+  end
+end
+
 Hoe.new('right_aws', RightAws::VERSION::STRING) do |p|
   p.rubyforge_name = 'rightaws'
   p.author = 'RightScale, Inc.'
