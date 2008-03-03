@@ -76,7 +76,7 @@ module RightAws
       # Returns Queue instance by queue name. 
       # If the queue does not exist at Amazon SQS and +create+ is true, the method creates it.
       #
-      #  RightAws::Sqs.queue('my_awesome_queue') #=> #<RightAws::Sqs::Queue:0xb7b626e4 ... >
+      #  RightAws::SqsGen2.queue('my_awesome_queue') #=> #<RightAws::SqsGen2::Queue:0xb7b626e4 ... >
       #
     def queue(queue_name, create=true, visibility=nil)
       url = @interface.queue_url_by_name(queue_name)
@@ -173,7 +173,7 @@ module RightAws
         # Retrieves first accessible message from queue. 
         # Returns Message instance or +nil+ it the queue is empty.
         #
-        #  queue.receive #=> #<RightAws::Sqs::Message:0xb7bf0884 ... >
+        #  queue.receive #=> #<RightAws::SqsGen2::Message:0xb7bf0884 ... >
         #
       def receive(visibility=nil)
         list = receive_messages(1, visibility)
