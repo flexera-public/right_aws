@@ -23,6 +23,7 @@ test/sdb/test_right_sdb.rb
 test/sdb/test_helper.rb
 test/sqs/test_helper.rb
 test/sqs/test_right_sqs.rb
+test/sqs/test_right_sqs_gen2.rb
 test/ts_right_aws.rb
 test/test_credentials.rb
 test/http_connection.rb
