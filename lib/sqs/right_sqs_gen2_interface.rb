@@ -66,7 +66,7 @@ module RightAws
     # Amazon's article "Migrating to Amazon SQS API version 2008-01-01" at:
     # http://developer.amazonwebservices.com/connect/entry.jspa?externalID=1148
     #
-    #  sqs = RightAws::SqsGen2Interface.new('1E3GDYEOGFJPIT75KDT40','hgTHt68JY07JKUY08ftHYtERkjgtfERn57DFE379', {:multi_thread => true, :logger => Logger.new('/tmp/x.log')}) #=> <RightSqs:0xb7af6264>
+    #  sqs = RightAws::SqsGen2Interface.new('1E3GDYEOGFJPIT75KDT40','hgTHt68JY07JKUY08ftHYtERkjgtfERn57DFE379', {:multi_thread => true, :logger => Logger.new('/tmp/x.log')}) 
     #  
     # Params is a hash:
     #
