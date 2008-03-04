@@ -12,6 +12,8 @@ lib/s3/right_s3_interface.rb
 lib/sdb/right_sdb_interface.rb
 lib/sqs/right_sqs.rb
 lib/sqs/right_sqs_interface.rb
+lib/sqs/right_sqs_gen2.rb
+lib/sqs/right_sqs_gen2_interface.rb
 test/ec2/test_helper.rb
 test/ec2/test_right_ec2.rb
 test/s3/test_helper.rb
@@ -21,6 +23,7 @@ test/sdb/test_right_sdb.rb
 test/sdb/test_helper.rb
 test/sqs/test_helper.rb
 test/sqs/test_right_sqs.rb
+test/sqs/test_right_sqs_gen2.rb
 test/ts_right_aws.rb
 test/test_credentials.rb
 test/http_connection.rb

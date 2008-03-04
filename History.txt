@@ -110,3 +110,25 @@ Initial release.
   * SDB support added.
   * RightAws::S3::bucket and RightAws::S3::Bucket.create methods behaviour 
     changed: param +create+ is set to +false+ by default.
+
+== 1.6.0
+
+r2780 | todd | 2008-02-11 11:41:07 -0800 (Mon, 11 Feb 2008) | 4 lines
+Some doc updates & tweaks: we now support ultra-large PUTs to S3, small SDB
+cleanups, add SDB to the list of interfaces in RightAws, update some copyrights,
+warn about loading attachment_fu AFTER right_aws (big no-no).
+
+r2784 | todd | 2008-02-11 13:46:47 -0800 (Mon, 11 Feb 2008) | 2 lines
+One final clarification: you may get a Net::HTTP bad monkey patch exception
+
+r2880 | todd | 2008-02-25 18:06:22 -0800 (Mon, 25 Feb 2008) | 2 lines
+Add SQS 'Gen 2' interface implementation
+
+r2913 | todd | 2008-02-29 16:57:07 -0800 (Fri, 29 Feb 2008) | 3 lines
+SqsGen2 (object interface), unit tests for both interfaces, documentation
+updates.
+
+r2922 | todd | 2008-03-03 15:26:42 -0800 (Mon, 03 Mar 2008) | 2 lines
+couple of documentation tweaks in prep for 1.6.0
+
+

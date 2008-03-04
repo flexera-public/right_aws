@@ -159,8 +159,8 @@ module RightAws
     # Retrieve a list of SDB domains from Amazon.
     # 
     # Returns a hash:
-    #   { :domails     => [domain1, ..., domainN],
-    #     :next_tocken => string || nil,
+    #   { :domains     => [domain1, ..., domainN],
+    #     :next_token => string || nil,
     #     :box_usage   => string,
     #     :request_id  => string }
     #     
@@ -171,7 +171,8 @@ module RightAws
     #                          :request_id => "976709f9-0111-2345-92cb-9ce90acd0982",
     #                          :domains    => ["toys", "dolls"]}
     # 
-    # if block is given then yields it in a loop till block returns true and SDB has the data.
+    # If a block is given, this method yields to it.  If the block returns true, list_domains will continue looping the request.  If the block returns false,
+    # list_domains will end.
     # 
     #   sdb.list_domains(10) do |result|   # list by 10 domains per iteration
     #     puts result.inspect
@@ -202,8 +203,8 @@ module RightAws
     
     # Create new SDB domain at Amazon.
     # 
-    # Returns a hash: { :box_usage, :request_id } on success or exception on error.
-    # (Amazon raises no errors if the domain already exists)
+    # Returns a hash: { :box_usage, :request_id } on success or an exception on error.
+    # (Amazon raises no errors if the domain already exists).
     # 
     # Example:
     # 
@@ -222,8 +223,8 @@ module RightAws
 
     # Delete SDB domain at Amazon.
     # 
-    # Returns a hash: { :box_usage, :request_id } on success or exception on error.
-    # (Amazon raises no errors if the domain does not exist)
+    # Returns a hash: { :box_usage, :request_id } on success or an exception on error.
+    # (Amazon raises no errors if the domain does not exist).
     # 
     # Example:
     # 
@@ -241,7 +242,7 @@ module RightAws
       on_exception
     end
     
-    # Add/Replace Item attributes.
+    # Add/Replace item attributes.
     # 
     # Params:
     #  domain_name = DomainName
@@ -253,8 +254,8 @@ module RightAws
     #  }
     #  replace = :replace | any other value to skip replacement
     #  
-    # Returns a hash: { :box_usage, :request_id } on success or exception on error. 
-    # (Amazon raises no errors if the attribute was not overriden due to :replace param unset)
+    # Returns a hash: { :box_usage, :request_id } on success or an exception on error. 
+    # (Amazon raises no errors if the attribute was not overridden, as when the :replace param is unset).
     # 
     # Example:
     # 
@@ -366,9 +367,9 @@ module RightAws
     #   sdb.query('family', query)     #=> hash of data
     #   sdb.query('family', query, 10) #=> hash of data with max of 10 items
     # 
-    # if block is given then yields it in a loop till block returns true and SDB has the data.
+    # If a block is given, query will iteratively yield results to it as long as the block continues to return true.
     # 
-    #   # list by 10 items per iteration dont 
+    #   # List 10 items per iteration. Don't 
     #   # forget to escape single quotes and backslashes and wrap all the items in single quotes.
     #   query = "['cat'='clew'] union ['dog'='Jon\\'s boot']"
     #   sdb.query('family', query, 10) do |result|
@@ -376,7 +377,7 @@ module RightAws
     #     true
     #   end
     #  
-    #   # same query using the auto escape way (pass the query and it's params as an array)
+    #   # Same query using automatic escaping...to use the auto escape, pass the query and its params as an array:
     #   query = [ "['cat'=?] union ['dog'=?]", "clew", "Jon's boot" ]
     #   sdb.query('family', query)
     #

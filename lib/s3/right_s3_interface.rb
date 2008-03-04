@@ -303,7 +303,7 @@ module RightAws
       # when you retrieve the object. The total size of the HTTP
       # request, not including the body, must be less than 4 KB.
       #
-      #  s3.put('my_awesome_bucket', 'log/curent/1.log', 'Ola-la!', 'x-amz-meta-family'=>'Woho556!') #=> true
+      #  s3.put('my_awesome_bucket', 'log/current/1.log', 'Ola-la!', 'x-amz-meta-family'=>'Woho556!') #=> true
       #
       # This method is capable of 'streaming' uploads; that is, it can upload
       # data from a file or other IO object without first reading all the data
@@ -323,9 +323,8 @@ module RightAws
       # 'Content-Length' bytes have been uploaded, and HttpConnection will
       # interpret this as an error. 
       #    
-      # Note: This method does not yet support very large PUTs, where very large
-      # is > 2 GB. This is due to the underlying Net::HTTP library, which does
-      # not send Expect: 100-Continue headers for these large requests.  
+      # This method now supports very large PUTs, where very large
+      # is > 2 GB. 
       # 
       # For Win32 users: Files and IO objects should be opened in binary mode.  If
       # a text mode IO object is passed to PUT, it will be converted to binary

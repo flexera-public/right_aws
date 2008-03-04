@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2007 RightScale Inc
+# Copyright (c) 2007-2008 RightScale Inc
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -43,13 +43,15 @@ require 's3/right_s3_interface'
 require 's3/right_s3'
 require 'sqs/right_sqs_interface'
 require 'sqs/right_sqs'
+require 'sqs/right_sqs_gen2_interface'
+require 'sqs/right_sqs_gen2'
 require 'sdb/right_sdb_interface'
 
 
 module RightAws #:nodoc:
   module VERSION #:nodoc:
     MAJOR = 1
-    MINOR = 5
+    MINOR = 6
     TINY  = 0
 
     STRING = [MAJOR, MINOR, TINY].join('.')
