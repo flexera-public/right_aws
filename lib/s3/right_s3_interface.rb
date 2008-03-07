@@ -284,14 +284,21 @@ module RightAws
         there_are_more_keys = response[:is_truncated]
         if(there_are_more_keys)
           if(response[:next_marker])
-            internal_options[:marker] = response[:next_marker]
+            # Dup from response so that no one can mess with these values in the
+            # yield block
+            internal_options[:marker] = response[:next_marker].dup
           else 
-            internal_options[:marker] = response[:contents].last[:key]
+            if( response[:contents].last[:key] > response[:common_prefixes].last )
+              internal_options[:marker] = response[:contents].last[:key].dup
+            else
+              internal_options[:marker] = response[:common_prefixes].last.dup
+            end
           end
-          internal_options[:'max-keys'] ? (internal_options[:'max-keys'] -= response[:contents].length) : nil 
+          total_results = response[:contents].length + response[:common_prefixes].length
+          internal_options[:'max-keys'] ? (internal_options[:'max-keys'] -= total_results) : nil 
         end
         yield response
-      end while there_are_more_keys 
+      end while there_are_more_keys && internal_options[:'max-keys'] > 0
       true
     rescue
       on_exception
