@@ -131,4 +131,8 @@ updates.
 r2922 | todd | 2008-03-03 15:26:42 -0800 (Mon, 03 Mar 2008) | 2 lines
 couple of documentation tweaks in prep for 1.6.0
 
+== 1.6.1
 
+r3051 | konstantin | 2008-03-14 21:26:12 +0300 (Fri, 14 Mar 2008) | 1 line
+
+#897, ActiveSdb alpha release
