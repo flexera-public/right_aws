@@ -30,7 +30,7 @@ Hoe.new('right_aws', RightAws::VERSION::STRING) do |p|
   p.url = p.paragraphs_of('README.txt', 0).first.split(/\n/)[1..-1]
   p.changes = p.paragraphs_of('History.txt', 0..1).join("\n\n")
   p.remote_rdoc_dir = "/right_aws_gem_doc"
-  p.extra_deps = [['right_http_connection','>= 1.2.1']]
+  p.extra_deps = [['right_http_connection','>= 1.2.1'],['uuidtools','>= 1.0.3']]
   p.test_globs = testglobs 
 end
 
@@ -84,6 +84,13 @@ task :testsdb do
   require 'test/test_credentials'
   TestCredentials.get_credentials
   require 'test/sdb/test_right_sdb.rb'
+end
+
+desc "Test active SDB interface"
+task :testactivesdb do
+  require 'test/test_credentials'
+  TestCredentials.get_credentials
+  require 'test/sdb/test_active_sdb.rb'
 end
 
 # vim: syntax=Ruby

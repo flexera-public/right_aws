@@ -10,6 +10,7 @@ lib/ec2/right_ec2.rb
 lib/s3/right_s3.rb
 lib/s3/right_s3_interface.rb
 lib/sdb/right_sdb_interface.rb
+lib/sdb/right_sdb.rb
 lib/sqs/right_sqs.rb
 lib/sqs/right_sqs_interface.rb
 lib/sqs/right_sqs_gen2.rb

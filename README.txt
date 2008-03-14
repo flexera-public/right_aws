@@ -11,7 +11,7 @@ The RightScale AWS gems have been designed to provide a robust, fast, and secure
 - RightAws::S3 and RightAws::S3Interface -- interface to Amazon S3 (Simple Storage Service)
 - RightAws::Sqs and RightAws::SqsInterface -- interface to first-generation Amazon SQS (Simple Queue Service) (API version 2007-05-01)
 - RightAws::SqsGen2 and RightAws::SqsGen2Interface -- interface to second-generation Amazon SQS (Simple Queue Service) (API version 2008-01-01)
-- RightAws::SdbInterface -- interface to Amazon SDB (SimpleDB)
+- RightAws::SdbInterface and RightAws::ActiveSdb -- interface to Amazon SDB (SimpleDB)
 
 == FEATURES:
 
