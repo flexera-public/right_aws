@@ -131,4 +131,14 @@ updates.
 r2922 | todd | 2008-03-03 15:26:42 -0800 (Mon, 03 Mar 2008) | 2 lines
 couple of documentation tweaks in prep for 1.6.0
 
+== 1.6.1 2008-03-14
+------------------------------------------------------------------------
+r2963 | todd | 2008-03-06 19:10:23 -0800 (Thu, 06 Mar 2008) | 3 lines
+
+(#950) Many minor fixes in incrementally_list_bucket to prevent a death loop
+in
+certain rare conditions
+
+
+
 
