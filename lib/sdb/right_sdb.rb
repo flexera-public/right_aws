@@ -298,7 +298,11 @@ module RightAws
 
         def find_from_ids(args, options) # :nodoc:
           cond = []
-          args.to_a.flatten.each { |id| cond << "'id'=#{self.connection.escape(id)}" }
+          # detect amount of records requested
+          bunch_of_records_requested = args.size > 1 || args.first.is_a?(Array)
+          # flatten ids
+          args = args.to_a.flatten
+          args.each { |id| cond << "'id'=#{self.connection.escape(id)}" }
           ids_cond = "[#{cond.join(' OR ')}]"
           # user defined :conditions to string (if it was defined)
           if options[:conditions].is_a?(Array)
@@ -306,7 +310,20 @@ module RightAws
           end
           # join ids condition and user defined conditions
           options[:conditions] = options[:conditions].blank? ? ids_cond : "#{options[:conditions]} intersection #{ids_cond}"
-          find_every(options)
+          result = find_every(options)
+          # if one record was requested then return it
+          unless bunch_of_records_requested
+            result.first
+          else
+            # if a bunch of records was requested then return check that we found all of them
+            # and return as an array
+            unless args.size == result.size
+              id_list = args.map{|i| "'#{i}'"}.join(',')
+              raise ActiveSdbError.new("Couldn't find all #{name} with IDs (#{id_list}) (found #{result.size} results, but was looking for #{args.size})")
+            else
+              result
+            end
+          end
         end
 
         # find_by helpers 

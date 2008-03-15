@@ -20,7 +20,7 @@ class TestSdb < Test::Unit::TestCase
     RightAws::ActiveSdb.establish_connection(TestCredentials.aws_access_key_id, TestCredentials.aws_secret_access_key)
   end
 
-  SDB_DELAY = 2
+  SDB_DELAY = 3
   
   def wait(delay, msg='')
     print "     waiting #{delay} seconds: #{msg}"
@@ -94,11 +94,19 @@ class TestSdb < Test::Unit::TestCase
     # find all rissian presidents Bushes
     assert_equal 0, Client.find(:all, :conditions => ["['post'=?] intersection ['country'=?] intersection ['name'=?]",'president', 'Russia','Bush']).size
     # --- find by ids
-    # must find 2 recs
+    # must find 1 rec (by rec id) and return it
+    assert_equal ids.first, Client.find(ids.first).id
+    # must find 1 rec (by one item array) and return an array
+    assert_equal ids.first, Client.find([ids.first]).first.id
+    # must find 2 recs (by a list of comma separated ids) and return an array
+    assert_equal ids.size, Client.find(*ids).size
+    # must find 2 recs (by an array of ids) and return an array
     assert_equal ids.size, Client.find(ids).size
     ids << 'dummy_id'
-    # must find 1 rec less
-    assert_equal ids.size - 1, Client.find(ids).size
+    # must raise an error when getting unexistent record
+    assert_raise(RightAws::ActiveSdb::ActiveSdbError) do 
+      Client.find(ids)
+    end
   end
 
   def test_05_find_first
