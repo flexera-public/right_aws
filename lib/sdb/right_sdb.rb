@@ -71,7 +71,7 @@ module RightAws
   #  Client.find_by_name('Putin').delete
   #  
   #  # Sandy disappointed in 'cooking' and decided to hide her 'gender' and 'country' ()
-  #  sandy = Client.find(sandy_id).first
+  #  sandy = Client.find(sandy_id)
   #  sandy.reload
   #  sandy.delete_values('hobby' => ['cooking'] )
   #  sandy.delete_attributes('country', 'gender')
