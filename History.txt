@@ -71,7 +71,6 @@ Initial release.
 
 * r1983, konstantin, 2007-10-25 22:33:00 +0400
   * Fixed ActiveSupport requirement bug (thanks to Toby)
-  * Fixed HttpConnection logging to stdout bug (thanks to Toby)
 
 == 1.4.4
 
@@ -139,6 +138,16 @@ r2963 | todd | 2008-03-06 19:10:23 -0800 (Thu, 06 Mar 2008) | 3 lines
 in
 certain rare conditions
 
+== 1.6.2 2008-03-19
+------------------------------------------------------------------------
+r3128 | todd | 2008-03-19 11:54:53 -0700 (Wed, 19 Mar 2008) | 2 lines
 
+Create 1.6.2 release branch
 
+------------------------------------------------------------------------
+r3130 | todd | 2008-03-19 12:01:12 -0700 (Wed, 19 Mar 2008) | 3 lines
 
+Apply Change 3124 to release_1_6_2 : further fixes to
+incrementally_list_bucket
+
+------------------------------------------------------------------------
