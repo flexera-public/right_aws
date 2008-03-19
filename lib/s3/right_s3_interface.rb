@@ -283,17 +283,7 @@ module RightAws
         response = request_info(req_hash, S3ImprovedListBucketParser.new(:logger => @logger))
         there_are_more_keys = response[:is_truncated]
         if(there_are_more_keys)
-          if(response[:next_marker])
-            # Dup from response so that no one can mess with these values in the
-            # yield block
-            internal_options[:marker] = response[:next_marker].dup
-          else 
-            if( response[:contents].last[:key] > response[:common_prefixes].last )
-              internal_options[:marker] = response[:contents].last[:key].dup
-            else
-              internal_options[:marker] = response[:common_prefixes].last.dup
-            end
-          end
+          internal_options[:marker] = decide_marker(response)
           total_results = response[:contents].length + response[:common_prefixes].length
           internal_options[:'max-keys'] ? (internal_options[:'max-keys'] -= total_results) : nil 
         end
@@ -304,6 +294,23 @@ module RightAws
       on_exception
     end
     
+    
+    private
+    def decide_marker(response)
+      return response[:next_marker].dup if response[:next_marker]
+      last_key = response[:contents].last[:key]
+      last_prefix = response[:common_prefixes].last
+      if(!last_key)
+        return nil if(!last_prefix)
+        last_prefix.dup
+      elsif(!last_prefix)
+        last_key.dup
+      else
+        last_key > last_prefix ? last_key.dup : last_prefix.dup
+      end
+    end
+    
+    public
       # Saves object to Amazon. Returns +true+  or an exception.
       # Any header starting with AMAZON_METADATA_PREFIX is considered
       # user metadata. It will be stored with the object and returned
