@@ -288,7 +288,7 @@ module RightAws
           internal_options[:'max-keys'] ? (internal_options[:'max-keys'] -= total_results) : nil 
         end
         yield response
-      end while there_are_more_keys && internal_options[:'max-keys'] > 0
+      end while there_are_more_keys && under_max_keys(internal_options)
       true
     rescue
       on_exception
@@ -308,6 +308,10 @@ module RightAws
       else
         last_key > last_prefix ? last_key.dup : last_prefix.dup
       end
+    end
+    
+    def under_max_keys(internal_options)
+      internal_options[:'max-keys'] ? internal_options[:'max-keys'] > 0 : true
     end
     
     public
