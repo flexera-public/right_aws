@@ -68,7 +68,8 @@ module RightAws
     
     SIGNATURE_VERSION = "1"
     # Amazon EC2 API version being used
-    API_VERSION       = "2007-08-29"
+#    API_VERSION       = "2007-08-29"
+    API_VERSION       = "2008-02-01"
     DEFAULT_HOST      = "ec2.amazonaws.com"
     DEFAULT_PROTOCOL  = 'https'
     DEFAULT_PORT      = 443
@@ -149,30 +150,24 @@ module RightAws
       return groups
     end
 
-
   #-----------------------------------------------------------------
   #-----------------------------------------------------------------
   #-----------------------------------------------------------------
 
-    def ec2_describe_images(type, list) #:nodoc:
-      link   = generate_request("DescribeImages", hash_params(type,list.to_a))
+    def ec2_describe_images(list, list_by='ImageId', image_type=nil) #:nodoc:
+      request_hash = hash_params(list_by, list.to_a)
+      request_hash['ImageType'] = image_type if image_type
+      link = generate_request("DescribeImages", request_hash)
       # We do not want to break the logic of parsing hence will use a dummy parser to process all the standart 
       # steps (errors checking etc). The dummy parser does nothig - just returns back the params it received.
       # If the caching is enabled and hit then throw  AwsNoChange. 
       # P.S. caching works for the whole images list only! (when the list param is blank)
       response, params = request_info(link, QEc2DummyParser.new)
       # if cache is ON and hits then throws AwsNoChange 
-      cache_hits?(:describe_images, response.body) if list.blank?
+      cache_hits?(:describe_images, response.body) if list.blank? && list_by == 'ImageId' && image_type.blank?
       parser = QEc2DescribeImagesParser.new(:logger => @logger)
       @@bench.xml.add!{ parser.parse(response, params) }
-      result = parser.result.collect do |image|
-        { :aws_id            => image.imageId,
-          :aws_location      => image.imageLocation,
-          :aws_owner         => image.imageOwnerId,
-          :aws_state         => image.imageState.downcase,
-          :aws_is_public     => image.isPublic,
-          :aws_product_codes => image.productCodes }
-      end
+      result = parser.result
       # put parsed data into cache if the caching is ON
       update_cache(:describe_images, :parsed => result) if list.blank?
       result
@@ -181,13 +176,16 @@ module RightAws
     end
 
       # Retrieve a list of images. Returns array of hashes describing the images or an exception:
-      #
+      # +image_type+ = 'machine' || 'kernel' || 'ramdisk' 
+      # 
       #  ec2.describe_images #=>
       #    [{:aws_owner => "522821470517",
       #      :aws_id => "ami-e4b6538d",
       #      :aws_state => "available",
       #      :aws_location => "marcins_cool_public_images/ubuntu-6.10.manifest.xml",
-      #      :aws_is_public => true},
+      #      :aws_is_public => true,
+      #      :aws_architecture => "i386",
+      #      :aws_image_type => "machine"},
       #     {...},
       #     {...} ]
       #
@@ -198,30 +196,32 @@ module RightAws
       #      :aws_id => "ami-e4b6538d",
       #      :aws_state => "available",
       #      :aws_location => "marcins_cool_public_images/ubuntu-6.10.manifest.xml",
-      #      :aws_is_public => true}]
+      #      :aws_is_public => true,
+      #      :aws_architecture => "i386",
+      #      :aws_image_type => "machine"}]
       #
-    def describe_images(list=[])
-      ec2_describe_images('ImageId', list)
+    def describe_images(list=[], image_type=nil)
+      ec2_describe_images(list, 'ImageId', image_type)
     end
 
       #
       #  Example:
       #
-      #  ec2.describe_images_by_owner('522821470517')
-      #  ec2.describe_images_by_owner('self')
+      #   ec2.describe_images_by_owner('522821470517')
+      #   ec2.describe_images_by_owner('self')
       #
-    def describe_images_by_owner(list)
-      ec2_describe_images('Owner', list)
+    def describe_images_by_owner(list, image_type=nil)
+      ec2_describe_images(list, 'Owner', image_type)
     end
 
       #
       #  Example:
       #
-      #  ec2.describe_images_by_executable_by('522821470517')
-      #  ec2.describe_images_by_executable_by('self')
+      #   ec2.describe_images_by_executable_by('522821470517')
+      #   ec2.describe_images_by_executable_by('self')
       #
-    def describe_images_by_executable_by(list)
-      ec2_describe_images('ExecutableBy', list)
+    def describe_images_by_executable_by(list, image_type=nil)
+      ec2_describe_images(list, 'ExecutableBy', image_type)
     end
 
 
@@ -251,7 +251,7 @@ module RightAws
     end
 
 
-      # Describe image attributes. Currently 'launchPermission' and 'productCodes' are supported.
+      # Describe image attributes. Currently 'launchPermission', 'productCodes', 'kernel', 'ramdisk' and 'blockDeviceMapping'  are supported.
       #
       #  ec2.describe_image_attribute('ami-e444444d') #=> {:groups=>["all"], :users=>["000000000777"]}
       #
@@ -259,15 +259,7 @@ module RightAws
       link = generate_request("DescribeImageAttribute", 
                               'ImageId'   => image_id,
                               'Attribute' => attribute)
-      image_attr = request_info(link, QEc2DescribeImageAttributeParser.new(:logger => @logger))
-      result = {}
-      if image_attr.launchPermission
-        result = { :users  => image_attr.launchPermission.userIds,
-                   :groups => image_attr.launchPermission.groups }
-      elsif image_attr.productCodes
-        result = { :aws_product_codes => image_attr.productCodes}
-      end
-      result
+      request_info(link, QEc2DescribeImageAttributeParser.new(:logger => @logger))
     rescue Exception
       on_exception
     end
@@ -331,47 +323,37 @@ module RightAws
       #
       #  ec2.modify_image_launch_perm_add_groups('ami-e444444d') #=> true
       #
-    def modify_image_launch_perm_add_groups(image_id, userGroup=['all'])
-      modify_image_attribute(image_id, 'launchPermission', 'add', :user_group => userGroup.to_a)
+    def modify_image_launch_perm_add_groups(image_id, user_group=['all'])
+      modify_image_attribute(image_id, 'launchPermission', 'add', :user_group => user_group.to_a)
     end
     
       # Remove image launch permissions for users groups (currently only 'all' is supported, which gives public launch permissions). 
       #
       #  ec2.modify_image_launch_perm_remove_groups('ami-e444444d') #=> true
       #
-    def modify_image_launch_perm_remove_groups(image_id, userGroup=['all'])
-      modify_image_attribute(image_id, 'launchPermission', 'remove', :user_group => userGroup.to_a)
+    def modify_image_launch_perm_remove_groups(image_id, user_group=['all'])
+      modify_image_attribute(image_id, 'launchPermission', 'remove', :user_group => user_group.to_a)
     end
     
       # Add product code to image
       #
       #  ec2.modify_image_product_code('ami-e444444d','0ABCDEF') #=> true
       #
-    def modify_image_product_code(image_id, productCode=[])
-      modify_image_attribute(image_id, 'productCodes', nil, :product_code => productCode.to_a)
+    def modify_image_product_code(image_id, product_code=[])
+      modify_image_attribute(image_id, 'productCodes', nil, :product_code => product_code.to_a)
     end
 
     def get_desc_instances(instances)  # :nodoc:
       result = []
-      instances.each do |item|
-        item.instancesSet.each do |instance|
+      instances.each do |reservation|
+        reservation[:instances_set].each do |instance|
           # Parse and remove timestamp from the reason string. The timestamp is of
           # the request, not when EC2 took action, thus confusing & useless...
-          reason = instance.reason.sub(/\(\d[^)]*GMT\) */, '')
-          result << {:aws_owner          => item.ownerId,
-                     :aws_reservation_id => item.reservationId,
-                     :aws_groups         => item.groupSet,
-                     :aws_state_code     => instance.instanceState.code,
-                     :dns_name           => instance.dnsName,
-                     :private_dns_name   => instance.privateDnsName,
-                     :aws_instance_id    => instance.instanceId,
-                     :aws_state          => instance.instanceState.name,
-                     :ssh_key_name       => instance.keyName,
-                     :aws_image_id       => instance.imageId,
-                     :aws_reason         => reason,
-                     :aws_product_codes  => instance.productCodes,
-                     :aws_instance_type  => instance.instanceType,
-                     :aws_launch_time    => instance.launchTime}
+          instance[:aws_reason]         = instance[:aws_reason].sub(/\(\d[^)]*GMT\) */, '')
+          instance[:aws_owner]          = reservation[:aws_owner]
+          instance[:aws_reservation_id] = reservation[:aws_reservation_id]
+          instance[:aws_groups]         = reservation[:aws_groups]
+          result << instance
         end
       end
       result
@@ -396,6 +378,9 @@ module RightAws
       #      :private_dns_name   => "domU-12-34-67-89-01-C9.usma2.compute.amazonaws.com",
       #      :aws_instance_type  => "m1.small",
       #      :aws_launch_time    => "2008-1-1T00:00:00.000Z"},
+      #      :aws_availability_zone => "us-east-1b",
+      #      :aws_kernel_id      => "aki-ba3adfd3",
+      #      :aws_ramdisk_id     => "ari-badbad00",
       #       ..., {...}]
       #
     def describe_instances(list=[])
@@ -439,34 +424,52 @@ module RightAws
       #     :aws_groups         => ["my_awesome_group"],
       #     :private_dns_name   => "",
       #     :aws_instance_type  => "m1.small",
-      #     :aws_launch_time    => "2008-1-1T00:00:00.000Z"}]
+      #     :aws_launch_time    => "2008-1-1T00:00:00.000Z"
+      #     :aws_ramdisk_id     => "ari-8605e0ef"
+      #     :aws_kernel_id      => "aki-9905e0f0",
+      #     :ami_launch_index   => "0",
+      #     :aws_availability_zone => "us-east-1b"
+      #     }]
       #
     def run_instances(image_id, min_count, max_count, group_ids, key_name, user_data='',  
-                      addressing_type = DEFAULT_ADDRESSING_TYPE,  
-                      instance_type   = DEFAULT_INSTANCE_TYPE) 
+                      addressing_type = nil, instance_type = nil,
+                      kernel_id = nil, ramdisk_id = nil, availability_zone = nil, 
+                      block_device_mappings = nil) 
  	    launch_instances(image_id, { :min_count       => min_count, 
  	                                 :max_count       => max_count, 
  	                                 :user_data       => user_data, 
                                    :group_ids       => group_ids, 
                                    :key_name        => key_name, 
                                    :instance_type   => instance_type, 
-                                   :addressing_type => addressing_type }) 
+                                   :addressing_type => addressing_type,
+                                   :kernel_id       => kernel_id,
+                                   :ramdisk_id      => ramdisk_id,
+                                   :availability_zone     => availability_zone,
+                                   :block_device_mappings => block_device_mappings
+                                 }) 
     end
     
      
       # Launch new EC2 instances. Returns a list of launched instances or an exception. 
+      #
+      # +lparams+ keys (default values in parenthesis):
+      #  :min_count              fixnum, (1)
+      #  :max_count              fixnum, (1)
+      #  :group_ids              array or string ([] == 'default')
+      #  :instance_type          string (DEFAULT_INSTACE_TYPE)
+      #  :addressing_type        string (DEFAULT_ADDRESSING_TYPE 
+      #  :key_name               string
+      #  :kernel_id              string
+      #  :ramdisk_id             string 
+      #  :availability_zone      string
+      #  :block_device_mappings  string
+      #  :user_data              string
       # 
-      # lparams and their default values: 
-      #  :min_count       - 1  
-      #  :max_count       - 1 
-      #  :user_data       - '' 
-      #  :group_ids       - [] # == 'default' 
-      #  :key_name        - nil 
-      #  :instance_type   - DEFAULT_INSTACE_TYPE 
-      #  :addressing_type - DEFAULT_ADDRESSING_TYPE 
-      # 
-      #  ec2.launch_instances('ami-e444444d', 'my_awesome_group', :user_data => "Woohoo!!!", \ 
-      #   :addressing_type => "public", :key_name => "my_awesome_key") #=> 
+      #  ec2.launch_instances('ami-e444444d', :group_ids => 'my_awesome_group', 
+      #                                       :user_data => "Woohoo!!!", 
+      #                                       :addressing_type => "public", 
+      #                                       :key_name => "my_awesome_key", 
+      #                                       :availability_zone => "us-east-1c") #=> 
       #   [{:aws_image_id       => "ami-e444444d", 
       #     :aws_reason         => "", 
       #     :aws_state_code     => "0", 
@@ -476,33 +479,32 @@ module RightAws
       #     :aws_state          => "pending", 
       #     :dns_name           => "", 
       #     :ssh_key_name       => "my_awesome_key", 
-      #     :aws_groups         => ["default"], 
+      #     :aws_groups         => ["my_awesome_group"], 
       #     :private_dns_name   => "", 
       #     :aws_instance_type  => "m1.small",
-      #     :aws_launch_time    => "2008-1-1T00:00:00.000Z"}] 
+      #     :aws_launch_time    => "2008-1-1T00:00:00.000Z",
+      #     :aws_ramdisk_id     => "ari-8605e0ef"
+      #     :aws_kernel_id      => "aki-9905e0f0",
+      #     :ami_launch_index   => "0",
+      #     :aws_availability_zone => "us-east-1c"
+      #     }] 
       #     
     def launch_instances(image_id, lparams={}) 
-      defaults = { 
-        :min_count       => 1, 
-        :max_count       => 1, 
-        :user_data       => '', 
-        :group_ids       => [], 
-        :key_name        => nil, 
-        :instance_type   => DEFAULT_INSTANCE_TYPE, 
-        :addressing_type => DEFAULT_ADDRESSING_TYPE 
-      } 
-      lparams = defaults.merge(lparams) 
-      
       @logger.info("Launching instance of image #{image_id} for #{@aws_access_key_id}, " + 
-                   "key: #{lparams[:key_name]}, groups: #{(lparams[:group_ids]||[]).to_a.join(',')}")
-        # careful: keyName and securityGroups may be nil
+                   "key: #{lparams[:key_name]}, groups: #{(lparams[:group_ids]).to_a.join(',')}")
+      # careful: keyName and securityGroups may be nil
       params = hash_params('SecurityGroup', lparams[:group_ids].to_a)
       params.update( {'ImageId'        => image_id,
-                      'MinCount'       => lparams[:min_count].to_s, 
-                      'MaxCount'       => lparams[:max_count].to_s, 
-                      'AddressingType' => lparams[:addressing_type] }) 
-      params['InstanceType'] = lparams[:instance_type]
-      params['KeyName']      = lparams[:key_name] unless lparams[:key_name].blank? 
+                      'MinCount'       => (lparams[:min_count] || 1).to_s, 
+                      'MaxCount'       => (lparams[:max_count] || 1).to_s, 
+                      'AddressingType' => lparams[:addressing_type] || DEFAULT_ADDRESSING_TYPE, 
+                      'InstanceType'   => lparams[:instance_type]   || DEFAULT_INSTANCE_TYPE })
+      # optional params
+      params['KeyName']                    = lparams[:key_name]              unless lparams[:key_name].blank? 
+      params['KernelId']                   = lparams[:kernel_id]             unless lparams[:kernel_id].blank? 
+      params['RamdiskId']                  = lparams[:ramdisk_id]            unless lparams[:ramdisk_id].blank? 
+      params['Placement.AvailabilityZone'] = lparams[:availability_zone]     unless lparams[:availability_zone].blank? 
+      params['BlockDeviceMappings']        = lparams[:block_device_mappings] unless lparams[:block_device_mappings].blank?
       unless lparams[:user_data].blank? 
         lparams[:user_data].strip! 
           # Do not use CGI::escape(encode64(...)) as it is done in Amazons EC2 library.
@@ -513,7 +515,7 @@ module RightAws
       end
       link = generate_request("RunInstances", params)
         #debugger
-      instances = request_info(link, QEc2RunInstancesParser.new(:logger => @logger))
+      instances = request_info(link, QEc2DescribeInstancesParser.new(:logger => @logger))
       get_desc_instances(instances)
     rescue Exception
       on_exception
@@ -534,16 +536,8 @@ module RightAws
       #      :aws_prev_state_code     => 16}]
       #
     def terminate_instances(list=[])
-      link      = generate_request("TerminateInstances", hash_params('InstanceId',list.to_a))
-      instances = request_info(link, QEc2TerminateInstancesParser.new(:logger => @logger))
-      instances.collect! do |instance|
-              { :aws_instance_id         => instance.instanceId,
-                :aws_shutdown_state      => instance.shutdownState.name,
-                :aws_shutdown_state_code => instance.shutdownState.code.to_i,
-                :aws_prev_state          => instance.previousState.name,
-                :aws_prev_state_code     => instance.previousState.code.to_i }
-      end 
-      instances
+      link = generate_request("TerminateInstances", hash_params('InstanceId',list.to_a))
+      request_info(link, QEc2TerminateInstancesParser.new(:logger => @logger))
     rescue Exception
       on_exception
     end
@@ -556,12 +550,8 @@ module RightAws
       #     :timestamp       => Wed May 23 21:36:07 UTC 2007,          # Time instance
       #     :aws_output      => "Linux version 2.6.16-xenU (builder@patchbat.amazonsa) (gcc version 4.0.1 20050727 ..."
     def get_console_output(instance_id)
-      link   = generate_request("GetConsoleOutput", { 'InstanceId.1' => instance_id })
-      result = request_info(link, QEc2GetConsoleOutputParser.new(:logger => @logger))
-      { :aws_instance_id => result.instanceId,
-        :aws_timestamp   => result.timestamp,
-        :timestamp       => (Time.parse(result.timestamp)).utc,
-        :aws_output      => result.output }
+      link = generate_request("GetConsoleOutput", { 'InstanceId.1' => instance_id })
+      request_info(link, QEc2GetConsoleOutputParser.new(:logger => @logger))
     rescue Exception
       on_exception
     end
@@ -593,7 +583,7 @@ module RightAws
       #    ..., {...}]
       #
     def describe_security_groups(list=[])
-      link   = generate_request("DescribeSecurityGroups", hash_params('GroupName',list.to_a))
+      link = generate_request("DescribeSecurityGroups", hash_params('GroupName',list.to_a))
       response, params = request_info(link, QEc2DummyParser.new)
       # check cache
       cache_hits?(:describe_security_groups, response.body) if list.blank?
@@ -740,10 +730,7 @@ module RightAws
       cache_hits?(:describe_key_pairs, response.body) if list.blank?
       parser = QEc2DescribeKeyPairParser.new(:logger => @logger)
       @@bench.xml.add!{ parser.parse(response, params) }
-      result = parser.result.collect do |key|
-        { :aws_key_name    => key.keyName,
-          :aws_fingerprint => key.keyFingerprint }
-      end
+      result = parser.result
       # update parsed data
       update_cache(:describe_key_pairs, :parsed => result) if list.blank?
       result
@@ -761,10 +748,7 @@ module RightAws
     def create_key_pair(name)
       link = generate_request("CreateKeyPair", 
                               'KeyName' => name.to_s)
-      key  = request_info(link, QEc2CreateKeyPairParser.new(:logger => @logger))
-      { :aws_key_name    => key.keyName,
-        :aws_fingerprint => key.keyFingerprint,
-        :aws_material    => key.keyMaterial}
+      request_info(link, QEc2CreateKeyPairParser.new(:logger => @logger))
     rescue Exception
       on_exception
     end
@@ -780,6 +764,100 @@ module RightAws
     rescue Exception
       on_exception
     end
+    
+  #-----------------------------------------------------------------
+  #      Elastic IPs
+  #-----------------------------------------------------------------
+
+    # Acquire a new elastic IP address for use with your account.
+    # Returns allocated IP address or an exception.
+    #
+    #  ec2.allocate_address #=> '75.101.154.140'
+    #
+    def allocate_address
+      link = generate_request("AllocateAddress")
+      request_info(link, QEc2AllocateAddressParser.new(:logger => @logger))
+    rescue Exception
+      on_exception
+    end
+
+    # Associate an elastic IP address with an instance.
+    # Returns +true+ or an exception.
+    #
+    #  ec2.associate_address('i-d630cbbf', '75.101.154.140') #=> true
+    #
+    def associate_address(instance_id, public_ip)
+      link = generate_request("AssociateAddress", 
+                              "InstanceId" => instance_id.to_s,
+                              "PublicIp"   => public_ip.to_s)
+      request_info(link, RightBoolResponseParser.new(:logger => @logger))
+    rescue Exception
+      on_exception
+    end
+
+    # List elastic IP addresses assigned to your account.
+    # Returns an array of 2 keys (:instance_id and :public_ip) hashes:
+    #
+    #  ec2.describe_addresses  #=> [{:instance_id=>"i-d630cbbf", :public_ip=>"75.101.154.140"},
+    #                               {:instance_id=>"", :public_ip=>"75.101.154.141"}]
+    #
+    #  ec2.describe_addresses('75.101.154.140') #=> [{:instance_id=>"i-d630cbbf", :public_ip=>"75.101.154.140"}]
+    #
+    def describe_addresses(list=[])
+      link = generate_request("DescribeAddresses", 
+                              hash_params('PublicIp',list.to_a))
+      request_info(link, QEc2DescribeAddressesParser.new(:logger => @logger))
+    rescue Exception
+      on_exception
+    end
+
+    # Disassociate the specified elastic IP address from the instance to which it is assigned.
+    # Returns +true+ or an exception.
+    # 
+    #  ec2.disassociate_address('75.101.154.140') #=> true
+    #
+    def disassociate_address(public_ip)
+      link = generate_request("DisassociateAddress", 
+                              "PublicIp" => public_ip.to_s)
+      request_info(link, RightBoolResponseParser.new(:logger => @logger))
+    rescue Exception
+      on_exception
+    end
+
+    # Release an elastic IP address associated with your account.
+    # Returns +true+ or an exception.
+    #
+    #  ec2.release_address('75.101.154.140') #=> true
+    #
+    def release_address(public_ip)
+      link = generate_request("ReleaseAddress", 
+                              "PublicIp" => public_ip.to_s)
+      request_info(link, RightBoolResponseParser.new(:logger => @logger))
+    rescue Exception
+      on_exception
+    end
+
+  #-----------------------------------------------------------------
+  #      Availability zones
+  #-----------------------------------------------------------------
+    
+    # Describes availability zones that are currently available to the account and their states.
+    # Returns an array of 2 keys (:zone_name and :zone_state) hashes:
+    #
+    #  ec2.describe_availability_zones  #=> [{:zone_state=>"available", :zone_name=>"us-east-1a"}, 
+    #                                        {:zone_state=>"available", :zone_name=>"us-east-1b"}, 
+    #                                        {:zone_state=>"available", :zone_name=>"us-east-1c"}]
+    #
+    #  ec2.describe_availability_zones('us-east-1c') #=> [{:zone_state=>"available", :zone_name=>"us-east-1c"}]
+    #
+    def describe_availability_zones(list=[])
+      link = generate_request("DescribeAvailabilityZones", 
+                              hash_params('ZoneName',list.to_a))
+      request_info(link, QEc2DescribeAvailabilityZonesParser.new(:logger => @logger))
+    rescue Exception
+      on_exception
+    end
+
     
   #- Internal stuff from here on down...
 
@@ -798,24 +876,15 @@ module RightAws
   #      PARSERS: Key Pair
   #-----------------------------------------------------------------
 
-    class QEc2DescribeKeyPairType #:nodoc:
-      attr_accessor :keyName 
-      attr_accessor :keyFingerprint
-    end
-
-    class QEc2CreateKeyPairType < QEc2DescribeKeyPairType #:nodoc:
-      attr_accessor :keyMaterial
-    end
-
     class QEc2DescribeKeyPairParser < RightAWSParser #:nodoc:
       def tagstart(name, attributes)
-        @item = QEc2DescribeKeyPairType.new if name == 'item'
+        @item = {} if name == 'item'
       end
       def tagend(name)
         case name 
-          when 'keyName'       ; @item.keyName        = @text
-          when 'keyFingerprint'; @item.keyFingerprint = @text
-          when 'item'          ; @result             << @item
+          when 'keyName'       : @item[:aws_key_name]    = @text
+          when 'keyFingerprint': @item[:aws_fingerprint] = @text
+          when 'item'          : @result                << @item
         end
       end
       def reset
@@ -825,13 +894,13 @@ module RightAws
 
     class QEc2CreateKeyPairParser < RightAWSParser #:nodoc:
       def tagstart(name, attributes)
-        @result = QEc2CreateKeyPairType.new if !@result
+        @result = {} if name == 'CreateKeyPairResponse'
       end
       def tagend(name)
         case name 
-          when 'keyName'        ; @result.keyName        = @text
-          when 'keyFingerprint' ; @result.keyFingerprint = @text
-          when 'keyMaterial'    ; @result.keyMaterial    = @text
+          when 'keyName'       : @result[:aws_key_name]    = @text
+          when 'keyFingerprint': @result[:aws_fingerprint] = @text
+          when 'keyMaterial'   : @result[:aws_material]    = @text
         end
       end
     end
@@ -910,30 +979,25 @@ module RightAws
   #-----------------------------------------------------------------
   #      PARSERS: Images
   #-----------------------------------------------------------------
-
-    class QEc2DescribeImagesResponseItemType #:nodoc:
-      attr_accessor :imageId 
-      attr_accessor :imageState 
-      attr_accessor :imageLocation
-      attr_accessor :imageOwnerId 
-      attr_accessor :isPublic
-      attr_accessor :productCodes
-    end
-
+    
     class QEc2DescribeImagesParser < RightAWSParser #:nodoc:
       def tagstart(name, attributes)
         if name == 'item' && @xmlpath[%r{.*/imagesSet$}]
-          @image = QEc2DescribeImagesResponseItemType.new 
+          @image = {}
         end
       end
       def tagend(name)
         case name
-          when 'imageId'       ; @image.imageId       = @text
-          when 'imageLocation' ; @image.imageLocation = @text
-          when 'imageState'    ; @image.imageState    = @text
-          when 'imageOwnerId'  ; @image.imageOwnerId  = @text
-          when 'isPublic'      ; @image.isPublic      = @text == 'true' ? true : false
-          when 'productCode'   ; (@image.productCodes ||= []) << @text
+          when 'imageId'       ; @image[:aws_id]       = @text
+          when 'imageLocation' ; @image[:aws_location] = @text
+          when 'imageState'    ; @image[:aws_state]    = @text
+          when 'imageOwnerId'  ; @image[:aws_owner]    = @text
+          when 'isPublic'      ; @image[:aws_is_public]= @text == 'true' ? true : false
+          when 'productCode'   ;(@image[:aws_product_codes] ||= []) << @text
+          when 'architecture'  ; @image[:aws_architecture] = @text
+          when 'imageType'     ; @image[:aws_image_type] = @text
+          when 'kernelId'      ; @image[:aws_kernel_id]  = @text
+          when 'ramdiskId'     ; @image[:aws_ramdisk_id] = @text
           when 'item'          ; @result << @image if @xmlpath[%r{.*/imagesSet$}]
         end
       end
@@ -952,24 +1016,14 @@ module RightAws
   #      PARSERS: Image Attribute
   #-----------------------------------------------------------------
 
-    class QEc2LaunchPermissionItemType #:nodoc:
-      attr_accessor :groups
-      attr_accessor :userIds
-    end
-    
-    class QEc2DescribeImageAttributeType #:nodoc:
-      attr_accessor :imageId 
-      attr_accessor :launchPermission
-      attr_accessor :productCodes
-    end
-
     class QEc2DescribeImageAttributeParser < RightAWSParser #:nodoc:
       def tagstart(name, attributes)
         case name
           when 'launchPermission'
-            @result.launchPermission = QEc2LaunchPermissionItemType.new
-            @result.launchPermission.groups  = []
-            @result.launchPermission.userIds = []
+            @result[:groups] = []
+            @result[:users]  = []
+          when 'productCodes'
+            @result[:aws_product_codes] = []
         end
       end
       def tagend(name)
@@ -977,17 +1031,17 @@ module RightAws
           # But nobody know what will they xml later as attribute. That is why we 
           # check for 'group' and 'userId' inside of 'launchPermission/item'
         case name
-          when 'imageId' ; @result.imageId = @text
-          when 'group'   
-            @result.launchPermission.groups  << @text if @xmlpath == 'DescribeImageAttributeResponse/launchPermission/item'
-          when 'userId'  
-            @result.launchPermission.userIds << @text if @xmlpath == 'DescribeImageAttributeResponse/launchPermission/item'
-          when 'productCode'
-            (@result.productCodes ||= []) << @text
+          when 'imageId'            : @result[:aws_id] = @text
+          when 'group'              : @result[:groups] << @text if @xmlpath == 'DescribeImageAttributeResponse/launchPermission/item'
+          when 'userId'             : @result[:users]  << @text if @xmlpath == 'DescribeImageAttributeResponse/launchPermission/item'
+          when 'productCode'        : @result[:aws_product_codes] << @text
+          when 'kernel'             : @result[:aws_kernel]  = @text
+          when 'ramdisk'            : @result[:aws_ramdisk] = @text
+          when 'blockDeviceMapping' : @result[:block_device_mapping] = @text
         end
       end
       def reset
-        @result = QEc2DescribeImageAttributeType.new 
+        @result = {}
       end
     end
 
@@ -995,75 +1049,59 @@ module RightAws
   #      PARSERS: Instances
   #-----------------------------------------------------------------
 
-    class QEc2InstanceStateType #:nodoc:
-      attr_accessor :code
-      attr_accessor :name
-    end
-
-    class QEc2RunningInstancesItemType #:nodoc:
-      attr_accessor :instanceId
-      attr_accessor :imageId
-      attr_accessor :instanceState
-      attr_accessor :dnsName
-      attr_accessor :privateDnsName
-      attr_accessor :reason
-      attr_accessor :keyName
-      attr_accessor :amiLaunchIndex
-      attr_accessor :productCodes
-      attr_accessor :instanceType
-      attr_accessor :launchTime
-    end
-
-    class QEc2DescribeInstancesType #:nodoc:
-      attr_accessor :reservationId
-      attr_accessor :ownerId
-      attr_accessor :groupSet
-      attr_accessor :instancesSet 
-    end
-
     class QEc2DescribeInstancesParser < RightAWSParser #:nodoc:
       def tagstart(name, attributes)
-        case name
-          when 'item'
-            if @xmlpath=='DescribeInstancesResponse/reservationSet'
-              @reservation = QEc2DescribeInstancesType.new 
-              @reservation.groupSet     = []
-              @reservation.instancesSet = []
-            elsif @xmlpath=='DescribeInstancesResponse/reservationSet/item/instancesSet'
-              @instance = QEc2RunningInstancesItemType.new
-                # the optional params (sometimes are missing and we dont want them to be nil) 
-              @instance.reason         = ''
-              @instance.dnsName        = ''
-              @instance.privateDnsName = ''
-              @instance.amiLaunchIndex = ''
-              @instance.keyName        = ''
-              @instance.instanceState  = QEc2InstanceStateType.new
-            end
-         end
+           # DescribeInstances property
+        if (name == 'item' && @xmlpath == 'DescribeInstancesResponse/reservationSet') || 
+           # RunInstances property
+           (name == 'RunInstancesResponse')  
+            @reservation = { :aws_groups    => [],
+                             :instances_set => [] }
+              
+        elsif (name == 'item') && 
+                # DescribeInstances property
+              ( @xmlpath=='DescribeInstancesResponse/reservationSet/item/instancesSet' ||
+               # RunInstances property
+                @xmlpath=='RunInstancesResponse/instancesSet' )
+              # the optional params (sometimes are missing and we dont want them to be nil) 
+            @instance = { :aws_reason       => '',
+                          :dns_name         => '',
+                          :private_dns_name => '',
+                          :ami_launch_index => '',
+                          :ssh_key_name     => '',
+                          :aws_state        => '' }
+        end
       end
       def tagend(name)
         case name 
-          when 'reservationId' ; @reservation.reservationId   = @text
-          when 'ownerId'       ; @reservation.ownerId         = @text
-          when 'groupId'       ; @reservation.groupSet       << @text
-          when 'instanceId'    ; @instance.instanceId         = @text
-          when 'imageId'       ; @instance.imageId            = @text
-          when 'dnsName'       ; @instance.dnsName            = @text
-          when 'privateDnsName'; @instance.privateDnsName     = @text
-          when 'reason'        ; @instance.reason             = @text
-          when 'keyName'       ; @instance.keyName            = @text
-          when 'amiLaunchIndex'; @instance.amiLaunchIndex     = @text
-          when 'code'          ; @instance.instanceState.code = @text
-          when 'name'          ; @instance.instanceState.name = @text
+          # reservation
+          when 'reservationId'   : @reservation[:aws_reservation_id] = @text
+          when 'ownerId'         : @reservation[:aws_owner]          = @text
+          when 'groupId'         : @reservation[:aws_groups]        << @text
+          # instance  
+          when 'instanceId'      : @instance[:aws_instance_id]    = @text
+          when 'imageId'         : @instance[:aws_image_id]       = @text
+          when 'dnsName'         : @instance[:dns_name]           = @text
+          when 'privateDnsName'  : @instance[:private_dns_name]   = @text
+          when 'reason'          : @instance[:aws_reason]         = @text
+          when 'keyName'         : @instance[:ssh_key_name]       = @text
+          when 'amiLaunchIndex'  : @instance[:ami_launch_index]   = @text
+          when 'code'            : @instance[:aws_state_code]     = @text
+          when 'name'            : @instance[:aws_state]          = @text
+          when 'productCode'     : @instance[:aws_product_codes] << @text
+          when 'instanceType'    : @instance[:aws_instance_type]  = @text
+          when 'launchTime'      : @instance[:aws_launch_time]    = @text
+          when 'kernelId'        : @instance[:aws_kernel_id]      = @text
+          when 'ramdiskId'       : @instance[:aws_ramdisk_id]     = @text
+          when 'availabilityZone': @instance[:aws_availability_zone] = @text
           when 'item'
-            if @xmlpath=='DescribeInstancesResponse/reservationSet/item/instancesSet'
-              @reservation.instancesSet << @instance
-            elsif @xmlpath=='DescribeInstancesResponse/reservationSet'
+            if @xmlpath == 'DescribeInstancesResponse/reservationSet/item/instancesSet' || # DescribeInstances property
+               @xmlpath == 'RunInstancesResponse/instancesSet'            # RunInstances property
+              @reservation[:instances_set] << @instance
+            elsif @xmlpath=='DescribeInstancesResponse/reservationSet'    # DescribeInstances property
               @result << @reservation
             end
-          when 'productCode'   ; (@instance.productCodes ||= []) << @text
-          when 'instanceType'  ; @instance.instanceType = @text
-	  when 'launchTime'    ; @instance.launchTime = @text
+          when 'RunInstancesResponse': @result << @reservation            # RunInstances property
         end
       end
       def reset
@@ -1075,84 +1113,24 @@ module RightAws
       def tagend(name)
         @result = @text if name == 'ownerId'
       end
-      def reset
-        @result = nil
-      end
-    end
-
-    class QEc2RunInstancesParser < RightAWSParser #:nodoc:
-      def tagstart(name, attributes)
-        case name
-          when 'RunInstancesResponse'
-            @reservation = QEc2DescribeInstancesType.new 
-            @reservation.groupSet     = []
-            @reservation.instancesSet = []
-          when 'item'
-            if @xmlpath == 'RunInstancesResponse/instancesSet'
-              @instance = QEc2RunningInstancesItemType.new
-                # the optional params (sometimes are missing and we dont want them to be nil) 
-              @instance.reason         = ''
-              @instance.dnsName        = ''
-              @instance.privateDnsName = ''
-              @instance.amiLaunchIndex = ''
-              @instance.keyName        = ''
-              @instance.instanceState  = QEc2InstanceStateType.new
-            end
-         end
-      end
-      def tagend(name)
-        case name 
-          when 'reservationId' ; @reservation.reservationId   = @text
-          when 'ownerId'       ; @reservation.ownerId         = @text
-          when 'groupId'       ; @reservation.groupSet       << @text
-          when 'instanceId'    ; @instance.instanceId         = @text
-          when 'imageId'       ; @instance.imageId            = @text
-          when 'dnsName'       ; @instance.dnsName            = @text
-          when 'privateDnsName'; @instance.privateDnsName     = @text
-          when 'reason'        ; @instance.reason             = @text
-          when 'keyName'       ; @instance.keyName            = @text
-          when 'amiLaunchIndex'; @instance.amiLaunchIndex     = @text
-          when 'code'          ; @instance.instanceState.code = @text
-          when 'name'          ; @instance.instanceState.name = @text
-          when 'item'          
-            @reservation.instancesSet << @instance if @xmlpath == 'RunInstancesResponse/instancesSet'
-          when 'RunInstancesResponse'; @result << @reservation
-          when 'productCode'   ; (@instance.productCodes ||= []) << @text
-          when 'instanceType'  ; @instance.instanceType = @text
-	  when 'launchTime'    ; @instance.launchTime = @text
-        end
-      end
-      def reset
-        @result = []
-      end
-    end
-
-    class QEc2TerminateInstancesResponseInfoType #:nodoc:
-      attr_accessor :instanceId
-      attr_accessor :shutdownState
-      attr_accessor :previousState
     end
 
     class QEc2TerminateInstancesParser < RightAWSParser #:nodoc:
       def tagstart(name, attributes)
-        if name == 'item'
-          @instance = QEc2TerminateInstancesResponseInfoType.new 
-          @instance.shutdownState = QEc2InstanceStateType.new
-          @instance.previousState = QEc2InstanceStateType.new
-        end
+        @instance = {} if name == 'item'
       end
       def tagend(name)
         case name
-        when 'instanceId' ; @instance.instanceId  = @text
-        when 'item'       ; @result              << @instance
+        when 'instanceId' : @instance[:aws_instance_id] = @text
         when 'code'
           if @xmlpath == 'TerminateInstancesResponse/instancesSet/item/shutdownState'
-               @instance.shutdownState.code = @text
-          else @instance.previousState.code = @text end
+               @instance[:aws_shutdown_state_code] = @text.to_i
+          else @instance[:aws_prev_state_code]     = @text.to_i end
         when 'name'
           if @xmlpath == 'TerminateInstancesResponse/instancesSet/item/shutdownState'
-               @instance.shutdownState.name = @text
-          else @instance.previousState.name = @text end
+               @instance[:aws_shutdown_state] = @text
+          else @instance[:aws_prev_state]     = @text end
+        when 'item'       : @result << @instance
         end
       end
       def reset
@@ -1164,22 +1142,18 @@ module RightAws
   #      PARSERS: Console
   #-----------------------------------------------------------------
 
-    class QEc2GetConsoleOutputResponseType #:nodoc:
-      attr_accessor :instanceId
-      attr_accessor :timestamp
-      attr_accessor :output
-    end
 
     class QEc2GetConsoleOutputParser < RightAWSParser #:nodoc:
       def tagend(name)
         case name
-        when 'instanceId' ; @result.instanceId = @text
-        when 'timestamp'  ; @result.timestamp  = @text
-        when 'output'     ; @result.output     = Base64.decode64 @text
+        when 'instanceId' : @result[:aws_instance_id] = @text
+        when 'timestamp'  : @result[:aws_timestamp]   = @text
+                            @result[:timestamp]       = (Time.parse(@text)).utc
+        when 'output'     : @result[:aws_output]      = Base64.decode64(@text)
         end
       end
       def reset
-        @result = QEc2GetConsoleOutputResponseType.new
+        @result = {}
       end
     end
 
@@ -1197,5 +1171,51 @@ module RightAws
         @result = [response, params]
       end
     end
+    
+  #-----------------------------------------------------------------
+  #      PARSERS: Elastic IPs
+  #-----------------------------------------------------------------
   
+    class QEc2AllocateAddressParser < RightAWSParser #:nodoc:
+      def tagend(name)
+        @result = @text if name == 'publicIp'
+      end
+    end
+    
+    class QEc2DescribeAddressesParser < RightAWSParser #:nodoc:
+      def tagstart(name, attributes)
+        @address = {} if name == 'item'
+      end
+      def tagend(name)
+        case name
+        when 'instanceId' ; @address[:instance_id] = @text
+        when 'publicIp'   ; @address[:public_ip]   = @text
+        when 'item'       ; @result << @address
+        end
+      end
+      def reset
+        @result = []
+      end
+    end
+
+  #-----------------------------------------------------------------
+  #      PARSERS: AvailabilityZones
+  #-----------------------------------------------------------------
+
+    class QEc2DescribeAvailabilityZonesParser < RightAWSParser #:nodoc:
+      def tagstart(name, attributes)
+        @zone = {} if name == 'item'
+      end
+      def tagend(name)
+        case name
+        when 'zoneName'  ; @zone[:zone_name]  = @text
+        when 'zoneState' ; @zone[:zone_state] = @text
+        when 'item'      ; @result << @zone
+        end
+      end
+      def reset
+        @result = []
+      end
+    end
+    
 end

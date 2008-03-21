@@ -64,5 +64,5 @@ class TestEc2 < Test::Unit::TestCase
 ##      # key must be deleted already
 ##    assert_raise(Rightscale::AwsError) { @ec2.delete_key_pair(@key) }
   end
-  
+
 end
