@@ -799,14 +799,22 @@ module RightAws
     # Returns an array of 2 keys (:instance_id and :public_ip) hashes:
     #
     #  ec2.describe_addresses  #=> [{:instance_id=>"i-d630cbbf", :public_ip=>"75.101.154.140"},
-    #                               {:instance_id=>"", :public_ip=>"75.101.154.141"}]
+    #                               {:instance_id=>nil, :public_ip=>"75.101.154.141"}]
     #
     #  ec2.describe_addresses('75.101.154.140') #=> [{:instance_id=>"i-d630cbbf", :public_ip=>"75.101.154.140"}]
     #
     def describe_addresses(list=[])
       link = generate_request("DescribeAddresses", 
                               hash_params('PublicIp',list.to_a))
-      request_info(link, QEc2DescribeAddressesParser.new(:logger => @logger))
+      response, params = request_info(link, QEc2DummyParser.new)
+      # check cache
+      cache_hits?(:describe_addresses, response.body) if list.blank?
+      parser = QEc2DescribeAddressesParser.new(:logger => @logger)
+      @@bench.xml.add!{ parser.parse(response, params) }
+      result = parser.result
+      # update parsed data
+      update_cache(:describe_addresses, :parsed => result) if list.blank?
+      result
     rescue Exception
       on_exception
     end
@@ -1188,7 +1196,7 @@ module RightAws
       end
       def tagend(name)
         case name
-        when 'instanceId' ; @address[:instance_id] = @text
+        when 'instanceId' ; @address[:instance_id] = @text.blank? ? nil : @text 
         when 'publicIp'   ; @address[:public_ip]   = @text
         when 'item'       ; @result << @address
         end
