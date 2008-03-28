@@ -25,7 +25,7 @@ require 'uuidtools'
 
 module RightAws
 
-  # = RightAws::ActiveSdb -- RightScale SDB interface
+  # = RightAws::ActiveSdb -- RightScale SDB interface (alpha release)
   # The RightAws::ActiveSdb class provides a complete interface to Amazon's Simple
   # Database Service.
   #
