@@ -181,13 +181,13 @@ module RightAws
       end
 
         # Pops (and deletes) first accessible message from queue. 
-        # Returns Message instance or +nil+ it the queue is empty.
+        # Returns Message instance or +nil+ if the queue is empty.
         #
         #  queue.pop #=> #<RightAws::SqsGen2::Message:0xb7bf0884 ... >
         #
       def pop
         list = @sqs.interface.pop_messages(@url, 1)
-        return nil if list == nil
+        return nil if list.empty?
         entry = list[0]
         msg = Message.new(self, entry['MessageId'], entry['ReceiptHandle'],
                             entry['Body'], visibility)

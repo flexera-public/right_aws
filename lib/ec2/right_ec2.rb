@@ -1072,12 +1072,13 @@ module RightAws
                # RunInstances property
                 @xmlpath=='RunInstancesResponse/instancesSet' )
               # the optional params (sometimes are missing and we dont want them to be nil) 
-            @instance = { :aws_reason       => '',
-                          :dns_name         => '',
-                          :private_dns_name => '',
-                          :ami_launch_index => '',
-                          :ssh_key_name     => '',
-                          :aws_state        => '' }
+            @instance = { :aws_reason        => '',
+                          :dns_name          => '',
+                          :private_dns_name  => '',
+                          :ami_launch_index  => '',
+                          :ssh_key_name      => '',
+                          :aws_state         => '',
+                          :aws_product_codes => [] }
         end
       end
       def tagend(name)

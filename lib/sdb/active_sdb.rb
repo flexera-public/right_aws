@@ -21,13 +21,26 @@
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
-require 'uuidtools'
+begin
+  require 'uuidtools'
+rescue LoadError => e
+  STDERR.puts("RightSDB Alpha requires the uuidtools gem.  Run \'gem install uuidtools\' and try again.")
+  exit
+end
 
 module RightAws
 
-  # = RightAws::ActiveSdb -- RightScale SDB interface
+  # = RightAws::ActiveSdb -- RightScale SDB interface (alpha release)
   # The RightAws::ActiveSdb class provides a complete interface to Amazon's Simple
   # Database Service.
+  # 
+  # ActiveSdb is in alpha and does not load by default with the rest of RightAws.  You must use an additional require statement to load the ActiveSdb class.  For example:
+  # 
+  #   require 'right_aws'
+  #   require 'sdb/active_sdb'
+  #   
+  # Additionally, the ActiveSdb class requires the 'uuidtools' gem; this gem is not normally required by RightAws and is not installed as a 
+  # dependency of RightAws.
   #
   # Simple ActiveSdb usage example:
   #
