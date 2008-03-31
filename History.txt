@@ -149,3 +149,6 @@ r3051 | konstantin | 2008-03-14 21:26:12 +0300 (Fri, 14 Mar 2008) | 1 line
 
 == 1.8.0
 
+r3264 | konstantin | 2008-03-28 18:32:10 +0300 (Fri, 28 Mar 2008) | 1 line
+
+#978, EBS support added

@@ -884,20 +884,21 @@ module RightAws
     # Describe all EBS volumes.
     #
     #  ec2.describe_volumes #=> 
-    #    [ { :status         => "available",
-    #        :volume_id      => "vol-268a6f4f",
-    #        :creation_time  => "2008-03-26T15:54:38.000Z",
-    #        :size           => 1073741824 },
-    #        :attachment_set =>
-    #          { :status        => "attached",
-    #            :volume_id     => "vol-398a6f50",
-    #            :device        => "/dev/sdh",
-    #            :instance_id   => "i-067db86f",
-    #            :attach_time   => "2008-03-27T21:50:05.000Z"}],
-    #            :status        => "in-use",
-    #            :volume_id     => "vol-398a6f50",
-    #            :creation_time => "2008-03-26T20:09:04.000Z",
-    #            :size          => 10737418240 } }, ... ]
+    #    [{ :volume_id      => "vol-5782673e",
+    #       :attachment_set => {},
+    #       :status         => "available",
+    #       :creation_time  => "2008-02-23T16:47:19.000Z",
+    #       :size           => 1000001765375},
+    #     { :volume_id      =>"vol-268a6f4f",
+    #       :attachment_set =>
+    #         { :volume_id   => "vol-268a6f4f",
+    #           :instance_id => "i-067db86f",
+    #           :status      => "attached",
+    #           :device      => "/dev/sdj",
+    #           :attach_time => "2008-03-29T17:46:01.000Z"},
+    #      :status        => "in-use",
+    #      :creation_time => "2008-03-26T15:54:38.000Z",
+    #      :size          => 1073741824}, ... ]
     #
     def describe_volumes(list=[])
       link = generate_request("DescribeVolumes", 
