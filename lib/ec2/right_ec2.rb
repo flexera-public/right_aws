@@ -142,6 +142,21 @@ module RightAws
       request_info_impl(thread[:ec2_connection], @@bench, request, parser)
     end
 
+    def request_cache_or_info(method, link, parser_class, use_cache=true) #:nodoc:
+      # We do not want to break the logic of parsing hence will use a dummy parser to process all the standart 
+      # steps (errors checking etc). The dummy parser does nothig - just returns back the params it received.
+      # If the caching is enabled and hit then throw  AwsNoChange. 
+      # P.S. caching works for the whole images list only! (when the list param is blank)      response, params = request_info(link, QEc2DummyParser.new)
+      # check cache
+      response, params = request_info(link, QEc2DummyParser.new)
+      cache_hits?(method.to_sym, response.body) if use_cache
+      parser = parser_class.new(:logger => @logger)
+      @@bench.xml.add!{ parser.parse(response, params) }
+      result = block_given? ? yield(parser) : parser.result
+      # update parsed data
+      update_cache(method.to_sym, :parsed => result) if use_cache
+      result
+    end
 
     def hash_params(prefix, list) #:nodoc:
       groups = {}
@@ -157,19 +172,7 @@ module RightAws
       request_hash = hash_params(list_by, list.to_a)
       request_hash['ImageType'] = image_type if image_type
       link = generate_request("DescribeImages", request_hash)
-      # We do not want to break the logic of parsing hence will use a dummy parser to process all the standart 
-      # steps (errors checking etc). The dummy parser does nothig - just returns back the params it received.
-      # If the caching is enabled and hit then throw  AwsNoChange. 
-      # P.S. caching works for the whole images list only! (when the list param is blank)
-      response, params = request_info(link, QEc2DummyParser.new)
-      # if cache is ON and hits then throws AwsNoChange 
-      cache_hits?(:describe_images, response.body) if list.blank? && list_by == 'ImageId' && image_type.blank?
-      parser = QEc2DescribeImagesParser.new(:logger => @logger)
-      @@bench.xml.add!{ parser.parse(response, params) }
-      result = parser.result
-      # put parsed data into cache if the caching is ON
-      update_cache(:describe_images, :parsed => result) if list.blank?
-      result
+      request_cache_or_info :describe_images, link,  QEc2DescribeImagesParser, (list.blank? && list_by == 'ImageId' && image_type.blank?)
     rescue Exception
       on_exception
     end
@@ -388,15 +391,9 @@ module RightAws
       #
     def describe_instances(list=[])
       link = generate_request("DescribeInstances", hash_params('InstanceId',list.to_a))
-      response, params = request_info(link, QEc2DummyParser.new)
-      # check cache
-      cache_hits?(:describe_instances, response.body) if list.blank?
-      parser = QEc2DescribeInstancesParser.new(:logger => @logger)
-      @@bench.xml.add!{ parser.parse(response, params) }
-      result = get_desc_instances(parser.result)
-      # update parsed data
-      update_cache(:describe_instances, :parsed => result) if list.blank?
-      result
+      request_cache_or_info(:describe_instances, link,  QEc2DescribeInstancesParser, list.blank?) do |parser|
+        get_desc_instances(parser.result)
+      end
     rescue Exception
       on_exception
     end
@@ -591,44 +588,39 @@ module RightAws
       #
     def describe_security_groups(list=[])
       link = generate_request("DescribeSecurityGroups", hash_params('GroupName',list.to_a))
-      response, params = request_info(link, QEc2DummyParser.new)
-      # check cache
-      cache_hits?(:describe_security_groups, response.body) if list.blank?
-      parser = QEc2DescribeSecurityGroupsParser.new(:logger => @logger)
-      @@bench.xml.add!{ parser.parse(response, params) }
-      
-      result = []     
-      parser.result.each do |item|
-        perms = []
-        item.ipPermissions.each do |perm|
-          perm.groups.each do |ngroup|
-            perms << {:group => ngroup.groupName,
-                      :owner => ngroup.userId}
+      request_cache_or_info( :describe_security_groups, link,  QEc2DescribeSecurityGroupsParser, list.blank?) do |parser|
+        result = []     
+        parser.result.each do |item|
+          perms = []
+          item.ipPermissions.each do |perm|
+            perm.groups.each do |ngroup|
+              perms << {:group => ngroup.groupName,
+                        :owner => ngroup.userId}
+            end
+            perm.ipRanges.each do |cidr_ip|
+              perms << {:from_port => perm.fromPort, 
+                        :to_port   => perm.toPort, 
+                        :protocol  => perm.ipProtocol,
+                        :cidr_ips  => cidr_ip}
+            end
           end
-          perm.ipRanges.each do |cidr_ip|
-            perms << {:from_port => perm.fromPort, 
-                      :to_port   => perm.toPort, 
-                      :protocol  => perm.ipProtocol,
-                      :cidr_ips  => cidr_ip}
-          end
-        end
-        
-           # delete duplication
-        perms.each_index do |i|
-          (0...i).each do |j|
-            if perms[i] == perms[j] then perms[i] = nil; break; end
-          end
-        end
-        perms.compact!
 
-        result << {:aws_owner       => item.ownerId, 
-                   :aws_group_name  => item.groupName, 
-                   :aws_description => item.groupDescription,
-                   :aws_perms       => perms}
+             # delete duplication
+          perms.each_index do |i|
+            (0...i).each do |j|
+              if perms[i] == perms[j] then perms[i] = nil; break; end
+            end
+          end
+          perms.compact!
+
+          result << {:aws_owner       => item.ownerId, 
+                     :aws_group_name  => item.groupName, 
+                     :aws_description => item.groupDescription,
+                     :aws_perms       => perms}
+        
+        end
+        result
       end
-      # update parsed data
-      update_cache(:describe_security_groups, :parsed => result) if list.blank?
-      result
     rescue Exception
       on_exception
     end
@@ -736,15 +728,7 @@ module RightAws
       #
     def describe_key_pairs(list=[])
       link = generate_request("DescribeKeyPairs", hash_params('KeyName',list.to_a))
-      response, params = request_info(link, QEc2DummyParser.new)
-      # check cache
-      cache_hits?(:describe_key_pairs, response.body) if list.blank?
-      parser = QEc2DescribeKeyPairParser.new(:logger => @logger)
-      @@bench.xml.add!{ parser.parse(response, params) }
-      result = parser.result
-      # update parsed data
-      update_cache(:describe_key_pairs, :parsed => result) if list.blank?
-      result
+      request_cache_or_info :describe_key_pairs, link,  QEc2DescribeKeyPairParser, list.blank?
     rescue Exception
       on_exception
     end
@@ -817,15 +801,7 @@ module RightAws
     def describe_addresses(list=[])
       link = generate_request("DescribeAddresses", 
                               hash_params('PublicIp',list.to_a))
-      response, params = request_info(link, QEc2DummyParser.new)
-      # check cache
-      cache_hits?(:describe_addresses, response.body) if list.blank?
-      parser = QEc2DescribeAddressesParser.new(:logger => @logger)
-      @@bench.xml.add!{ parser.parse(response, params) }
-      result = parser.result
-      # update parsed data
-      update_cache(:describe_addresses, :parsed => result) if list.blank?
-      result
+      request_cache_or_info :describe_addresses, link,  QEc2DescribeAddressesParser, list.blank?
     rescue Exception
       on_exception
     end
@@ -872,7 +848,7 @@ module RightAws
     def describe_availability_zones(list=[])
       link = generate_request("DescribeAvailabilityZones", 
                               hash_params('ZoneName',list.to_a))
-      request_info(link, QEc2DescribeAvailabilityZonesParser.new(:logger => @logger))
+      request_cache_or_info :describe_availability_zones, link,  QEc2DescribeAvailabilityZonesParser, list.blank?
     rescue Exception
       on_exception
     end
@@ -884,26 +860,23 @@ module RightAws
     # Describe all EBS volumes.
     #
     #  ec2.describe_volumes #=> 
-    #    [{ :volume_id      => "vol-5782673e",
-    #       :attachment_set => {},
-    #       :status         => "available",
-    #       :creation_time  => "2008-02-23T16:47:19.000Z",
-    #       :size           => 1000001765375},
-    #     { :volume_id      =>"vol-268a6f4f",
-    #       :attachment_set =>
-    #         { :volume_id   => "vol-268a6f4f",
-    #           :instance_id => "i-067db86f",
-    #           :status      => "attached",
-    #           :device      => "/dev/sdj",
-    #           :attach_time => "2008-03-29T17:46:01.000Z"},
-    #      :status        => "in-use",
-    #      :creation_time => "2008-03-26T15:54:38.000Z",
-    #      :size          => 1073741824}, ... ]
+    #    [{ :aws_id         => "vol-5782673e",
+    #       :aws_status     => "available",
+    #       :aws_created_at => "2008-02-23T16:47:19.000Z",
+    #       :aws_size       => 1000001765375},
+    #     { :aws_id         =>"vol-268a6f4f",
+    #       :aws_status     => "in-use",
+    #       :aws_created_at => "2008-03-26T15:54:38.000Z",
+    #       :aws_size       => 1073741824,
+    #       :aws_attachment_status => "attached",
+    #       :aws_instance_id => "i-067db86f",
+    #       :aws_device      => "/dev/sdj",
+    #       :aws_attached_at => "2008-03-29T17:46:01.000Z"}, ... ]
     #
     def describe_volumes(list=[])
       link = generate_request("DescribeVolumes", 
                               hash_params('VolumeId',list.to_a))
-      request_info(link, QEc2DescribeVolumesParser.new(:logger => @logger))
+      request_cache_or_info :describe_volumes, link,  QEc2DescribeVolumesParser, list.blank?
     rescue Exception
       on_exception
     end
@@ -911,10 +884,10 @@ module RightAws
     # Create new EBS volume based on previously created snapshot.
     #
     #  ec2.create_volume('snap-000000', 10*.megabyte*1024*1024*1024) #=> 
-    #    { :create_time => "2008-03-28T13:03:33.000Z",
-    #      :status      => "creating",
-    #      :volume_id   => "vol-b48a6fdd",
-    #      :size        => 100931731456}    
+    #    { :aws_created_at => "2008-03-28T13:03:33.000Z",
+    #      :aws_status     => "creating",
+    #      :aws_id         => "vol-b48a6fdd",
+    #      :aws_size       => 100931731456}    
     #
     def create_volume(snapshot_id, size)
       link = generate_request("CreateVolume", 
@@ -929,10 +902,10 @@ module RightAws
     # This does not deletes any snapshots created from this volume.
     #
     #  ec2.delete_volume('vol-b48a6fdd') #=> 
-    #    { :create_time => "2008-03-28T13:03:33.000Z",
-    #      :status      => "deleting",
-    #      :volume_id   => "vol-b48a6fdd",
-    #      :size        => 100931731456}    
+    #    { :aws_created_at => "2008-03-28T13:03:33.000Z",
+    #      :aws_status     => "deleting",
+    #      :aws_id         => "vol-b48a6fdd",
+    #      :aws_size       => 100931731456}    
     #
     def delete_volume(volume_id)
       link = generate_request("DeleteVolume", 
@@ -946,11 +919,11 @@ module RightAws
     # volume using the specified device name.
     #
     #  ec2.attach_volume('vol-898a6fe0', 'i-7c905415', '/dev/sdh') #=>
-    #    { :instance_id => "i-7c905415",
-    #      :device      => "/dev/sdh",
-    #      :status      => "attaching",
-    #      :attach_time => "2008-03-28T14:14:39.000Z",
-    #      :volume_id   => "vol-898a6fe0" }
+    #    { :aws_instance_id => "i-7c905415",
+    #      :aws_device      => "/dev/sdh",
+    #      :aws_status      => "attaching",
+    #      :aws_attached_at => "2008-03-28T14:14:39.000Z",
+    #      :aws_id          => "vol-898a6fe0" }
     #
     def attach_volume(volume_id, instance_id, device)
       link = generate_request("AttachVolume", 
@@ -965,11 +938,11 @@ module RightAws
     # Detach the specified EBS volume from the instance to which it is attached.
     # 
     #   ec2.detach_volume('vol-898a6fe0', 'i-7c905415') #=> 
-    #     { :instance_id => "i-7c905415",
-    #       :device      => "/dev/sdh",
-    #       :status      => "detaching",
-    #       :attach_time => "2008-03-28T14:38:34.000Z",
-    #       :volume_id   => "vol-898a6fe0"}
+    #     { :aws_instance_id => "i-7c905415",
+    #       :aws_device      => "/dev/sdh",
+    #       :aws_status      => "detaching",
+    #       :aws_attached_at => "2008-03-28T14:38:34.000Z",
+    #       :aws_id          => "vol-898a6fe0"}
     #
     def detach_volume(volume_id, instance_id)
       link = generate_request("DetachVolume", 
@@ -988,21 +961,21 @@ module RightAws
      # Describe all EBS snapshots.
      #
      # ec2.describe_snapshots #=> 
-     #   [ { :progress    => "100%",
-     #       :status      => "completed",
-     #       :snapshot_id => "snap-72a5401b",
-     #       :volume_id   => "vol-5582673c",
-     #       :start_time  => "2008-02-23T02:50:48.000Z"},
-     #     { :progress    => "100%",
-     #       :status      => "completed",
-     #       :snapshot_id => "snap-75a5401c",
-     #       :volume_id   => "vol-5582673c",
-     #       :start_time  => "2008-02-23T16:23:19.000Z" },...]
+     #   [ { :aws_progress   => "100%",
+     #       :aws_status     => "completed",
+     #       :aws_id         => "snap-72a5401b",
+     #       :aws_volume_id  => "vol-5582673c",
+     #       :aws_started_at => "2008-02-23T02:50:48.000Z"},
+     #     { :aws_progress   => "100%",
+     #       :aws_status     => "completed",
+     #       :aws_id         => "snap-75a5401c",
+     #       :aws_volume_id  => "vol-5582673c",
+     #       :aws_started_at => "2008-02-23T16:23:19.000Z" },...]
      #
     def describe_snapshots(list=[])
       link = generate_request("DescribeSnapshots", 
                               hash_params('SnapshotId',list.to_a))
-      request_info(link, QEc2DescribeSnapshotsParser.new(:logger => @logger))
+      request_cache_or_info :describe_snapshots, link,  QEc2DescribeSnapshotsParser, list.blank?
     rescue Exception
       on_exception
     end
@@ -1010,11 +983,11 @@ module RightAws
     # Create a snapshot of specified volume.
     #
     #  ec2.create_snapshot('vol-898a6fe0') #=> 
-    #    { :progress    => "",
-    #      :start_time  => "2008-03-28T13:47:02.000Z",
-    #      :status      => "pending",
-    #      :snapshot_id => "snap-55a5403c",
-    #      :volume_id   => "vol-898a6fe0"}
+    #    { :aws_progress    => "",
+    #      :aws_started_at  => "2008-03-28T13:47:02.000Z",
+    #      :aws_status      => "pending",
+    #      :aws_id          => "snap-55a5403c",
+    #      :aws_volume_id   => "vol-898a6fe0" }
     #
     def create_snapshot(volume_id)
       link = generate_request("CreateSnapshot", 
@@ -1027,11 +1000,11 @@ module RightAws
     # Delete the specified snapshot.
     #
     #  ec2.delete_snapshot('snap-55a5403c') #=> 
-    #    { :progress    => "100%",
-    #      :start_time  => "2008-03-28T13:47:02.000Z",
-    #      :status      => "deleted",
-    #      :snapshot_id => "snap-55a5403c",
-    #      :volume_id   => "vol-898a6fe0"}
+    #    { :aws_progress   => "100%",
+    #      :aws_started_at => "2008-03-28T13:47:02.000Z",
+    #      :aws_status     => "deleted",
+    #      :aws_id         => "snap-55a5403c",
+    #      :aws_volume_id  => "vol-898a6fe0" }
     #
     def delete_snapshot(snapshot_id)
       link = generate_request("DeleteSnapshot", 
@@ -1402,10 +1375,10 @@ module RightAws
     class QEc2CreateAndDeleteVolumeParser < RightAWSParser #:nodoc:
       def tagend(name)
         case name 
-          when 'volumeId'   : @result[:volume_id]   = @text;
-          when 'size'       : @result[:size]        = @text.to_i
-          when 'status'     : @result[:status]      = @text
-          when 'createTime' : @result[:create_time] = @text;
+          when 'volumeId'   : @result[:aws_id]         = @text;
+          when 'size'       : @result[:aws_size]       = @text.to_i
+          when 'status'     : @result[:aws_status]     = @text
+          when 'createTime' : @result[:aws_created_at] = @text;
         end
       end
       def reset
@@ -1416,11 +1389,11 @@ module RightAws
     class QEc2AttachAndDetachVolumeParser < RightAWSParser #:nodoc:
       def tagend(name)
         case name 
-          when 'volumeId'   : @result[:volume_id]   = @text
-          when 'instanceId' : @result[:instance_id] = @text
-          when 'device'     : @result[:device]      = @text
-          when 'status'     : @result[:status]      = @text
-          when 'attachTime' : @result[:attach_time] = @text
+          when 'volumeId'   : @result[:aws_id]                = @text
+          when 'instanceId' : @result[:aws_instance_id]       = @text
+          when 'device'     : @result[:aws_device]            = @text
+          when 'status'     : @result[:aws_attachment_status] = @text
+          when 'attachTime' : @result[:aws_attached_at]       = @text
         end
       end
       def reset
@@ -1433,7 +1406,7 @@ module RightAws
         case name
         when 'item'
           case @xmlpath
-          when 'DescribeVolumesResponse/volumeSet' : @volume = { :attachment_set => {}}
+          when 'DescribeVolumesResponse/volumeSet' : @volume = {}
           end
         end
       end
@@ -1441,19 +1414,18 @@ module RightAws
         case name 
           when 'volumeId'
             case @xmlpath
-            when 'DescribeVolumesResponse/volumeSet/item' : @volume[:volume_id] = @text
-            when 'DescribeVolumesResponse/volumeSet/item/attachmentSet/item' : @volume[:attachment_set][:volume_id] = @text
+            when 'DescribeVolumesResponse/volumeSet/item' : @volume[:aws_id] = @text
             end
           when 'status'
             case @xmlpath
-            when 'DescribeVolumesResponse/volumeSet/item' : @volume[:status] = @text
-            when 'DescribeVolumesResponse/volumeSet/item/attachmentSet/item' : @volume[:attachment_set][:status] = @text
+            when 'DescribeVolumesResponse/volumeSet/item' : @volume[:aws_status] = @text
+            when 'DescribeVolumesResponse/volumeSet/item/attachmentSet/item' : @volume[:aws_attachment_status] = @text
             end
-          when 'size'       : @volume[:size] = @text.to_i
-          when 'createTime' : @volume[:creation_time] = @text
-          when 'instanceId' : @volume[:attachment_set][:instance_id] = @text
-          when 'device'     : @volume[:attachment_set][:device]      = @text
-          when 'attachTime' : @volume[:attachment_set][:attach_time] = @text
+          when 'size'       : @volume[:aws_size]        = @text.to_i
+          when 'createTime' : @volume[:aws_created_at]  = @text
+          when 'instanceId' : @volume[:aws_instance_id] = @text
+          when 'device'     : @volume[:aws_device]      = @text
+          when 'attachTime' : @volume[:aws_attached_at] = @text
           when 'item' 
             case @xmlpath
             when 'DescribeVolumesResponse/volumeSet' : @result << @volume
@@ -1477,12 +1449,12 @@ module RightAws
       end
       def tagend(name)
         case name 
-          when 'volumeId'   : @snapshot[:volume_id]   = @text
-          when 'snapshotId' : @snapshot[:snapshot_id] = @text
-          when 'status'     : @snapshot[:status]      = @text
-          when 'startTime'  : @snapshot[:start_time]  = @text
-          when 'progress'   : @snapshot[:progress]    = @text
-          when 'item'       : @result                << @snapshot
+          when 'volumeId'   : @snapshot[:aws_volume_id]  = @text
+          when 'snapshotId' : @snapshot[:aws_id]         = @text
+          when 'status'     : @snapshot[:aws_status]     = @text
+          when 'startTime'  : @snapshot[:aws_started_at] = @text
+          when 'progress'   : @snapshot[:aws_progress]   = @text
+          when 'item'       : @result                   << @snapshot
         end
       end
       def reset
@@ -1493,11 +1465,11 @@ module RightAws
     class QEc2CreateAndDeleteSnapshotParser < RightAWSParser #:nodoc:
       def tagend(name)
         case name 
-          when 'volumeId'   : @result[:volume_id]   = @text
-          when 'snapshotId' : @result[:snapshot_id] = @text
-          when 'status'     : @result[:status]      = @text
-          when 'startTime'  : @result[:start_time]  = @text
-          when 'progress'   : @result[:progress]    = @text
+          when 'volumeId'   : @result[:aws_volume_id]  = @text
+          when 'snapshotId' : @result[:aws_id]         = @text
+          when 'status'     : @result[:aws_status]     = @text
+          when 'startTime'  : @result[:aws_started_at] = @text
+          when 'progress'   : @result[:aws_progress]   = @text
         end
       end
       def reset
