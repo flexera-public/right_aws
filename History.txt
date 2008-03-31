@@ -145,5 +145,9 @@ certain rare conditions
 == 1.7.0
 
 r3051 | konstantin | 2008-03-14 21:26:12 +0300 (Fri, 14 Mar 2008) | 1 line
-
 #897, ActiveSdb alpha release
+
+r3286 | konstantin | 2008-03-31 17:45:19 +0400 (Пнд, 31 Мар 2008) | 4 lines
+1. remove code duplication on the methods being cached
+2. add describe_availability_zones to cached methods
+
