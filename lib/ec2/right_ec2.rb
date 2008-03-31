@@ -68,7 +68,6 @@ module RightAws
     
     SIGNATURE_VERSION = "1"
     # Amazon EC2 API version being used
-#    API_VERSION       = "2007-08-29"
     API_VERSION       = "2008-02-01"
     DEFAULT_HOST      = "ec2.amazonaws.com"
     DEFAULT_PROTOCOL  = 'https'
@@ -143,7 +142,22 @@ module RightAws
       request_info_impl(thread[:ec2_connection], @@bench, request, parser)
     end
 
-
+    def request_cache_or_info(method, link, parser_class, use_cache=true) #:nodoc:
+      # We do not want to break the logic of parsing hence will use a dummy parser to process all the standart 
+      # steps (errors checking etc). The dummy parser does nothig - just returns back the params it received.
+      # If the caching is enabled and hit then throw  AwsNoChange. 
+      # P.S. caching works for the whole images list only! (when the list param is blank)      response, params = request_info(link, QEc2DummyParser.new)
+      # check cache
+      response, params = request_info(link, QEc2DummyParser.new)
+      cache_hits?(method.to_sym, response.body) if use_cache
+      parser = parser_class.new(:logger => @logger)
+      @@bench.xml.add!{ parser.parse(response, params) }
+      result = block_given? ? yield(parser) : parser.result
+      # update parsed data
+      update_cache(method.to_sym, :parsed => result) if use_cache
+      result
+    end
+    
     def hash_params(prefix, list) #:nodoc:
       groups = {}
       list.each_index{|i| groups.update("#{prefix}.#{i+1}"=>list[i])} if list
@@ -158,19 +172,7 @@ module RightAws
       request_hash = hash_params(list_by, list.to_a)
       request_hash['ImageType'] = image_type if image_type
       link = generate_request("DescribeImages", request_hash)
-      # We do not want to break the logic of parsing hence will use a dummy parser to process all the standart 
-      # steps (errors checking etc). The dummy parser does nothig - just returns back the params it received.
-      # If the caching is enabled and hit then throw  AwsNoChange. 
-      # P.S. caching works for the whole images list only! (when the list param is blank)
-      response, params = request_info(link, QEc2DummyParser.new)
-      # if cache is ON and hits then throws AwsNoChange 
-      cache_hits?(:describe_images, response.body) if list.blank? && list_by == 'ImageId' && image_type.blank?
-      parser = QEc2DescribeImagesParser.new(:logger => @logger)
-      @@bench.xml.add!{ parser.parse(response, params) }
-      result = parser.result
-      # put parsed data into cache if the caching is ON
-      update_cache(:describe_images, :parsed => result) if list.blank?
-      result
+      request_cache_or_info :describe_images, link,  QEc2DescribeImagesParser, (list.blank? && list_by == 'ImageId' && image_type.blank?)
     rescue Exception
       on_exception
     end
@@ -385,15 +387,9 @@ module RightAws
       #
     def describe_instances(list=[])
       link = generate_request("DescribeInstances", hash_params('InstanceId',list.to_a))
-      response, params = request_info(link, QEc2DummyParser.new)
-      # check cache
-      cache_hits?(:describe_instances, response.body) if list.blank?
-      parser = QEc2DescribeInstancesParser.new(:logger => @logger)
-      @@bench.xml.add!{ parser.parse(response, params) }
-      result = get_desc_instances(parser.result)
-      # update parsed data
-      update_cache(:describe_instances, :parsed => result) if list.blank?
-      result
+      request_cache_or_info(:describe_instances, link,  QEc2DescribeInstancesParser, list.blank?) do |parser|
+        get_desc_instances(parser.result)
+      end
     rescue Exception
       on_exception
     end
@@ -584,44 +580,39 @@ module RightAws
       #
     def describe_security_groups(list=[])
       link = generate_request("DescribeSecurityGroups", hash_params('GroupName',list.to_a))
-      response, params = request_info(link, QEc2DummyParser.new)
-      # check cache
-      cache_hits?(:describe_security_groups, response.body) if list.blank?
-      parser = QEc2DescribeSecurityGroupsParser.new(:logger => @logger)
-      @@bench.xml.add!{ parser.parse(response, params) }
-      
-      result = []     
-      parser.result.each do |item|
-        perms = []
-        item.ipPermissions.each do |perm|
-          perm.groups.each do |ngroup|
-            perms << {:group => ngroup.groupName,
-                      :owner => ngroup.userId}
+      request_cache_or_info( :describe_security_groups, link,  QEc2DescribeSecurityGroupsParser, list.blank?) do |parser|
+        result = []     
+        parser.result.each do |item|
+          perms = []
+          item.ipPermissions.each do |perm|
+            perm.groups.each do |ngroup|
+              perms << {:group => ngroup.groupName,
+                        :owner => ngroup.userId}
+            end
+            perm.ipRanges.each do |cidr_ip|
+              perms << {:from_port => perm.fromPort, 
+                        :to_port   => perm.toPort, 
+                        :protocol  => perm.ipProtocol,
+                        :cidr_ips  => cidr_ip}
+            end
           end
-          perm.ipRanges.each do |cidr_ip|
-            perms << {:from_port => perm.fromPort, 
-                      :to_port   => perm.toPort, 
-                      :protocol  => perm.ipProtocol,
-                      :cidr_ips  => cidr_ip}
-          end
-        end
-        
-           # delete duplication
-        perms.each_index do |i|
-          (0...i).each do |j|
-            if perms[i] == perms[j] then perms[i] = nil; break; end
-          end
-        end
-        perms.compact!
 
-        result << {:aws_owner       => item.ownerId, 
-                   :aws_group_name  => item.groupName, 
-                   :aws_description => item.groupDescription,
-                   :aws_perms       => perms}
+             # delete duplication
+          perms.each_index do |i|
+            (0...i).each do |j|
+              if perms[i] == perms[j] then perms[i] = nil; break; end
+            end
+          end
+          perms.compact!
+
+          result << {:aws_owner       => item.ownerId, 
+                     :aws_group_name  => item.groupName, 
+                     :aws_description => item.groupDescription,
+                     :aws_perms       => perms}
+        
+        end
+        result
       end
-      # update parsed data
-      update_cache(:describe_security_groups, :parsed => result) if list.blank?
-      result
     rescue Exception
       on_exception
     end
@@ -725,15 +716,7 @@ module RightAws
       #
     def describe_key_pairs(list=[])
       link = generate_request("DescribeKeyPairs", hash_params('KeyName',list.to_a))
-      response, params = request_info(link, QEc2DummyParser.new)
-      # check cache
-      cache_hits?(:describe_key_pairs, response.body) if list.blank?
-      parser = QEc2DescribeKeyPairParser.new(:logger => @logger)
-      @@bench.xml.add!{ parser.parse(response, params) }
-      result = parser.result
-      # update parsed data
-      update_cache(:describe_key_pairs, :parsed => result) if list.blank?
-      result
+      request_cache_or_info :describe_key_pairs, link,  QEc2DescribeKeyPairParser, list.blank?
     rescue Exception
       on_exception
     end
@@ -806,15 +789,7 @@ module RightAws
     def describe_addresses(list=[])
       link = generate_request("DescribeAddresses", 
                               hash_params('PublicIp',list.to_a))
-      response, params = request_info(link, QEc2DummyParser.new)
-      # check cache
-      cache_hits?(:describe_addresses, response.body) if list.blank?
-      parser = QEc2DescribeAddressesParser.new(:logger => @logger)
-      @@bench.xml.add!{ parser.parse(response, params) }
-      result = parser.result
-      # update parsed data
-      update_cache(:describe_addresses, :parsed => result) if list.blank?
-      result
+      request_cache_or_info :describe_addresses, link,  QEc2DescribeAddressesParser, list.blank?
     rescue Exception
       on_exception
     end
@@ -861,11 +836,10 @@ module RightAws
     def describe_availability_zones(list=[])
       link = generate_request("DescribeAvailabilityZones", 
                               hash_params('ZoneName',list.to_a))
-      request_info(link, QEc2DescribeAvailabilityZonesParser.new(:logger => @logger))
+      request_cache_or_info :describe_availability_zones, link,  QEc2DescribeAvailabilityZonesParser, list.blank?
     rescue Exception
       on_exception
     end
-
     
   #- Internal stuff from here on down...
 
