@@ -863,7 +863,7 @@ module RightAws
     #    [{ :aws_id         => "vol-5782673e",
     #       :aws_status     => "available",
     #       :aws_created_at => "2008-02-23T16:47:19.000Z",
-    #       :aws_size       => 1000001765375},
+    #       :aws_size       => "1000001765375"},
     #     { :aws_id         =>"vol-268a6f4f",
     #       :aws_status     => "in-use",
     #       :aws_created_at => "2008-03-26T15:54:38.000Z",
@@ -887,7 +887,7 @@ module RightAws
     #    { :aws_created_at => "2008-03-28T13:03:33.000Z",
     #      :aws_status     => "creating",
     #      :aws_id         => "vol-b48a6fdd",
-    #      :aws_size       => 100931731456}    
+    #      :aws_size       => "100931731456" }
     #
     def create_volume(snapshot_id, size)
       link = generate_request("CreateVolume", 
@@ -905,7 +905,7 @@ module RightAws
     #    { :aws_created_at => "2008-03-28T13:03:33.000Z",
     #      :aws_status     => "deleting",
     #      :aws_id         => "vol-b48a6fdd",
-    #      :aws_size       => 100931731456}    
+    #      :aws_size       => "100931731456" }
     #
     def delete_volume(volume_id)
       link = generate_request("DeleteVolume", 
@@ -1375,10 +1375,10 @@ module RightAws
     class QEc2CreateAndDeleteVolumeParser < RightAWSParser #:nodoc:
       def tagend(name)
         case name 
-          when 'volumeId'   : @result[:aws_id]         = @text;
-          when 'size'       : @result[:aws_size]       = @text.to_i
+          when 'volumeId'   : @result[:aws_id]         = @text
+          when 'size'       : @result[:aws_size]       = @text
           when 'status'     : @result[:aws_status]     = @text
-          when 'createTime' : @result[:aws_created_at] = @text;
+          when 'createTime' : @result[:aws_created_at] = @text
         end
       end
       def reset
@@ -1421,7 +1421,7 @@ module RightAws
             when 'DescribeVolumesResponse/volumeSet/item' : @volume[:aws_status] = @text
             when 'DescribeVolumesResponse/volumeSet/item/attachmentSet/item' : @volume[:aws_attachment_status] = @text
             end
-          when 'size'       : @volume[:aws_size]        = @text.to_i
+          when 'size'       : @volume[:aws_size]        = @text
           when 'createTime' : @volume[:aws_created_at]  = @text
           when 'instanceId' : @volume[:aws_instance_id] = @text
           when 'device'     : @volume[:aws_device]      = @text
