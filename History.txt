@@ -140,14 +140,53 @@ r2963 | todd | 2008-03-06 19:10:23 -0800 (Thu, 06 Mar 2008) | 3 lines
 in
 certain rare conditions
 
-
-
 == 1.7.0
 
 r3051 | konstantin | 2008-03-14 21:26:12 +0300 (Fri, 14 Mar 2008) | 1 line
 #897, ActiveSdb alpha release
 
-r3286 | konstantin | 2008-03-31 17:45:19 +0400 (Пнд, 31 Мар 2008) | 4 lines
+<<<<<<< .mine
+#897, ActiveSdb alpha release
+
+------------------------------------------------------------------------
+r3204 | todd | 2008-03-26 17:50:45 -0700 (Wed, 26 Mar 2008) | 4 lines
+
+Do not autoload right_sdb with the rest of the modules; it requires uuidtools.
+We want the user to explicly request ActiveSdb, at least as long as it is
+alpha/beta.
+
+------------------------------------------------------------------------
+r3220 | konstantin | 2008-03-26 23:03:51 -0700 (Wed, 26 Mar 2008) | 1 line
+
+mark ActiveSdb release as alpha,(port to 1.7.0)
+------------------------------------------------------------------------
+r3229 | konstantin | 2008-03-27 03:43:17 -0700 (Thu, 27 Mar 2008) | 1 line
+
+aws pcode fix (release 2.5)
+------------------------------------------------------------------------
+r3243 | todd | 2008-03-27 12:10:49 -0700 (Thu, 27 Mar 2008) | 1 line
+
+(#991) Bring SqsGen2::Queue.pop fix into 1.7.0.  Also bring removal of
+uuidtools dependency.
+------------------------------------------------------------------------
+r3249 | todd | 2008-03-27 17:59:14 -0700 (Thu, 27 Mar 2008) | 1 line
+
+(#991) Print an informational message if the require of uuidtools fails for
+ActiveSdb.  Update RDoc to show how to include ActiveSdb class.  Update README
+to point to ActiveSdb RDoc.
+------------------------------------------------------------------------
+r3250 | todd | 2008-03-27 18:03:09 -0700 (Thu, 27 Mar 2008) | 2 lines
+
+(#991) Change manifest entry from right_sdb to active_sdb
+
+------------------------------------------------------------------------
+r3251 | todd | 2008-03-27 18:03:33 -0700 (Thu, 27 Mar 2008) | 1 line
+
+(#991) Rename file from right_sdb to active_sdb.
+------------------------------------------------------------------------
+r3286 | konstantin | 2008-03-31 06:45:19 -0700 (Mon, 31 Mar 2008) | 4 lines
+
+right_aws 1.7.0
 1. remove code duplication on the methods being cached
 2. add describe_availability_zones to cached methods
 
