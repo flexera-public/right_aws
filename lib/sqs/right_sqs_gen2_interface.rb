@@ -130,10 +130,10 @@ module RightAws
       request_hash.update(param)
       request_data   = request_hash.sort{|a,b| (a[0].to_s.downcase)<=>(b[0].to_s.downcase)}.to_s
       request_hash['Signature'] = AwsUtils::sign(@aws_secret_access_key, request_data)
-      request_body = request_hash.to_a.collect{|key,val| key.to_s + "=" + val.to_s }.join("&")
+      request_body = request_hash.to_a.collect{|key,val| CGI.escape(key.to_s) + "=" + CGI.escape(val.to_s) }.join("&")
       request        = Net::HTTP::Post.new(AwsUtils.URLencode(queue_uri))
       request['Content-Type'] = 'application/x-www-form-urlencoded' 
-      request.body = AwsUtils.URLencode(request_body)
+      request.body = request_body
         # prepare output hash
       { :request  => request, 
         :server   => @params[:server],
