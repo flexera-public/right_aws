@@ -71,13 +71,13 @@ multithreaded mode.
   http://developer.amazonwebservices.com/connect/kbcategory.jspa?categoryID=48
 * For first generation SQS read RightAws::Sqs and consult the Amazon SQS API documentation at
   http://developer.amazonwebservices.com/connect/kbcategory.jspa?categoryID=31
-* For second generation SQS read RightAws::SqsGen2, RightAws::SqsGen2Interface and consult the Amazon SQS API documentation at
+* For second generation SQS read RightAws::SqsGen2, RightAws::SqsGen2Interface, and consult the Amazon SQS API documentation at
   http://developer.amazonwebservices.com/connect/entry.jspa?externalID=1214&categoryID=31 
 
   Amazon's Migration Guide for moving from first to second generation SQS is
   avalable at:
   http://developer.amazonwebservices.com/connect/entry.jspa?externalID=1148
-* For SDB read RightAws::Sdb and consult the Amazon SDB API documentation at
+* For SDB read RightAws::SdbInterface, RightAws::ActiveSdb, and consult the Amazon SDB API documentation at
   http://developer.amazonwebservices.com/connect/kbcategory.jspa?categoryID=141
 
 == KNOWN ISSUES:
