@@ -189,15 +189,40 @@ to point to ActiveSdb RDoc.
 r3250 | todd | 2008-03-27 18:03:09 -0700 (Thu, 27 Mar 2008) | 2 lines
 
 (#991) Change manifest entry from right_sdb to active_sdb
-
 ------------------------------------------------------------------------
 r3251 | todd | 2008-03-27 18:03:33 -0700 (Thu, 27 Mar 2008) | 1 line
 
 (#991) Rename file from right_sdb to active_sdb.
 ------------------------------------------------------------------------
-r3286 | konstantin | 2008-03-31 06:45:19 -0700 (Mon, 31 Mar 2008) | 4 lines
+r3289 | konstantin | 2008-03-31 17:56:46 +0400 (Fri, 31 Mar 2008) | 1 line
 
-right_aws 1.7.0
+right_aws 1.8.0 history fix
+------------------------------------------------------------------------
+r3292 | konstantin | 2008-03-31 19:58:08 +0400 (Fri, 31 Mar 2008) | 1 line
+
+right_aws 1.8.0: get volume size as string
+------------------------------------------------------------------------
+r3288 | konstantin | 2008-03-31 17:53:10 +0400 (Mon, 31 Mar 2008) | 5 lines
+
 1. remove code duplication on the methods being cached
 2. add describe_availability_zones to cached methods
+3. refactor EBS methods output keys
+------------------------------------------------------------------------
+r3286 | konstantin | 2008-03-31 06:45:19 -0700 (Mon, 31 Mar 2008) | 4 lines
 
+1. remove code duplication on the methods being cached
+2. add describe_availability_zones to cached methods
+------------------------------------------------------------------------
+r3351 | todd | 2008-04-04 02:14:45 +0400 (Fri, 04 Apr 2008) | 1 line
+
+Fix escaping problem in SqsGen2Interface: POST bodies did not properly escape the '&' character
+------------------------------------------------------------------------
+r3374 | todd | 2008-04-04 21:11:55 +0400 (Fri, 04 Apr 2008) | 1 line
+
+Port all 1.7.0/1.7.1 branch changes back to trunk
+------------------------------------------------------------------------
+r3427 | konstantin | 2008-04-08 21:01:04 +0400 (Tue, 08 Apr 2008) | 5 lines
+
+1. #1018, signature version '0' support added for: Ec2, SQS, SDB (Jurgen thanks)
+2. #1017, perform sha1 digest calculation once only
+ 
