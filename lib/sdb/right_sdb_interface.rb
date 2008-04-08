@@ -29,7 +29,6 @@ module RightAws
     
     include RightAwsBaseInterface
 
-    SIGNATURE_VERSION = '1'
     DEFAULT_HOST      = 'sdb.amazonaws.com'
     DEFAULT_PORT      = 443
     DEFAULT_PROTOCOL  = 'https'
@@ -45,6 +44,7 @@ module RightAws
     #    { :server       => 'sdb.amazonaws.com'  # Amazon service host: 'sdb.amazonaws.com'(default)
     #      :port         => 443                  # Amazon service port: 80 or 443(default)
     #      :protocol     => 'https'              # Amazon service protocol: 'http' or 'https'(default)
+    #      :signature_version => '0'             # The signature version : '0' or '1'(default)
     #      :multi_thread => true|false           # Multi-threaded (connection per each thread): true or false(default)
     #      :logger       => Logger Object}       # Logger instance: logs to STDOUT if omitted }
     #      
@@ -76,9 +76,13 @@ module RightAws
                       "AWSAccessKeyId"    => @aws_access_key_id,
                       "Version"           => API_VERSION,
                       "Timestamp"         => Time.now.utc.strftime("%Y-%m-%dT%H:%M:%S.000Z"),
-                      "SignatureVersion"  => SIGNATURE_VERSION }
+                      "SignatureVersion"  => signature_version }
+      service_hash.update(params)
       # prepare string to sight
-      string_to_sign = service_hash.merge(params).sort{|a,b| (a[0].to_s.downcase)<=>(b[0].to_s.downcase)}.to_s
+      string_to_sign = case signature_version
+                       when '0' : service_hash["Action"] + service_hash["Timestamp"]
+                       when '1' : service_hash.sort{|a,b| (a[0].to_s.downcase)<=>(b[0].to_s.downcase)}.to_s
+                       end
       service_hash.update('Signature' =>  AwsUtils::sign(@aws_secret_access_key, string_to_sign))
       service_string = service_hash.to_a.collect{|key,val| key + "=#{CGI::escape(val.to_s)}" }.join("&")
       #

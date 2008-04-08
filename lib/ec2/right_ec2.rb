@@ -66,7 +66,6 @@ module RightAws
   class Ec2 < RightAwsBase
     include RightAwsBaseInterface
     
-    SIGNATURE_VERSION = "1"
     # Amazon EC2 API version being used
     API_VERSION       = "2008-02-01"
     DEFAULT_HOST      = "ec2.amazonaws.com"
@@ -103,6 +102,7 @@ module RightAws
     # * <tt>:protocol</tt>: 'http' or 'https', default: DEFAULT_PROTOCOL
     # * <tt>:multi_thread</tt>: true=HTTP connection per thread, false=per process
     # * <tt>:logger</tt>: for log messages, default: RAILS_DEFAULT_LOGGER else STDOUT
+    # * <tt>:signature_version</tt>:  The signature version : '0' or '1'(default)
     #
     def initialize(aws_access_key_id=nil, aws_secret_access_key=nil, params={})
       init({ :name             => 'EC2', 
@@ -115,17 +115,20 @@ module RightAws
     end
 
 
-    def generate_request(action, param={}) #:nodoc:
-      timestamp    = ( Time::now ).utc.strftime("%Y-%m-%dT%H:%M:%S.000Z")
-      request_hash = {"Action"            => action,
+    def generate_request(action, params={}) #:nodoc:
+      service_hash = {"Action"            => action,
                       "AWSAccessKeyId"    => @aws_access_key_id,
                       "Version"           => @@api,
-                      "Timestamp"         => timestamp,
-                      "SignatureVersion"  => SIGNATURE_VERSION }
-      request_hash.update(param)
-      request_data   = request_hash.sort{|a,b| (a[0].to_s.downcase)<=>(b[0].to_s.downcase)}.to_s
-      request_hash.update('Signature' =>  AwsUtils::sign(@aws_secret_access_key, request_data))
-      request_params = request_hash.to_a.collect{|key,val| key + "=" + CGI::escape(val) }.join("&")
+                      "Timestamp"         => Time.now.utc.strftime("%Y-%m-%dT%H:%M:%S.000Z"),
+                      "SignatureVersion"  => signature_version }
+      service_hash.update(params)
+      # prepare string to sight
+      string_to_sign = case signature_version
+                       when '0' : service_hash["Action"] + service_hash["Timestamp"]
+                       when '1' : service_hash.sort{|a,b| (a[0].to_s.downcase)<=>(b[0].to_s.downcase)}.to_s
+                       end
+      service_hash.update('Signature' =>  AwsUtils::sign(@aws_secret_access_key, string_to_sign))
+      request_params = service_hash.to_a.collect{|key,val| key + "=" + CGI::escape(val) }.join("&")
       request        = Net::HTTP::Get.new("/?#{request_params}")
         # prepare output hash
       { :request  => request, 

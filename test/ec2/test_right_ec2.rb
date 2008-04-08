@@ -65,4 +65,12 @@ class TestEc2 < Test::Unit::TestCase
 ##    assert_raise(Rightscale::AwsError) { @ec2.delete_key_pair(@key) }
   end
 
+  def test_10_signature_version_0
+    ec2 = Rightscale::Ec2.new(TestCredentials.aws_access_key_id, TestCredentials.aws_secret_access_key, :signature_version => '0')
+    images = ec2.describe_images
+    assert images.size>0, 'Amazon must have at least some public images'
+    # check that the request has correct signature version
+    assert ec2.last_request.path.include?('SignatureVersion=0')
+  end
+  
 end

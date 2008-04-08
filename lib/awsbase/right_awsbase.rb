@@ -26,8 +26,9 @@ module RightAws
   require 'md5'
   
   class AwsUtils #:nodoc:
+    @@digest = OpenSSL::Digest::Digest.new("sha1")
     def self.sign(aws_secret_access_key, auth_string)
-      Base64.encode64(OpenSSL::HMAC.digest(OpenSSL::Digest::Digest.new("sha1"), aws_secret_access_key, auth_string)).strip
+      Base64.encode64(OpenSSL::HMAC.digest(@@digest, aws_secret_access_key, auth_string)).strip
     end
 
     # From Amazon's SQS Dev Guide, a brief description of how to escape:
@@ -92,6 +93,8 @@ module RightAws
   end
 
   module RightAwsBaseInterface
+    DEFAULT_SIGNATURE_VERSION = '1'
+    
     @@caching = false
     def self.caching
       @@caching
@@ -118,6 +121,8 @@ module RightAws
     attr_reader :connection
       # Cache
     attr_reader :cache
+      # Signature version (all services except s3)
+    attr_reader :signature_version
 
     def init(service_info, aws_access_key_id, aws_secret_access_key, params={}) #:nodoc:
       @params = params
@@ -135,6 +140,7 @@ module RightAws
       @logger.info "New #{self.class.name} using #{@params[:multi_thread] ? 'multi' : 'single'}-threaded mode"
       @error_handler = nil
       @cache = {}
+      @signature_version = (params[:signature_version] || DEFAULT_SIGNATURE_VERSION).to_s
     end
 
     # Returns +true+ if the describe_xxx responses are being cached 

@@ -26,7 +26,6 @@ module RightAws
   class SqsInterface < RightAwsBase
     include RightAwsBaseInterface
     
-    SIGNATURE_VERSION = "1"
     API_VERSION       = "2007-05-01"
     DEFAULT_HOST      = "queue.amazonaws.com"
     DEFAULT_PORT      = 443
@@ -57,6 +56,7 @@ module RightAws
       #    {:server       => 'queue.amazonaws.com' # Amazon service host: 'queue.amazonaws.com'(default)
       #     :port         => 443                   # Amazon service port: 80 or 443(default)
       #     :multi_thread => true|false            # Multi-threaded (connection per each thread): true or false(default)
+      #     :signature_version => '0'              # The signature version : '0' or '1'(default)
       #     :logger       => Logger Object}        # Logger instance: logs to STDOUT if omitted }
       #
     def initialize(aws_access_key_id=nil, aws_secret_access_key=nil, params={})
@@ -75,23 +75,26 @@ module RightAws
   #-----------------------------------------------------------------
 
       # Generates a request hash for the query API
-    def generate_request(action, param={})  # :nodoc:
+    def generate_request(action, params={})  # :nodoc:
         # Sometimes we need to use queue uri (delete queue etc)
         # In that case we will use Symbol key: 'param[:queue_url]'
-      queue_uri = param[:queue_url] ? URI(param[:queue_url]).path : '/'
+      queue_uri = params[:queue_url] ? URI(params[:queue_url]).path : '/'
         # remove unset(=optional) and symbolyc keys
-      param.each{ |key, value| param.delete(key) if (value.nil? || key.is_a?(Symbol)) }
+      params.each{ |key, value| params.delete(key) if (value.nil? || key.is_a?(Symbol)) }
         # prepare output hash
-      request_hash = { "Action"           => action,
-                       # "Expires"          => Time.now.utc.since(REQUEST_TTL).strftime("%Y-%m-%dT%H:%M:%SZ"),
+      service_hash = { "Action"           => action,
                        "Expires"          => (Time.now + REQUEST_TTL).utc.strftime("%Y-%m-%dT%H:%M:%SZ"),
                        "AWSAccessKeyId"   => @aws_access_key_id,
                        "Version"          => API_VERSION,
-                       "SignatureVersion" => SIGNATURE_VERSION }
-      request_hash.update(param)
-      request_data   = request_hash.sort{|a,b| (a[0].to_s.downcase)<=>(b[0].to_s.downcase)}.to_s
-      request_hash['Signature'] = AwsUtils::sign(@aws_secret_access_key, request_data)
-      request_params = request_hash.to_a.collect{|key,val| key.to_s + "=" + CGI::escape(val.to_s) }.join("&")
+                       "SignatureVersion" => signature_version }
+      service_hash.update(params)
+      # prepare string to sight
+      string_to_sign = case signature_version
+                       when '0' : service_hash["Action"] + service_hash["Expires"]
+                       when '1' : service_hash.sort{|a,b| (a[0].to_s.downcase)<=>(b[0].to_s.downcase)}.to_s
+                       end
+      service_hash['Signature'] = AwsUtils::sign(@aws_secret_access_key, string_to_sign)
+      request_params = service_hash.to_a.collect{|key,val| key.to_s + "=" + CGI::escape(val.to_s) }.join("&")
       request        = Net::HTTP::Get.new("#{queue_uri}?#{request_params}")
         # prepare output hash
       { :request  => request, 
