@@ -225,4 +225,9 @@ r3427 | konstantin | 2008-04-08 21:01:04 +0400 (Tue, 08 Apr 2008) | 5 lines
 
 1. #1018, signature version '0' support added for: Ec2, SQS, SDB (Jurgen thanks)
 2. #1017, perform sha1 digest calculation once only
- 
+------------------------------------------------------------------------
+r3678 | konstantin | 2008-04-29 15:38:57 +0400 (Tue, 29 Apr 2008) | 1 line
+
+1. #1086, right_aws active_support dependency removal from S3Interface#generate_link
+2. S3Interface#get_link doc improved
+
