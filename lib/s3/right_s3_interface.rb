@@ -33,7 +33,8 @@ module RightAws
     DEFAULT_PORT           = 443
     DEFAULT_PROTOCOL       = 'https'
     REQUEST_TTL            = 30
-    DEFAULT_EXPIRES_AFTER  = 1 * 24 * 60 * 60 # One day's worth of seconds
+    DEFAULT_EXPIRES_AFTER  =   1 * 24 * 60 * 60 # One day's worth of seconds
+    ONE_YEAR_IN_SECONDS    = 365 * 24 * 60 * 60
     AMAZON_HEADER_PREFIX   = 'x-amz-'
     AMAZON_METADATA_PREFIX = 'x-amz-meta-'
 
@@ -601,7 +602,7 @@ module RightAws
       end
        # expiration time
       expires ||= DEFAULT_EXPIRES_AFTER
-      expires   = Time.now.utc.since(expires) if expires.is_a?(Fixnum) && (expires<1.year)
+      expires   = Time.now.utc + expires if expires.is_a?(Fixnum) && (expires < ONE_YEAR_IN_SECONDS)
       expires   = expires.to_i
         # remove unset(==optional) and symbolyc keys
       headers.each{ |key, value| headers.delete(key) if (value.nil? || key.is_a?(Symbol)) }
@@ -669,8 +670,16 @@ module RightAws
     
       # Generates link for 'GetObject'.
       #
-      #  s3.get_link('my_awesome_bucket',key) #=> url string
+      # if a bucket comply with virtual hosting naming then retuns a link with the 
+      # bucket as a part of host name:
+      # 
+      #  s3.get_link('my-awesome-bucket',key) #=> https://my-awesome-bucket.s3.amazonaws.com:443/asia%2Fcustomers?Signature=nh7...
+      #  
+      # otherwise returns an old style link (the bucket is a part of path):
+      # 
+      #  s3.get_link('my_awesome_bucket',key) #=> https://s3.amazonaws.com:443/my_awesome_bucket/asia%2Fcustomers?Signature=QAO...
       #
+      # see http://docs.amazonwebservices.com/AmazonS3/2006-03-01/VirtualHosting.html
     def get_link(bucket, key, expires=nil, headers={})
       generate_link('GET', headers.merge(:url=>"#{bucket}/#{CGI::escape key}"), expires)
     rescue
