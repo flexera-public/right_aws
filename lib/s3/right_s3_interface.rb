@@ -373,12 +373,12 @@ module RightAws
       #       :headers => {"last-modified"     => "Wed, 23 May 2007 09:08:04 GMT", 
       #                    "content-type"      => "", 
       #                    "etag"              => "\"000000000096f4ee74bc4596443ef2a4\"", 
-      #                     "date"              => "Wed, 23 May 2007 09:08:03 GMT", 
-      #                     "x-amz-id-2"        => "ZZZZZZZZZZZZZZZZZZZZ1HJXZoehfrS4QxcxTdNGldR7w/FVqblP50fU8cuIMLiu", 
-      #                     "x-amz-meta-family" => "Woho556!",
-      #                     "x-amz-request-id"  => "0000000C246D770C", 
-      #                     "server"            => "AmazonS3", 
-      #                     "content-length"    => "7"}}
+      #                    "date"              => "Wed, 23 May 2007 09:08:03 GMT", 
+      #                    "x-amz-id-2"        => "ZZZZZZZZZZZZZZZZZZZZ1HJXZoehfrS4QxcxTdNGldR7w/FVqblP50fU8cuIMLiu", 
+      #                    "x-amz-meta-family" => "Woho556!",
+      #                    "x-amz-request-id"  => "0000000C246D770C", 
+      #                    "server"            => "AmazonS3", 
+      #                    "content-length"    => "7"}}
       #
       # If a block is provided, yields incrementally to the block as
       # the response is read.  For large responses, this function is ideal as
@@ -430,6 +430,54 @@ module RightAws
       on_exception
     end
 
+      # Copy an object. 
+      #  directive: :copy    - copy meta-headers from source (default value)
+      #             :replace - replace meta-headers by passed ones
+      #
+      #  # copy a key with meta-headers
+      #  s3.copy('b1', 'key1', 'b1', 'key1_copy') #=> {:e_tag=>"\"e8b...8d\"", :last_modified=>"2008-05-11T10:25:22.000Z"}
+      #  
+      #  # copy a key, overwrite meta-headers
+      #  s3.copy('b1', 'key2', 'b1', 'key2_copy', :replace, 'x-amz-meta-family'=>'Woho555!') #=> {:e_tag=>"\"e8b...8d\"", :last_modified=>"2008-05-11T10:26:22.000Z"}
+      #
+      # see: http://docs.amazonwebservices.com/AmazonS3/2006-03-01/UsingCopyingObjects.html
+      #      http://docs.amazonwebservices.com/AmazonS3/2006-03-01/RESTObjectCOPY.html
+      #
+    def copy(src_bucket, src_key, dest_bucket, dest_key=nil, directive=:copy, headers={})
+      dest_key ||= src_key
+      headers['x-amz-metadata-directive'] = directive.to_s.upcase
+      headers['x-amz-copy-source']        = "#{src_bucket}/#{src_key}"
+      req_hash = generate_rest_request('PUT', headers.merge(:url=>"#{dest_bucket}/#{CGI::escape dest_key}"))
+      request_info(req_hash, S3CopyParser.new)
+    rescue
+      on_exception
+    end
+    
+      # Move an object. 
+      #  directive: :copy    - copy meta-headers from source (default value)
+      #             :replace - replace meta-headers by passed ones
+      #
+      #  # move bucket1/key1 to bucket1/key2
+      #  s3.move('bucket1', 'key1', 'bucket1', 'key2') #=> {:e_tag=>"\"e8b...8d\"", :last_modified=>"2008-05-11T10:27:22.000Z"}
+      #  
+      #  # move bucket1/key1 to bucket2/key2 with new meta-headers assignment
+      #  s3.copy('bucket1', 'key1', 'bucket2', 'key2', :replace, 'x-amz-meta-family'=>'Woho555!') #=> {:e_tag=>"\"e8b...8d\"", :last_modified=>"2008-05-11T10:28:22.000Z"}
+      #  
+    def move(src_bucket, src_key, dest_bucket, dest_key=nil, directive=:copy, headers={})
+      copy_result = copy(src_bucket, src_key, dest_bucket, dest_key, directive, headers)
+      # delete an original key if it differs from a destination one
+      delete(src_bucket, src_key) unless src_bucket == dest_bucket && src_key == dest_key
+      copy_result
+    end
+
+      # Rename an object. 
+      # 
+      #  # rename bucket1/key1 to bucket1/key2
+      #  s3.rename('bucket1', 'key1', 'key2') #=> {:e_tag=>"\"e8b...8d\"", :last_modified=>"2008-05-11T10:29:22.000Z"}
+      #  
+    def rename(src_bucket, src_key, dest_key, headers={})
+      move(src_bucket, src_key, src_bucket, dest_key, :copy, headers)
+    end
       
       # Retieves the ACL (access control policy) for a bucket or object. Returns a hash of headers and xml doc with ACL data. See: http://docs.amazonwebservices.com/AmazonS3/2006-03-01/RESTAccessPolicy.html.
       #
@@ -881,6 +929,18 @@ module RightAws
             @current_grantee[:permissions] = @text
           when 'Grant'
             @result[:grantees] << @current_grantee
+        end
+      end
+    end
+
+    class S3CopyParser < RightAWSParser  # :nodoc:
+      def reset
+        @result = {}
+      end
+      def tagend(name)
+        case name
+        when 'LastModified' : @result[:last_modified] = @text
+        when 'ETag'         : @result[:e_tag]         = @text
         end
       end
     end

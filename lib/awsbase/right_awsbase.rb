@@ -543,7 +543,7 @@ module RightAws
       tagend(name)
     end
     def text(text)
-      @text = text
+      @text += text
       tagtext(text)
     end
       # Parser method.

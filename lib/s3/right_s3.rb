@@ -249,6 +249,40 @@ module RightAws
         key = Key.create(self, key.to_s) unless key.is_a?(Key)
         key.get(headers)
       end
+
+        # Rename object. Returns RightAws::S3::Key instance.
+        # 
+        #  new_key = bucket.rename_key('logs/today/1.log','logs/today/2.log')   #=> #<RightAws::S3::Key:0xb7b1e240 ... >
+        #  puts key.name   #=> 'logs/today/2.log'
+        #  key.exists?     #=> true
+        #
+      def rename_key(old_key_or_name, new_name)
+        old_key_or_name = Key.create(self, old_key_or_name.to_s) unless old_key_or_name.is_a?(Key)
+        old_key_or_name.rename(new_name)
+        old_key_or_name
+      end
+
+        # Create an object copy. Returns a destination RightAws::S3::Key instance.
+        # 
+        #  new_key = bucket.copy_key('logs/today/1.log','logs/today/2.log')   #=> #<RightAws::S3::Key:0xb7b1e240 ... >
+        #  puts key.name   #=> 'logs/today/2.log'
+        #  key.exists?     #=> true
+        #
+      def copy_key(old_key_or_name, new_key_or_name)
+        old_key_or_name = Key.create(self, old_key_or_name.to_s) unless old_key_or_name.is_a?(Key)
+        old_key_or_name.copy(new_key_or_name)
+      end
+      
+        # Move an object to other location. Returns a destination RightAws::S3::Key instance.
+        # 
+        #  new_key = bucket.copy_key('logs/today/1.log','logs/today/2.log')   #=> #<RightAws::S3::Key:0xb7b1e240 ... >
+        #  puts key.name   #=> 'logs/today/2.log'
+        #  key.exists?     #=> true
+        #
+      def move_key(old_key_or_name, new_key_or_name)
+        old_key_or_name = Key.create(self, old_key_or_name.to_s) unless old_key_or_name.is_a?(Key)
+        old_key_or_name.move(new_key_or_name)
+      end
       
         # Remove all keys from a bucket. 
         # Returns +true+. 
@@ -260,7 +294,7 @@ module RightAws
       end
 
         # Delete all keys where the 'folder_key' can be interpreted
-	# as a 'folder' name. 
+        # as a 'folder' name. 
         # Returns an array of string keys that have been deleted.
         #
         #  bucket.keys.map{|key| key.name}.join(', ') #=> 'test, test/2/34, test/3, test1, test1/logs'
@@ -334,7 +368,7 @@ module RightAws
       end
       
         # Create a new Key instance, but do not create the actual key.
-	# In normal use this method should not be called directly.
+        # In normal use this method should not be called directly.
         # Use RightAws::S3::Key.create or bucket.key() instead. 
         #
       def initialize(bucket, name, data=nil, headers={}, meta_headers={}, 
@@ -417,6 +451,66 @@ module RightAws
         @bucket.s3.interface.put(@bucket.name, @name, @data, meta.merge(headers))
       end
       
+        # Rename an object. Returns new object name.
+        # 
+        #  key = RightAws::S3::Key.create(bucket, 'logs/today/1.log') #=> #<RightAws::S3::Key:0xb7b1e240 ... >
+        #  key.rename('logs/today/2.log')   #=> 'logs/today/2.log'
+        #  puts key.name                    #=> 'logs/today/2.log'
+        #  key.exists?                      #=> true
+        #
+      def rename(new_name)
+        @bucket.s3.interface.rename(@bucket.name, @name, new_name)
+        @name = new_name
+      end
+      
+        # Create an object copy. Returns a destination RightAws::S3::Key instance.
+        #
+        #  # Key instance as destination
+        #  key1 = RightAws::S3::Key.create(bucket, 'logs/today/1.log') #=> #<RightAws::S3::Key:0xb7b1e240 ... >
+        #  key2 = RightAws::S3::Key.create(bucket, 'logs/today/2.log') #=> #<RightAws::S3::Key:0xb7b5e240 ... >
+        #  key1.put('Olala!')   #=> true
+        #  key1.copy(key2)      #=> #<RightAws::S3::Key:0xb7b5e240 ... >
+        #  key1.exists?         #=> true
+        #  key2.exists?         #=> true
+        #  puts key2.data       #=> 'Olala!'
+        #
+        #  # String as destination
+        #  key = RightAws::S3::Key.create(bucket, 'logs/today/777.log') #=> #<RightAws::S3::Key:0xb7b1e240 ... >
+        #  key.put('Olala!')                          #=> true
+        #  new_key = key.copy('logs/today/888.log')   #=> #<RightAws::S3::Key:0xb7b5e240 ... >
+        #  key.exists?                                #=> true
+        #  new_key.exists?                            #=> true
+        #
+      def copy(new_key_or_name)
+        new_key_or_name = Key.create(@bucket, new_key_or_name.to_s) unless new_key_or_name.is_a?(Key)
+        @bucket.s3.interface.copy(@bucket.name, @name, new_key_or_name.bucket.name, new_key_or_name.name)
+        new_key_or_name
+      end
+
+        # Move an object to other location. Returns a destination RightAws::S3::Key instance.
+        #
+        #  # Key instance as destination
+        #  key1 = RightAws::S3::Key.create(bucket, 'logs/today/1.log') #=> #<RightAws::S3::Key:0xb7b1e240 ... >
+        #  key2 = RightAws::S3::Key.create(bucket, 'logs/today/2.log') #=> #<RightAws::S3::Key:0xb7b5e240 ... >
+        #  key1.put('Olala!')   #=> true
+        #  key1.move(key2)      #=> #<RightAws::S3::Key:0xb7b5e240 ... >
+        #  key1.exists?         #=> false
+        #  key2.exists?         #=> true
+        #  puts key2.data       #=> 'Olala!'
+        #  
+        #  # String as destination
+        #  key = RightAws::S3::Key.create(bucket, 'logs/today/777.log') #=> #<RightAws::S3::Key:0xb7b1e240 ... >
+        #  key.put('Olala!')                          #=> true
+        #  new_key = key.move('logs/today/888.log')   #=> #<RightAws::S3::Key:0xb7b5e240 ... >
+        #  key.exists?                                #=> false
+        #  new_key.exists?                            #=> true
+        #
+      def move(new_key_or_name)
+        new_key_or_name = Key.create(@bucket, new_key_or_name.to_s) unless new_key_or_name.is_a?(Key)
+        @bucket.s3.interface.move(@bucket.name, @name, new_key_or_name.bucket.name, new_key_or_name.name)
+        new_key_or_name
+      end
+      
         # Retrieve key info from bucket and update attributes.
         # Refresh meta-headers (by calling +head+ method) if +head+ is set. 
         # Returns +true+ if the key exists in bucket and +false+ otherwise. 
@@ -444,7 +538,7 @@ module RightAws
         end
       end
 
-        # Retrieve meta-headers from S3.
+        # Updates headers and meta-headers from S3.
         # Returns +true+. 
         #
         #  key.meta_headers #=> {"family"=>"qwerty"}
@@ -455,7 +549,27 @@ module RightAws
         @headers, @meta_headers = self.class.split_meta(@bucket.s3.interface.head(@bucket, @name))
         true
       end
-
+      
+        # Reload meta-headers only. Returns meta-headers hash.
+        #
+        #  key.reload_meta   #=> {"family"=>"qwerty", "name"=>"asdfg"}
+        #
+      def reload_meta
+        @meta_headers = self.class.split_meta(@bucket.s3.interface.head(@bucket, @name)).last
+      end
+      
+        # Replace meta-headers by new hash at S3. Returns new meta-headers hash.
+        #
+        #  key.reload_meta   #=> {"family"=>"qwerty", "name"=>"asdfg"}
+        #  key.save_meta     #=> {"family"=>"oops", "race" => "troll"}
+        #  key.reload_meta   #=> {"family"=>"oops", "race" => "troll"}
+        #
+      def save_meta(meta_headers)
+        meta = self.class.add_meta_prefix(meta_headers)
+        @bucket.s3.interface.copy(@bucket.name, @name, @bucket.name, @name, :replace, meta)
+        @meta_headers = self.class.split_meta(meta)[1]
+      end
+ 
         # Check for existence of the key in the given bucket. 
         # Returns +true+ or +false+. 
         #
@@ -703,7 +817,7 @@ module RightAws
 
         # Apply current grantee @perms to +thing+. This method is called internally by the +grant+
         # and +revoke+ methods. In normal use this method should not
-	# be called directly.
+        # be called directly.
         # 
         #  grantee.perms = ['FULL_CONTROL']
         #  grantee.apply #=> true

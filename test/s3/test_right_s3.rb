@@ -6,10 +6,13 @@ class TestS3 < Test::Unit::TestCase
   
   def setup
     @s3     = Rightscale::S3Interface.new(TestCredentials.aws_access_key_id, TestCredentials.aws_secret_access_key)
-    @bucket = 'right_s3_awesome_test_bucket'
+    @bucket = 'right_s3_awesome_test_bucket_00001'
     @key1   = 'test/woohoo1/'
     @key2   = 'test1/key/woohoo2'
     @key3   = 'test2/A%B@C_D&E?F+G=H"I'
+    @key1_copy =     'test/woohoo1_2'
+    @key1_new_name = 'test/woohoo1_3'
+    @key2_new_name = 'test1/key/woohoo2_new'
     @s      = Rightscale::S3.new(TestCredentials.aws_access_key_id, TestCredentials.aws_secret_access_key)
   end
 
@@ -74,19 +77,61 @@ class TestS3 < Test::Unit::TestCase
     assert(keys.include? @key3)
   end
   
-  def test_09_delete_folder
+  def test_09_copy_key
+    #--- test COPY
+    # copy a key
+    assert @s3.copy(@bucket, @key1, @bucket, @key1_copy)
+    # check it was copied well
+    assert_equal RIGHT_OBJECT_TEXT, @s3.get_object(@bucket, @key1_copy), "copied object must have the same data"
+    # check meta-headers were copied
+    headers = @s3.head(@bucket, @key1_copy)
+    assert_equal 'Woohoo1!', headers['x-amz-meta-family'], "x-amz-meta-family header must be equal to 'Woohoo1!'"
+    #--- test REPLACE
+    assert @s3.copy(@bucket, @key1, @bucket, @key1_copy, :replace, 'x-amz-meta-family' => 'oooops!')
+    # check it was copied well
+    assert_equal RIGHT_OBJECT_TEXT, @s3.get_object(@bucket, @key1_copy), "copied object must have the same data"
+    # check meta-headers were overwrittenn
+    headers = @s3.head(@bucket, @key1_copy)
+    assert_equal 'oooops!', headers['x-amz-meta-family'], "x-amz-meta-family header must be equal to 'oooops!'"
+  end
+
+  def test_10_move_key
+    # move a key
+    assert @s3.move(@bucket, @key1, @bucket, @key1_new_name)
+    # check it's data was moved correctly
+    assert_equal RIGHT_OBJECT_TEXT, @s3.get_object(@bucket, @key1_new_name), "moved object must have the same data"
+    # check meta-headers were moved
+    headers = @s3.head(@bucket, @key1_new_name)
+    assert_equal 'Woohoo1!', headers['x-amz-meta-family'], "x-amz-meta-family header must be equal to 'Woohoo1!'"
+    # check the original key is not exists any more
+    keys = @s3.list_bucket(@bucket).map{|b| b[:key]}
+    assert(!keys.include?(@key1))
+  end
+
+  def test_11_rename_key
+    # rename a key
+    assert @s3.rename(@bucket, @key2, @key2_new_name)
+    # check the new key data
+    assert_equal RIGHT_OBJECT_TEXT, @s3.get_object(@bucket, @key2_new_name), "moved object must have the same data"
+    # check meta-headers
+    headers = @s3.head(@bucket, @key2_new_name)
+    assert_equal 'Woohoo2!', headers['x-amz-meta-family'], "x-amz-meta-family header must be equal to 'Woohoo2!'"
+    # check the original key is not exists any more
+    keys = @s3.list_bucket(@bucket).map{|b| b[:key]}
+    assert(!keys.include?(@key2))
+  end
+  
+  def test_12_delete_folder
     assert_equal 1, @s3.delete_folder(@bucket, 'test').size, "Only one key(#{@key1}) must be deleted!"
   end
 
-
-  def test_10_delete_bucket
+  def test_13_delete_bucket
     assert_raise(Rightscale::AwsError) { @s3.delete_bucket(@bucket) }
     assert @s3.clear_bucket(@bucket), 'Clear_bucket fail'
     assert_equal 0, @s3.list_bucket(@bucket).size, 'Bucket must be empty'
     assert @s3.delete_bucket(@bucket)
     assert !@s3.list_all_my_buckets.map{|bucket| bucket[:name]}.include?(@bucket), "#{@bucket} must not exist"
   end
-
 
   #---------------------------
   # Rightscale::S3 classes
@@ -145,7 +190,80 @@ class TestS3 < Test::Unit::TestCase
     assert !key2.exists?
   end
   
-  def test_23_clear_delete
+  def test_23_rename_key
+    bucket = Rightscale::S3::Bucket.create(@s, @bucket, false)
+    # -- 1 -- (key based rename)
+    # create a key
+    key = bucket.key('test/copy/1')
+    key.put(RIGHT_OBJECT_TEXT)
+    original_key = key.clone
+    assert key.exists?, "'test/copy/1' should exist"
+    # rename it
+    key.rename('test/copy/2')
+    assert_equal 'test/copy/2', key.name
+    assert key.exists?, "'test/copy/2' should exist"
+    # the original key should not exist
+    assert !original_key.exists?, "'test/copy/1' should not exist"
+    # -- 2 -- (bucket based rename)
+    bucket.rename_key('test/copy/2', 'test/copy/3')
+    assert  bucket.key('test/copy/3').exists?, "'test/copy/3' should exist"
+    assert !bucket.key('test/copy/2').exists?, "'test/copy/2' should not exist"
+  end
+  
+  def test_24_copy_key
+    bucket = Rightscale::S3::Bucket.create(@s, @bucket, false)
+    # -- 1 -- (key based copy)
+    # create a key
+    key = bucket.key('test/copy/10')
+    key.put(RIGHT_OBJECT_TEXT)
+    # make copy
+    new_key = key.copy('test/copy/11')
+    # make sure both the keys exist and have a correct data
+    assert key.exists?,     "'test/copy/10' should exist"
+    assert new_key.exists?, "'test/copy/11' should exist"
+    assert_equal RIGHT_OBJECT_TEXT, key.get
+    assert_equal RIGHT_OBJECT_TEXT, new_key.get
+    # -- 2 -- (bucket based copy)
+    bucket.copy_key('test/copy/11', 'test/copy/12')
+    assert bucket.key('test/copy/11').exists?, "'test/copy/11' should exist"
+    assert bucket.key('test/copy/12').exists?, "'test/copy/12' should exist"
+    assert_equal RIGHT_OBJECT_TEXT, bucket.key('test/copy/11').get
+    assert_equal RIGHT_OBJECT_TEXT, bucket.key('test/copy/12').get
+  end
+  
+  def test_25_move_key
+    bucket = Rightscale::S3::Bucket.create(@s, @bucket, false)
+    # -- 1 -- (key based copy)
+    # create a key
+    key = bucket.key('test/copy/20')
+    key.put(RIGHT_OBJECT_TEXT)
+    # move
+    new_key = key.move('test/copy/21')
+    # make sure both the keys exist and have a correct data
+    assert !key.exists?,    "'test/copy/20' should not exist"
+    assert new_key.exists?, "'test/copy/21' should exist"
+    assert_equal RIGHT_OBJECT_TEXT, new_key.get
+    # -- 2 -- (bucket based copy)
+    bucket.copy_key('test/copy/21', 'test/copy/22')
+    assert bucket.key('test/copy/21').exists?, "'test/copy/21' should not exist"
+    assert bucket.key('test/copy/22').exists?, "'test/copy/22' should exist"
+    assert_equal RIGHT_OBJECT_TEXT, bucket.key('test/copy/22').get
+  end
+  
+  def test_26_save_meta
+    bucket = Rightscale::S3::Bucket.create(@s, @bucket, false)
+    # create a key
+    key = bucket.key('test/copy/30')
+    key.put(RIGHT_OBJECT_TEXT)
+    assert key.meta_headers.blank?
+    # store some meta keys
+    meta = {'family' => 'oops','race' => 'troll'}
+    assert_equal meta, key.save_meta(meta)
+    # reload meta
+    assert_equal meta, key.reload_meta
+  end
+    
+  def test_27_clear_delete
     bucket = Rightscale::S3::Bucket.create(@s, @bucket, false)
       # add another key
     bucket.put(@key2, RIGHT_OBJECT_TEXT)
