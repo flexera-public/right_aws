@@ -231,3 +231,16 @@ r3678 | konstantin | 2008-04-29 15:38:57 +0400 (Tue, 29 Apr 2008) | 1 line
 1. #1086, right_aws active_support dependency removal from S3Interface#generate_link
 2. S3Interface#get_link doc improved
 
+------------------------------------------------------------------------
+r3823 | konstantin | 2008-05-12 18:05:29 +0400 (Mon, 12 May 2008) | 11 lines
+
+#1141
+Fixed:
+ - RightAWSParser#text method ('ETag' field was parsed incorrectly)
+Added:
+ - RightAws::S3Interface : rename, copy and move methods
+ - RightAws::S3::Bucket  : rename_key, copy_key and move_key methods
+ - RightAws::S3::Key     : rename, copy, move, reload_meta and save_meta methods
+Improved:
+ - test_right_s3.rb to test all the methods above
+     
