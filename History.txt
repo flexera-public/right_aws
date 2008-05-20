@@ -243,4 +243,9 @@ Added:
  - RightAws::S3::Key     : rename, copy, move, reload_meta and save_meta methods
 Improved:
  - test_right_s3.rb to test all the methods above
-     
+ 
+------------------------------------------------------------------------
+r3940 | konstantin | 2008-05-20 14:56:06 +0400 (Tue, 20 May 2008) | 4 lines
+
+ - ec2: c1.medium and c1.xlarge types support
+  
