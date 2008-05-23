@@ -457,6 +457,17 @@ module RightAws
             @aws.logger.warn("##### Retry ##{@retries} is being performed. Sleeping for #{@reiteration_delay} sec. Whole time: #{Time.now-@started_at} sec ####")
             sleep @reiteration_delay 
             @reiteration_delay *= 2
+
+            # Always make sure that the fp is set to point to the beginning(?)
+            # of the File/IO. TODO: it assumes that offset is 0, which is bad.
+            if(request[:request].body_stream && request[:request].body_stream.respond_to?(:pos))
+              begin
+                request[:request].body_stream.pos = 0
+              rescue Exception => e
+                @logger.warn("Retry may fail due to unable to reset the file pointer" +
+                             " -- #{self.class.name} : #{e.inspect}")
+              end
+            end
           else
             @aws.logger.info("##### Retry ##{@retries} is being performed due to a redirect.  ####")
           end
@@ -469,7 +480,7 @@ module RightAws
         # Is this a 5xx error ? 
         if @aws.last_response.code.to_s[/^5\d\d$/] 
           @aws.connection.finish "#{self.class.name}: code: #{@aws.last_response.code}: '#{@aws.last_response.message}'" 
-        # Is this a 4xxx error ? 
+        # Is this a 4xx error ? 
         elsif @aws.last_response.code.to_s[/^4\d\d$/] && @close_on_4xx_probability > rand(100) 
           @aws.connection.finish "#{self.class.name}: code: #{@aws.last_response.code}: '#{@aws.last_response.message}', " + 
                                  "probability: #{@close_on_4xx_probability}%"           
