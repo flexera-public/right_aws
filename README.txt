@@ -82,6 +82,11 @@ multithreaded mode.
 
 == KNOWN ISSUES:
 
+- Attempting to use the Gibberish plugin (used by the Beast forum app) 
+  will break right_aws as well as lots of other code.  Gibberish
+  changes the semantics of core Ruby (specifically, the String class) and thus presents a reliability
+  problem for most Ruby programs.
+
 - 2/11/08: If you use RightAws in conjunction with attachment_fu, the
   right_aws gem must be included (using the require statement) AFTER
   attachment_fu.  If right_aws is loaded before attachment_fu, you'll
