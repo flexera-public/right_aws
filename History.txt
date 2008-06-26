@@ -217,6 +217,8 @@ Initial release.
   * ec2: c1.medium and c1.xlarge types support
   
 * r4374, konstantin, 2008-06-26 11:30:17 +0400 (Thi, 26 June 2008), 3 lines
-  * #978, right_aws gem: API 2008-05-05 support added (EBS improvements)
+  * #978, API 2008-05-05 support added (EBS improvements)
 
+* r4375, konstantin, 2008-06-26 13:31:20 +0400 (Thi, 26 June 2008), 4 lines
+  * #1053, File#lstat support for Windows platform (thanks to Benjamin)
 
