@@ -129,7 +129,7 @@ Initial release.
 * r2922, todd, 2008-03-03 15:26:42 -0800 (Mon, 03 Mar 2008), 2 lines
   * couple of documentation tweaks in prep for 1.6.0
 
-== 1.6.1 2008-03-14
+== 1.6.1
 
 * r2963, todd, 2008-03-06 19:10:23 -0800 (Thu, 06 Mar 2008), 3 lines
   * (#950) Many minor fixes in incrementally_list_bucket to prevent a death loop
@@ -145,10 +145,10 @@ Initial release.
 * r3264, konstantin, 2008-03-28 18:32:10 +0300 (Fri, 28 Mar 2008), 1 line
   * #978, EBS support added
 
-* r3288, konstantin, 2008-03-31 17:53:10 +0400 (–ü–Ω–¥, 31 –ú–∞—Ä 2008), 5 lines
-  * 1. remove code duplication on the methods being cached
-  * 2. add describe_availability_zones to cached methods
-  * 3. refactor EBS methods output keys
+* r3288, konstantin, 2008-03-31 17:53:10 +0400 (Mon, 31 Mar 2008), 5 lines
+  1. remove code duplication on the methods being cached
+  2. add describe_availability_zones to cached methods
+  3. refactor EBS methods output keys
 
 * r3204, todd, 2008-03-26 17:50:45 -0700 (Wed, 26 Mar 2008), 4 lines
   * Do not autoload right_sdb with the rest of the modules; it requires uuidtools.
@@ -183,13 +183,13 @@ Initial release.
   * right_aws 1.8.0: get volume size as string
 
 * r3288, konstantin, 2008-03-31 17:53:10 +0400 (Mon, 31 Mar 2008), 5 lines
-  * 1. remove code duplication on the methods being cached
-  * 2. add describe_availability_zones to cached methods
-  * 3. refactor EBS methods output keys
+  1. remove code duplication on the methods being cached
+  2. add describe_availability_zones to cached methods
+  3. refactor EBS methods output keys
 
 * r3286, konstantin, 2008-03-31 06:45:19 -0700 (Mon, 31 Mar 2008), 4 lines
-  * 1. remove code duplication on the methods being cached
-  * 2. add describe_availability_zones to cached methods
+  1. remove code duplication on the methods being cached
+  2. add describe_availability_zones to cached methods
 
 * r3351, todd, 2008-04-04 02:14:45 +0400 (Fri, 04 Apr 2008), 1 line
   * Fix escaping problem in SqsGen2Interface: POST bodies did not properly escape the '&' character
@@ -198,24 +198,25 @@ Initial release.
   * Port all 1.7.0/1.7.1 branch changes back to trunk
 
 * r3427, konstantin, 2008-04-08 21:01:04 +0400 (Tue, 08 Apr 2008), 5 lines
-  * 1. #1018, signature version '0' support added for: Ec2, SQS, SDB (Jurgen thanks)
-  * 2. #1017, perform sha1 digest calculation once only
+  1. #1018, signature version '0' support added for: Ec2, SQS, SDB (Jurgen thanks)
+  2. #1017, perform sha1 digest calculation once only
 
 * r3678, konstantin, 2008-04-29 15:38:57 +0400 (Tue, 29 Apr 2008), 1 line
-  * 1. #1086, right_aws active_support dependency removal from S3Interface#generate_link
-  * 2. S3Interface#get_link doc improved
+  1. #1086, right_aws active_support dependency removal from S3Interface#generate_link
+  2. S3Interface#get_link doc improved
 
 * r3823, konstantin, 2008-05-12 18:05:29 +0400 (Mon, 12 May 2008), 11 lines
   * #1141
-    Fixed:
-      - RightAWSParser#text method ('ETag' field was parsed incorrectly)
-    Added:
-      - RightAws::S3Interface : rename, copy and move methods
-      - RightAws::S3::Bucket  : rename_key, copy_key and move_key methods
-      - RightAws::S3::Key     : rename, copy, move, reload_meta and save_meta methods
-    Improved:
-     - test_right_s3.rb to test all the methods above
+    * Fixed: RightAWSParser#text method ('ETag' field was parsed incorrectly)
+    * Added: RightAws::S3Interface : rename, copy and move methods
+    * Added: RightAws::S3::Bucket  : rename_key, copy_key and move_key methods
+    * Added: RightAws::S3::Key     : rename, copy, move, reload_meta and save_meta methods
+    * Improved: test_right_s3.rb to test all the methods above
  
 * r3940, konstantin, 2008-05-20 14:56:06 +0400 (Tue, 20 May 2008), 4 lines
   * ec2: c1.medium and c1.xlarge types support
   
+* r4374, konstantin, 2008-06-26 11:30:17 +0400 (Thi, 26 June 2008), 3 lines
+  * #978, right_aws gem: API 2008-05-05 support added (EBS improvements)
+
+

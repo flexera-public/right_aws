@@ -656,3 +656,13 @@ module RightAws
   end
 
 end
+
+# File.lstat.size doesn't report large sizes correctly in Ruby 1.8 (Windows).
+if RUBY_PLATFORM[/mswin|mingw|bccwin|wince/i]
+  require 'win32/file'
+  class File
+    def lstat
+      self.stat
+    end
+  end
+end
