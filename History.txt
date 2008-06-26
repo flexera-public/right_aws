@@ -89,163 +89,133 @@ Initial release.
     (The Ec2 functions are being cached: describe_images, describe_instances, 
     describe_security_groups and describe_key_pairs)
 
-== 1.4.5
-== 1.4.6
-*r 2619, konstantin, 01-17-08 16:18:36  +0300
+== 1.4.5 - 1.4.6
+* r 2619, konstantin, 01-17-08 16:18:36  +0300
   * S3 Location constraints support added.
   * Fixed bug with trailing '/' in the bucket name for 'EU' located buckets
   * Added: S3Interface#bucket_location, S3::Bucket#location
 
 == 1.4.7
-*r 2622, konstantin, 01-18-08 13:52:20  +0300
+* r 2622, konstantin, 01-18-08 13:52:20  +0300
   * Virtual domains doc added
   * S3 Query API fixed to support virtual domains.
 
 == 1.4.8
-*r 2650, konstantin, 01-24-08 11:12:00  +0300
+* r 2650, konstantin, 01-24-08 11:12:00  +0300
   * net_fix.rb moved to right_http_connection
 
 == 1.5.0
-*r 2688, konstantin, 02-30-08 15:42:00  +0300
+* r 2688, konstantin, 02-30-08 15:42:00  +0300
   * SDB support added.
   * RightAws::S3::bucket and RightAws::S3::Bucket.create methods behaviour 
     changed: param +create+ is set to +false+ by default.
 
 == 1.6.0
 
-r2780 | todd | 2008-02-11 11:41:07 -0800 (Mon, 11 Feb 2008) | 4 lines
-Some doc updates & tweaks: we now support ultra-large PUTs to S3, small SDB
-cleanups, add SDB to the list of interfaces in RightAws, update some copyrights,
-warn about loading attachment_fu AFTER right_aws (big no-no).
+* r2780, todd, 2008-02-11 11:41:07 -0800 (Mon, 11 Feb 2008), 4 lines
+  * Some doc updates & tweaks: we now support ultra-large PUTs to S3, small SDB
+    cleanups, add SDB to the list of interfaces in RightAws, update some copyrights,
+    warn about loading attachment_fu AFTER right_aws (big no-no).
 
-r2784 | todd | 2008-02-11 13:46:47 -0800 (Mon, 11 Feb 2008) | 2 lines
-One final clarification: you may get a Net::HTTP bad monkey patch exception
+* r2784, todd, 2008-02-11 13:46:47 -0800 (Mon, 11 Feb 2008), 2 lines
+  * One final clarification: you may get a Net::HTTP bad monkey patch exception
 
-r2880 | todd | 2008-02-25 18:06:22 -0800 (Mon, 25 Feb 2008) | 2 lines
-Add SQS 'Gen 2' interface implementation
+* r2880, todd, 2008-02-25 18:06:22 -0800 (Mon, 25 Feb 2008), 2 lines
+  * Add SQS 'Gen 2' interface implementation
 
-r2913 | todd | 2008-02-29 16:57:07 -0800 (Fri, 29 Feb 2008) | 3 lines
-SqsGen2 (object interface), unit tests for both interfaces, documentation
-updates.
+* r2913, todd, 2008-02-29 16:57:07 -0800 (Fri, 29 Feb 2008), 3 lines
+  * SqsGen2 (object interface), unit tests for both interfaces, documentation updates.
 
-r2922 | todd | 2008-03-03 15:26:42 -0800 (Mon, 03 Mar 2008) | 2 lines
-couple of documentation tweaks in prep for 1.6.0
+* r2922, todd, 2008-03-03 15:26:42 -0800 (Mon, 03 Mar 2008), 2 lines
+  * couple of documentation tweaks in prep for 1.6.0
 
 == 1.6.1 2008-03-14
 
-------------------------------------------------------------------------
-r2963 | todd | 2008-03-06 19:10:23 -0800 (Thu, 06 Mar 2008) | 3 lines
-
-(#950) Many minor fixes in incrementally_list_bucket to prevent a death loop
-in
-certain rare conditions
-
+* r2963, todd, 2008-03-06 19:10:23 -0800 (Thu, 06 Mar 2008), 3 lines
+  * (#950) Many minor fixes in incrementally_list_bucket to prevent a death loop
+    in certain rare conditions
 
 == 1.7.0
 
-r3051 | konstantin | 2008-03-14 21:26:12 +0300 (Fri, 14 Mar 2008) | 1 line
-#897, ActiveSdb alpha release
-
-#897, ActiveSdb alpha release
+* r3051, konstantin, 2008-03-14 21:26:12 +0300 (Fri, 14 Mar 2008), 1 line
+  * #897, ActiveSdb alpha release
 
 == 1.8.0
 
-r3264 | konstantin | 2008-03-28 18:32:10 +0300 (Fri, 28 Mar 2008) | 1 line
-#978, EBS support added
+* r3264, konstantin, 2008-03-28 18:32:10 +0300 (Fri, 28 Mar 2008), 1 line
+  * #978, EBS support added
 
-r3288 | konstantin | 2008-03-31 17:53:10 +0400 (–ü–Ω–¥, 31 –ú–∞—Ä 2008) | 5 lines
-1. remove code duplication on the methods being cached
-2. add describe_availability_zones to cached methods
-3. refactor EBS methods output keys
-=======
+* r3288, konstantin, 2008-03-31 17:53:10 +0400 (–ü–Ω–¥, 31 –ú–∞—Ä 2008), 5 lines
+  * 1. remove code duplication on the methods being cached
+  * 2. add describe_availability_zones to cached methods
+  * 3. refactor EBS methods output keys
 
-------------------------------------------------------------------------
-r3204 | todd | 2008-03-26 17:50:45 -0700 (Wed, 26 Mar 2008) | 4 lines
+* r3204, todd, 2008-03-26 17:50:45 -0700 (Wed, 26 Mar 2008), 4 lines
+  * Do not autoload right_sdb with the rest of the modules; it requires uuidtools.
+    We want the user to explicly request ActiveSdb, at least as long as it is
+    alpha/beta.
 
-Do not autoload right_sdb with the rest of the modules; it requires uuidtools.
-We want the user to explicly request ActiveSdb, at least as long as it is
-alpha/beta.
+* r3220, konstantin, 2008-03-26 23:03:51 -0700 (Wed, 26 Mar 2008), 1 line
+  * mark ActiveSdb release as alpha,(port to 1.7.0)
 
-------------------------------------------------------------------------
-r3220 | konstantin | 2008-03-26 23:03:51 -0700 (Wed, 26 Mar 2008) | 1 line
+* r3229, konstantin, 2008-03-27 03:43:17 -0700 (Thu, 27 Mar 2008), 1 line
+  * aws pcode fix (release 2.5)
 
-mark ActiveSdb release as alpha,(port to 1.7.0)
-------------------------------------------------------------------------
-r3229 | konstantin | 2008-03-27 03:43:17 -0700 (Thu, 27 Mar 2008) | 1 line
+* r3243, todd, 2008-03-27 12:10:49 -0700 (Thu, 27 Mar 2008), 1 line
+  * (#991) Bring SqsGen2::Queue.pop fix into 1.7.0.  Also bring removal of
+    uuidtools dependency.
 
-aws pcode fix (release 2.5)
-------------------------------------------------------------------------
-r3243 | todd | 2008-03-27 12:10:49 -0700 (Thu, 27 Mar 2008) | 1 line
+* r3249, todd, 2008-03-27 17:59:14 -0700 (Thu, 27 Mar 2008), 1 line
+  * (#991) Print an informational message if the require of uuidtools fails for
+    ActiveSdb.  Update RDoc to show how to include ActiveSdb class.  Update README
+    to point to ActiveSdb RDoc.
 
-(#991) Bring SqsGen2::Queue.pop fix into 1.7.0.  Also bring removal of
-uuidtools dependency.
-------------------------------------------------------------------------
-r3249 | todd | 2008-03-27 17:59:14 -0700 (Thu, 27 Mar 2008) | 1 line
+* r3250, todd, 2008-03-27 18:03:09 -0700 (Thu, 27 Mar 2008), 2 lines
+  * (#991) Change manifest entry from right_sdb to active_sdb
 
-(#991) Print an informational message if the require of uuidtools fails for
-ActiveSdb.  Update RDoc to show how to include ActiveSdb class.  Update README
-to point to ActiveSdb RDoc.
-------------------------------------------------------------------------
-r3250 | todd | 2008-03-27 18:03:09 -0700 (Thu, 27 Mar 2008) | 2 lines
+* r3251, todd, 2008-03-27 18:03:33 -0700 (Thu, 27 Mar 2008), 1 line
+  * (#991) Rename file from right_sdb to active_sdb.
 
-(#991) Change manifest entry from right_sdb to active_sdb
-------------------------------------------------------------------------
-r3251 | todd | 2008-03-27 18:03:33 -0700 (Thu, 27 Mar 2008) | 1 line
+* r3289, konstantin, 2008-03-31 17:56:46 +0400 (Fri, 31 Mar 2008), 1 line
+  * right_aws 1.8.0 history fix
 
-(#991) Rename file from right_sdb to active_sdb.
-------------------------------------------------------------------------
-r3289 | konstantin | 2008-03-31 17:56:46 +0400 (Fri, 31 Mar 2008) | 1 line
+* r3292, konstantin, 2008-03-31 19:58:08 +0400 (Fri, 31 Mar 2008), 1 line
+  * right_aws 1.8.0: get volume size as string
 
-right_aws 1.8.0 history fix
-------------------------------------------------------------------------
-r3292 | konstantin | 2008-03-31 19:58:08 +0400 (Fri, 31 Mar 2008) | 1 line
+* r3288, konstantin, 2008-03-31 17:53:10 +0400 (Mon, 31 Mar 2008), 5 lines
+  * 1. remove code duplication on the methods being cached
+  * 2. add describe_availability_zones to cached methods
+  * 3. refactor EBS methods output keys
 
-right_aws 1.8.0: get volume size as string
-------------------------------------------------------------------------
-r3288 | konstantin | 2008-03-31 17:53:10 +0400 (Mon, 31 Mar 2008) | 5 lines
+* r3286, konstantin, 2008-03-31 06:45:19 -0700 (Mon, 31 Mar 2008), 4 lines
+  * 1. remove code duplication on the methods being cached
+  * 2. add describe_availability_zones to cached methods
 
-1. remove code duplication on the methods being cached
-2. add describe_availability_zones to cached methods
-3. refactor EBS methods output keys
-------------------------------------------------------------------------
-r3286 | konstantin | 2008-03-31 06:45:19 -0700 (Mon, 31 Mar 2008) | 4 lines
+* r3351, todd, 2008-04-04 02:14:45 +0400 (Fri, 04 Apr 2008), 1 line
+  * Fix escaping problem in SqsGen2Interface: POST bodies did not properly escape the '&' character
 
-1. remove code duplication on the methods being cached
-2. add describe_availability_zones to cached methods
-------------------------------------------------------------------------
-r3351 | todd | 2008-04-04 02:14:45 +0400 (Fri, 04 Apr 2008) | 1 line
+* r3374, todd, 2008-04-04 21:11:55 +0400 (Fri, 04 Apr 2008), 1 line
+  * Port all 1.7.0/1.7.1 branch changes back to trunk
 
-Fix escaping problem in SqsGen2Interface: POST bodies did not properly escape the '&' character
-------------------------------------------------------------------------
-r3374 | todd | 2008-04-04 21:11:55 +0400 (Fri, 04 Apr 2008) | 1 line
+* r3427, konstantin, 2008-04-08 21:01:04 +0400 (Tue, 08 Apr 2008), 5 lines
+  * 1. #1018, signature version '0' support added for: Ec2, SQS, SDB (Jurgen thanks)
+  * 2. #1017, perform sha1 digest calculation once only
 
-Port all 1.7.0/1.7.1 branch changes back to trunk
-------------------------------------------------------------------------
-r3427 | konstantin | 2008-04-08 21:01:04 +0400 (Tue, 08 Apr 2008) | 5 lines
+* r3678, konstantin, 2008-04-29 15:38:57 +0400 (Tue, 29 Apr 2008), 1 line
+  * 1. #1086, right_aws active_support dependency removal from S3Interface#generate_link
+  * 2. S3Interface#get_link doc improved
 
-1. #1018, signature version '0' support added for: Ec2, SQS, SDB (Jurgen thanks)
-2. #1017, perform sha1 digest calculation once only
-------------------------------------------------------------------------
-r3678 | konstantin | 2008-04-29 15:38:57 +0400 (Tue, 29 Apr 2008) | 1 line
-
-1. #1086, right_aws active_support dependency removal from S3Interface#generate_link
-2. S3Interface#get_link doc improved
-
-------------------------------------------------------------------------
-r3823 | konstantin | 2008-05-12 18:05:29 +0400 (Mon, 12 May 2008) | 11 lines
-
-#1141
-Fixed:
- - RightAWSParser#text method ('ETag' field was parsed incorrectly)
-Added:
- - RightAws::S3Interface : rename, copy and move methods
- - RightAws::S3::Bucket  : rename_key, copy_key and move_key methods
- - RightAws::S3::Key     : rename, copy, move, reload_meta and save_meta methods
-Improved:
- - test_right_s3.rb to test all the methods above
+* r3823, konstantin, 2008-05-12 18:05:29 +0400 (Mon, 12 May 2008), 11 lines
+  * #1141
+    Fixed:
+      - RightAWSParser#text method ('ETag' field was parsed incorrectly)
+    Added:
+      - RightAws::S3Interface : rename, copy and move methods
+      - RightAws::S3::Bucket  : rename_key, copy_key and move_key methods
+      - RightAws::S3::Key     : rename, copy, move, reload_meta and save_meta methods
+    Improved:
+     - test_right_s3.rb to test all the methods above
  
-------------------------------------------------------------------------
-r3940 | konstantin | 2008-05-20 14:56:06 +0400 (Tue, 20 May 2008) | 4 lines
-
- - ec2: c1.medium and c1.xlarge types support
+* r3940, konstantin, 2008-05-20 14:56:06 +0400 (Tue, 20 May 2008), 4 lines
+  * ec2: c1.medium and c1.xlarge types support
   
