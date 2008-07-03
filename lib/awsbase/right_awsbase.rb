@@ -132,6 +132,7 @@ module RightAws
       @aws_secret_access_key = aws_secret_access_key
       @params[:server]       ||= service_info[:default_host]
       @params[:port]         ||= service_info[:default_port]
+      @params[:service]      ||= service_info[:default_service]
       @params[:protocol]     ||= service_info[:default_protocol]
       @params[:multi_thread] ||= defined?(AWS_DAEMON)
       @logger = @params[:logger]
