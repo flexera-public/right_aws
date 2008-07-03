@@ -69,6 +69,7 @@ module RightAws
     # Amazon EC2 API version being used
     API_VERSION       = "2008-02-01"
     DEFAULT_HOST      = "ec2.amazonaws.com"
+    DEFAULT_PATH      = '/'
     DEFAULT_PROTOCOL  = 'https'
     DEFAULT_PORT      = 443
     
@@ -108,7 +109,8 @@ module RightAws
     def initialize(aws_access_key_id=nil, aws_secret_access_key=nil, params={})
       init({ :name             => 'EC2', 
              :default_host     => ENV['EC2_URL'] ? URI.parse(ENV['EC2_URL']).host   : DEFAULT_HOST, 
-             :default_port     => ENV['EC2_URL'] ? URI.parse(ENV['EC2_URL']).port   : DEFAULT_PORT, 
+             :default_port     => ENV['EC2_URL'] ? URI.parse(ENV['EC2_URL']).port   : DEFAULT_PORT,
+             :default_service  => ENV['EC2_URL'] ? URI.parse(ENV['EC2_URL']).path   : DEFAULT_PATH,             
              :default_protocol => ENV['EC2_URL'] ? URI.parse(ENV['EC2_URL']).scheme : DEFAULT_PROTOCOL }, 
            aws_access_key_id    || ENV['AWS_ACCESS_KEY_ID'] , 
            aws_secret_access_key|| ENV['AWS_SECRET_ACCESS_KEY'],
@@ -130,7 +132,7 @@ module RightAws
                        end
       service_hash.update('Signature' =>  AwsUtils::sign(@aws_secret_access_key, string_to_sign))
       request_params = service_hash.to_a.collect{|key,val| key + "=" + CGI::escape(val) }.join("&")
-      request        = Net::HTTP::Get.new("/?#{request_params}")
+      request        = Net::HTTP::Get.new("#{@params[:service]}?#{request_params}")
         # prepare output hash
       { :request  => request, 
         :server   => @params[:server],
