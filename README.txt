@@ -118,7 +118,7 @@ REXML parsing.
 
 == INSTALL:
 
-sudo gem install
+sudo gem install right_aws
 
 == LICENSE:
 
