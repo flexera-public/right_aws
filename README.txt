@@ -34,6 +34,8 @@ The RightScale AWS gems have been designed to provide a robust, fast, and secure
   AWS accounts.
 - Support for both first- and second-generation SQS (API versions 2007-05-01
   and 2008-01-01).  These versions of SQS are not compatible.
+- Support for signature versions 0 and 1 on SQS, SDB, and EC2.
+- Interoperability with any cloud running Eucalyptus (http://eucalyptus.cs.ucsb.edu)
 - Test suite (requires AWS account to do "live" testing).
 
 == THREADING:
