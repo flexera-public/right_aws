@@ -165,7 +165,7 @@ Initial release.
     We now reset the seek pointer of the streaming IO object to its initial position.
   - Removal of an accidental dependency on ActiveSupport in RightAws::S3Interface.get_link().
   - Monkey-patch of the Ruby File class on Windows platforms to correct a problem in lstat.
-    The lstat bug was causing very large file uploads to fail on Windows [ Contributed by Benjamin Allfree ] 
+    The lstat bug was causing failure of very large file uploads on Windows [ Contributed by Benjamin Allfree ] 
   - Fixed parsing of the ETag field for S3 objects
   
 
