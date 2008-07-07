@@ -2,7 +2,7 @@ require File.dirname(__FILE__) + '/test_helper.rb'
 
 class TestSqs < Test::Unit::TestCase
 
-  GRANTEE_EMAIL_ADDRESS = 'fester@example.com'
+  GRANTEE_EMAIL_ADDRESS = 'madhur@amazon.com'
   RIGHT_MESSAGE_TEXT    = 'Right test message'
 
   
@@ -28,6 +28,23 @@ class TestSqs < Test::Unit::TestCase
       end
     end
     queue_url
+  end
+
+  
+
+  
+  def assert_eventually_equal(value, timeout=30, failmsg="", &block)
+    start_time = Time.now.to_i
+    tries = 0
+    while(yield != value) do
+      tries += 1
+      print '-' 
+      STDOUT.flush
+      s = Time.now.to_i - start_time
+      flunk("Timeout: #{failmsg}: did not equal \"#{value}\" after #{tries} tries in #{s}s.") if s > timeout
+      sleep(1)
+      setup if (tries % 10) == 0 
+    end
   end
   
   
@@ -58,7 +75,10 @@ class TestSqs < Test::Unit::TestCase
     queue_url = @sqs.queue_url_by_name(@queue_name)
     assert @sqs.set_visibility_timeout(queue_url, 222), 'Set_visibility_timeout fail'
     sleep 20 # Amazon needs some time to change attribute
-    assert_equal 222, @sqs.get_visibility_timeout(queue_url), 'Get_visibility_timeout must return to 222'
+    #assert_equal 222, @sqs.get_visibility_timeout(queue_url), 'Get_visibility_timeout must return to 222'
+    assert_eventually_equal(222, 60, 'Get_visibility_timeout must return to 222') do
+      @sqs.get_visibility_timeout(queue_url)
+    end
   end
   
   def test_05_add_test_remove_grant
@@ -124,7 +144,9 @@ class TestSqs < Test::Unit::TestCase
     assert queue.is_a?(Rightscale::Sqs::Queue)
     wait_for_queue_url(@queue_name)
       # check that amount of queues has increased
-    assert_equal queues_size + 1, @s.queues.size
+    assert_eventually_equal(queues_size + 1, 60, "The number of queues did not increase by one") do
+      @s.queues.size
+    end
       # delete queue
     assert queue.delete
   end
@@ -185,6 +207,8 @@ class TestSqs < Test::Unit::TestCase
   end
   
   def test_24_send_size
+    queue_url = @sqs.queue_url_by_name("#{@queue_name}_24")
+    @sqs.delete_queue(queue_url)
     queue = Rightscale::Sqs::Queue.create(@s, "#{@queue_name}_24", true)
       # send 5 messages
     assert queue.push('a1')
