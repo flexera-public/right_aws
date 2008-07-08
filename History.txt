@@ -140,85 +140,33 @@ Initial release.
 * r3051, konstantin, 2008-03-14 21:26:12 +0300 (Fri, 14 Mar 2008), 1 line
   * #897, ActiveSdb alpha release
 
-== 1.8.0
+== 1.7.1
 
-* r3264, konstantin, 2008-03-28 18:32:10 +0300 (Fri, 28 Mar 2008), 1 line
-  * #978, EBS support added
-
-* r3288, konstantin, 2008-03-31 17:53:10 +0400 (Mon, 31 Mar 2008), 5 lines
-  1. remove code duplication on the methods being cached
-  2. add describe_availability_zones to cached methods
-  3. refactor EBS methods output keys
-
-* r3204, todd, 2008-03-26 17:50:45 -0700 (Wed, 26 Mar 2008), 4 lines
-  * Do not autoload right_sdb with the rest of the modules; it requires uuidtools.
+  Do not autoload right_sdb with the rest of the modules; it requires uuidtools.
     We want the user to explicly request ActiveSdb, at least as long as it is
     alpha/beta.
 
-* r3220, konstantin, 2008-03-26 23:03:51 -0700 (Wed, 26 Mar 2008), 1 line
-  * mark ActiveSdb release as alpha,(port to 1.7.0)
+  Fix escaping problem in SqsGen2Interface: POST bodies did not properly escape the '&' character
 
-* r3229, konstantin, 2008-03-27 03:43:17 -0700 (Thu, 27 Mar 2008), 1 line
-  * aws pcode fix (release 2.5)
+== 1.7.2
 
-* r3243, todd, 2008-03-27 12:10:49 -0700 (Thu, 27 Mar 2008), 1 line
-  * (#991) Bring SqsGen2::Queue.pop fix into 1.7.0.  Also bring removal of
-    uuidtools dependency.
-
-* r3249, todd, 2008-03-27 17:59:14 -0700 (Thu, 27 Mar 2008), 1 line
-  * (#991) Print an informational message if the require of uuidtools fails for
-    ActiveSdb.  Update RDoc to show how to include ActiveSdb class.  Update README
-    to point to ActiveSdb RDoc.
-
-* r3250, todd, 2008-03-27 18:03:09 -0700 (Thu, 27 Mar 2008), 2 lines
-  * (#991) Change manifest entry from right_sdb to active_sdb
-
-* r3251, todd, 2008-03-27 18:03:33 -0700 (Thu, 27 Mar 2008), 1 line
-  * (#991) Rename file from right_sdb to active_sdb.
-
-* r3289, konstantin, 2008-03-31 17:56:46 +0400 (Fri, 31 Mar 2008), 1 line
-  * right_aws 1.8.0 history fix
-
-* r3292, konstantin, 2008-03-31 19:58:08 +0400 (Fri, 31 Mar 2008), 1 line
-  * right_aws 1.8.0: get volume size as string
-
-* r3288, konstantin, 2008-03-31 17:53:10 +0400 (Mon, 31 Mar 2008), 5 lines
-  1. remove code duplication on the methods being cached
-  2. add describe_availability_zones to cached methods
-  3. refactor EBS methods output keys
-
-* r3286, konstantin, 2008-03-31 06:45:19 -0700 (Mon, 31 Mar 2008), 4 lines
-  1. remove code duplication on the methods being cached
-  2. add describe_availability_zones to cached methods
-
-* r3351, todd, 2008-04-04 02:14:45 +0400 (Fri, 04 Apr 2008), 1 line
-  * Fix escaping problem in SqsGen2Interface: POST bodies did not properly escape the '&' character
-
-* r3374, todd, 2008-04-04 21:11:55 +0400 (Fri, 04 Apr 2008), 1 line
-  * Port all 1.7.0/1.7.1 branch changes back to trunk
-
-* r3427, konstantin, 2008-04-08 21:01:04 +0400 (Tue, 08 Apr 2008), 5 lines
-  1. #1018, signature version '0' support added for: Ec2, SQS, SDB (Jurgen thanks)
-  2. #1017, perform sha1 digest calculation once only
-
-* r3678, konstantin, 2008-04-29 15:38:57 +0400 (Tue, 29 Apr 2008), 1 line
-  1. #1086, right_aws active_support dependency removal from S3Interface#generate_link
-  2. S3Interface#get_link doc improved
-
-* r3823, konstantin, 2008-05-12 18:05:29 +0400 (Mon, 12 May 2008), 11 lines
-  * #1141
-    * Fixed: RightAWSParser#text method ('ETag' field was parsed incorrectly)
-    * Added: RightAws::S3Interface : rename, copy and move methods
-    * Added: RightAws::S3::Bucket  : rename_key, copy_key and move_key methods
-    * Added: RightAws::S3::Key     : rename, copy, move, reload_meta and save_meta methods
-    * Improved: test_right_s3.rb to test all the methods above
- 
-* r3940, konstantin, 2008-05-20 14:56:06 +0400 (Tue, 20 May 2008), 4 lines
-  * ec2: c1.medium and c1.xlarge types support
+  Release Notes:
   
-* r4374, konstantin, 2008-06-26 11:30:17 +0400 (Thi, 26 June 2008), 3 lines
-  * #978, API 2008-05-05 support added (EBS improvements)
+  RightAws includes some new features, including:
+  - Support in RightAws::S3 and RightAws::S3Interface for S3 key copy, move, and rename
+  - Support for signature version 0 request authentication to EC2, SQS, and SDB
+  - Enhanced S3 object meta-header read and update
+  - Interoperability with clouds running Eucalyptus (http://eucalyptus.cs.ucsb.edu)
+    [ Contributed by the Eucalyptus group ]
+  - Support for c1.medium and c1.xlarge instance types
 
-* r4375, konstantin, 2008-06-26 13:31:20 +0400 (Thi, 26 June 2008), 4 lines
-  * #1053, File#lstat support for Windows platform (thanks to Benjamin)
+  Bug fixes include:
+  - Corrected the failure, under certain conditions, of retries of streaming PUTs to S3.
+    We now reset the seek pointer of the streaming IO object to its initial position.
+  - Removal of an accidental dependency on ActiveSupport in RightAws::S3Interface.get_link().
+  - Monkey-patch of the Ruby File class on Windows platforms to correct a problem in lstat.
+    The lstat bug was causing failure of very large file uploads on Windows [ Contributed by Benjamin Allfree ] 
+  - Fixed parsing of the ETag field for S3 objects
+  
+
 

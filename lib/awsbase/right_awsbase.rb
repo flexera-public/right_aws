@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2007 RightScale Inc
+# Copyright (c) 2007-2008 RightScale Inc
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -658,12 +658,3 @@ module RightAws
 
 end
 
-# File.lstat.size doesn't report large sizes correctly in Ruby 1.8 (Windows).
-if RUBY_PLATFORM[/mswin|mingw|bccwin|wince/i]
-  require 'win32/file'
-  class File
-    def lstat
-      self.stat
-    end
-  end
-end

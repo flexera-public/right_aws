@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2007 RightScale Inc
+# Copyright (c) 2007-2008 RightScale Inc
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -862,7 +862,7 @@ module RightAws
   #-----------------------------------------------------------------
   #      EBS: Volumes
   #-----------------------------------------------------------------
-
+  
     # Describe all EBS volumes.
     #
     #  ec2.describe_volumes #=> 
@@ -890,7 +890,7 @@ module RightAws
     rescue Exception
       on_exception
     end
-
+    
     # Create new EBS volume based on previously created snapshot. 
     # +Size+ in Gigabytes.
     #
@@ -1379,7 +1379,7 @@ module RightAws
   #-----------------------------------------------------------------
   #      PARSERS: EBS - Volumes
   #-----------------------------------------------------------------
-  
+ 
     class QEc2CreateVolumeParser < RightAWSParser #:nodoc:
       def tagend(name)
         case name 
@@ -1395,7 +1395,7 @@ module RightAws
         @result = {}
       end
     end
-
+    
     class QEc2AttachAndDetachVolumeParser < RightAWSParser #:nodoc:
       def tagend(name)
         case name 
@@ -1404,20 +1404,20 @@ module RightAws
           when 'device'     then @result[:aws_device]            = @text
           when 'status'     then @result[:aws_attachment_status] = @text
           when 'attachTime' then @result[:aws_attached_at]       = Time.parse(@text)
-        end
+  end
       end
       def reset
         @result = {}
       end
     end
-    
+      
     class QEc2DescribeVolumesParser < RightAWSParser #:nodoc:
       def tagstart(name, attributes)
         case name
         when 'item'
           case @xmlpath
           when 'DescribeVolumesResponse/volumeSet' then @volume = {}
-          end
+end
         end
       end
       def tagend(name)

@@ -19,21 +19,15 @@
 # LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-#
-#
 
 
-# A hack because there's a bug in add! in Benchmark::Tms
-module Benchmark  #:nodoc:
-  class Tms #:nodoc:
-    def add!(&blk)
-      t = Benchmark::measure(&blk)
-      @utime  = utime + t.utime
-      @stime  = stime + t.stime
-      @cutime = cutime + t.cutime
-      @cstime = cstime + t.cstime
-      @real   = real + t.real
-      self
+
+# File.lstat.size doesn't report large sizes correctly in Ruby 1.8 (Windows).
+if RUBY_PLATFORM[/mswin|mingw|bccwin|wince/i]
+  require 'win32/file'
+  class File
+    def lstat
+      self.stat
     end
   end
 end
