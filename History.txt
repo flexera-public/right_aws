@@ -167,6 +167,13 @@ Initial release.
   - Monkey-patch of the Ruby File class on Windows platforms to correct a problem in lstat.
     The lstat bug was causing failure of very large file uploads on Windows [ Contributed by Benjamin Allfree ] 
   - Fixed parsing of the ETag field for S3 objects
+
+-- 1.7.3
+
+  Release Notes:
+
+  - Removed the 1.7.2 monkey-patch of the Ruby File class on Windows.  This patch broke Rails 2.0.
+    The patch is now included in the README for anyone to use at their own risk.
   
 
 
