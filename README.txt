@@ -84,6 +84,18 @@ multithreaded mode.
 
 == KNOWN ISSUES:
 
+- 7/08: A user has reported that uploads of large files on Windows may be broken on some
+  Win platforms due to a buggy File.lstat.size.  Use the following monkey-patch at your own risk, 
+  as it has been proven to break Rails 2.0 on Windows:
+
+    require 'win32/file'
+    class File
+      def lstat
+        self.stat
+      end
+    end
+
+
 - Attempting to use the Gibberish plugin (used by the Beast forum app) 
   will break right_aws as well as lots of other code.  Gibberish
   changes the semantics of core Ruby (specifically, the String class) and thus presents a reliability
