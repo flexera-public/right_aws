@@ -33,6 +33,7 @@ module RightAws
     DEFAULT_PORT      = 443
     DEFAULT_PROTOCOL  = 'https'
     API_VERSION       = '2007-11-07'
+    DEFAULT_NIL_REPRESENTATION = 'nil'
 
     @@bench = AwsBenchmarkingBlock.new
     def self.bench_xml; @@bench.xml;     end
@@ -46,7 +47,8 @@ module RightAws
     #      :protocol     => 'https'              # Amazon service protocol: 'http' or 'https'(default)
     #      :signature_version => '0'             # The signature version : '0' or '1'(default)
     #      :multi_thread => true|false           # Multi-threaded (connection per each thread): true or false(default)
-    #      :logger       => Logger Object}       # Logger instance: logs to STDOUT if omitted }
+    #      :logger       => Logger Object        # Logger instance: logs to STDOUT if omitted 
+    #      :nil_representation => 'mynil'}       # interpret Ruby nil as this string value; i.e. use this string in SDB to represent nils
     #      
     # Example:
     # 
@@ -55,6 +57,8 @@ module RightAws
     # see: http://docs.amazonwebservices.com/AmazonSimpleDB/2007-11-07/DeveloperGuide/
     #
     def initialize(aws_access_key_id=nil, aws_secret_access_key=nil, params={})
+      @nil_rep = params[:nil_representation] ? params[:nil_representation] : DEFAULT_NIL_REPRESENTATION
+      params.delete(:nil_representation)
       init({ :name             => 'SDB', 
              :default_host     => ENV['SDB_URL'] ? URI.parse(ENV['SDB_URL']).host   : DEFAULT_HOST, 
              :default_port     => ENV['SDB_URL'] ? URI.parse(ENV['SDB_URL']).port   : DEFAULT_PORT, 
@@ -69,8 +73,8 @@ module RightAws
     #-----------------------------------------------------------------
     def generate_request(action, params={}) #:nodoc:
       # remove empty params from request
-      params.delete_if {|key,value| value.blank? }
-      params_string  = params.to_a.collect{|key,val| key + "=#{CGI::escape(val.to_s)}" }.join("&")
+      params.delete_if {|key,value| value.nil? }
+      #params_string  = params.to_a.collect{|key,val| key + "=#{CGI::escape(val.to_s)}" }.join("&")
       # prepare service data
       service_hash = {"Action"            => action,
                       "AWSAccessKeyId"    => @aws_access_key_id,
@@ -88,12 +92,12 @@ module RightAws
       #
       # use POST method if the length of the query string is too large
       # see http://docs.amazonwebservices.com/AmazonSimpleDB/2007-11-07/DeveloperGuide/MakingRESTRequests.html
-      if (service_string + params_string).size > 2000
-        request      = Net::HTTP::Post.new("/?#{service_string}")
-        request.body = params_string
+      if service_string.size > 2000
+        request      = Net::HTTP::Post.new("/")
+        request.body = service_string
       else
-        params_string = "&#{params_string}" unless params_string.blank?
-        request       = Net::HTTP::Get.new("/?#{service_string}#{params_string}")
+        #params_string = "&#{params_string}" unless params_string.blank?
+        request       = Net::HTTP::Get.new("/?#{service_string}")
       end
       # prepare output hash
       { :request  => request, 
@@ -120,14 +124,15 @@ module RightAws
           # set replacement attribute
           result["Attribute.#{idx}.Replace"] = 'true' if replace
           # pack Name/Value
-          unless values.blank?
-            values.to_a.each do |value|
+          unless values.nil?
+            Array(values).each do |value|
               result["Attribute.#{idx}.Name"]  = attribute
-              result["Attribute.#{idx}.Value"] = value 
+              result["Attribute.#{idx}.Value"] = ruby_to_sdb(value) 
               idx += 1
             end
           else
             result["Attribute.#{idx}.Name"] = attribute
+            result["Attribute.#{idx}.Value"] = ruby_to_sdb(nil) 
             idx += 1
           end
         end
@@ -142,6 +147,18 @@ module RightAws
     #
     def escape(value)
       %Q{'#{value.to_s.gsub(/(['\\])/){ "\\#{$1}" }}'} if value
+    end
+    
+    # Convert a Ruby language value to a SDB value by replacing Ruby nil with the user's chosen string representation of nil.
+    # Non-nil values are unaffected by this filter.
+    def ruby_to_sdb(value)
+      value.nil? ? @nil_rep : value
+    end
+    
+    # Convert a SDB value to a Ruby language value by replacing the user's chosen string representation of nil with Ruby nil.
+    # Values are unaffected by this filter unless they match the nil representation exactly.
+    def sdb_to_ruby(value)
+      value.eql?(@nil_rep) ? nil : value
     end
     
     # Create query expression from an array.
@@ -324,7 +341,11 @@ module RightAws
       link = generate_request("GetAttributes", 'DomainName'    => domain_name,
                                                'ItemName'      => item_name,
                                                'AttributeName' => attribute_name )
-      request_info(link, QSdbGetAttributesParser.new)
+      res = request_info(link, QSdbGetAttributesParser.new)
+      res[:attributes].each_value do |values|
+        values.collect! { |e| sdb_to_ruby(e) }
+      end
+      res
     rescue Exception
       on_exception
     end
