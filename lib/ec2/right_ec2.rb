@@ -904,9 +904,9 @@ module RightAws
     #
     def create_volume(snapshot_id, size, zone)
       link = generate_request("CreateVolume", 
-                              "SnapshotId" => snapshot_id.to_s,
-                              "Size"       => size.to_s,
-                              "Zone"       => zone.to_s )
+                              "SnapshotId"        => snapshot_id.to_s,
+                              "Size"              => size.to_s,
+                              "AvailabilityZone"  => zone.to_s )
       request_info(link, QEc2CreateVolumeParser.new(:logger => @logger))
     rescue Exception
       on_exception
@@ -1383,12 +1383,12 @@ module RightAws
     class QEc2CreateVolumeParser < RightAWSParser #:nodoc:
       def tagend(name)
         case name 
-          when 'volumeId'   then @result[:aws_id]         = @text
-          when 'status'     then @result[:aws_status]     = @text
-          when 'createTime' then @result[:aws_created_at] = Time.parse(@text)
-          when 'size'       then @result[:aws_size]       = @text.to_i ###
-          when 'snapshotId' then @result[:snapshot_id]    = @text.blank? ? nil : @text ###
-          when 'zone'       then @result[:zone]           = @text ###
+          when 'volumeId'         then @result[:aws_id]         = @text
+          when 'status'           then @result[:aws_status]     = @text
+          when 'createTime'       then @result[:aws_created_at] = Time.parse(@text)
+          when 'size'             then @result[:aws_size]       = @text.to_i ###
+          when 'snapshotId'       then @result[:snapshot_id]    = @text.blank? ? nil : @text ###
+          when 'availabilityZone' then @result[:zone]           = @text ###
         end
       end
       def reset
@@ -1431,13 +1431,13 @@ end
             when 'DescribeVolumesResponse/volumeSet/item' then @volume[:aws_status] = @text
             when 'DescribeVolumesResponse/volumeSet/item/attachmentSet/item' then @volume[:aws_attachment_status] = @text
             end
-          when 'size'       then @volume[:aws_size]        = @text.to_i
-          when 'createTime' then @volume[:aws_created_at]  = Time.parse(@text)
-          when 'instanceId' then @volume[:aws_instance_id] = @text
-          when 'device'     then @volume[:aws_device]      = @text
-          when 'attachTime' then @volume[:aws_attached_at] = Time.parse(@text)
-          when 'snapshotId' then @volume[:snapshot_id]     = @text.blank? ? nil : @text
-          when 'zone'       then @volume[:zone]            = @text
+          when 'size'             then @volume[:aws_size]        = @text.to_i
+          when 'createTime'       then @volume[:aws_created_at]  = Time.parse(@text)
+          when 'instanceId'       then @volume[:aws_instance_id] = @text
+          when 'device'           then @volume[:aws_device]      = @text
+          when 'attachTime'       then @volume[:aws_attached_at] = Time.parse(@text)
+          when 'snapshotId'       then @volume[:snapshot_id]     = @text.blank? ? nil : @text
+          when 'availabilityZone' then @volume[:zone]            = @text
           when 'item' 
             case @xmlpath
             when 'DescribeVolumesResponse/volumeSet' then @result << @volume
