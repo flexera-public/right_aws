@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2007 RightScale Inc
+# Copyright (c) 2007-2008 RightScale Inc
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -69,6 +69,7 @@ module RightAws
     # Amazon EC2 API version being used
     API_VERSION       = "2008-02-01"
     DEFAULT_HOST      = "ec2.amazonaws.com"
+    DEFAULT_PATH      = '/'
     DEFAULT_PROTOCOL  = 'https'
     DEFAULT_PORT      = 443
     
@@ -108,7 +109,8 @@ module RightAws
     def initialize(aws_access_key_id=nil, aws_secret_access_key=nil, params={})
       init({ :name             => 'EC2', 
              :default_host     => ENV['EC2_URL'] ? URI.parse(ENV['EC2_URL']).host   : DEFAULT_HOST, 
-             :default_port     => ENV['EC2_URL'] ? URI.parse(ENV['EC2_URL']).port   : DEFAULT_PORT, 
+             :default_port     => ENV['EC2_URL'] ? URI.parse(ENV['EC2_URL']).port   : DEFAULT_PORT,
+             :default_service  => ENV['EC2_URL'] ? URI.parse(ENV['EC2_URL']).path   : DEFAULT_PATH,             
              :default_protocol => ENV['EC2_URL'] ? URI.parse(ENV['EC2_URL']).scheme : DEFAULT_PROTOCOL }, 
            aws_access_key_id    || ENV['AWS_ACCESS_KEY_ID'] , 
            aws_secret_access_key|| ENV['AWS_SECRET_ACCESS_KEY'],
@@ -125,12 +127,12 @@ module RightAws
       service_hash.update(params)
       # prepare string to sight
       string_to_sign = case signature_version
-                       when '0' : service_hash["Action"] + service_hash["Timestamp"]
-                       when '1' : service_hash.sort{|a,b| (a[0].to_s.downcase)<=>(b[0].to_s.downcase)}.to_s
+                       when '0' then service_hash["Action"] + service_hash["Timestamp"]
+                       when '1' then service_hash.sort{|a,b| (a[0].to_s.downcase)<=>(b[0].to_s.downcase)}.to_s
                        end
       service_hash.update('Signature' =>  AwsUtils::sign(@aws_secret_access_key, string_to_sign))
       request_params = service_hash.to_a.collect{|key,val| key + "=" + CGI::escape(val) }.join("&")
-      request        = Net::HTTP::Get.new("/?#{request_params}")
+      request        = Net::HTTP::Get.new("#{@params[:service]}?#{request_params}")
         # prepare output hash
       { :request  => request, 
         :server   => @params[:server],
@@ -857,166 +859,7 @@ module RightAws
       on_exception
     end
 
-  #-----------------------------------------------------------------
-  #      EBS: Volumes
-  #-----------------------------------------------------------------
-
-    # Describe all EBS volumes.
-    #
-    #  ec2.describe_volumes #=> 
-    #    [{ :aws_id         => "vol-5782673e",
-    #       :aws_status     => "available",
-    #       :aws_created_at => "2008-02-23T16:47:19.000Z",
-    #       :aws_size       => "1000001765375"},
-    #     { :aws_id         =>"vol-268a6f4f",
-    #       :aws_status     => "in-use",
-    #       :aws_created_at => "2008-03-26T15:54:38.000Z",
-    #       :aws_size       => 1073741824,
-    #       :aws_attachment_status => "attached",
-    #       :aws_instance_id => "i-067db86f",
-    #       :aws_device      => "/dev/sdj",
-    #       :aws_attached_at => "2008-03-29T17:46:01.000Z"}, ... ]
-    #
-    def describe_volumes(list=[])
-      link = generate_request("DescribeVolumes", 
-                              hash_params('VolumeId',list.to_a))
-      request_cache_or_info :describe_volumes, link,  QEc2DescribeVolumesParser, list.blank?
-    rescue Exception
-      on_exception
-    end
-
-    # Create new EBS volume based on previously created snapshot.
-    #
-    #  ec2.create_volume('snap-000000', 10*.megabyte*1024*1024*1024) #=> 
-    #    { :aws_created_at => "2008-03-28T13:03:33.000Z",
-    #      :aws_status     => "creating",
-    #      :aws_id         => "vol-b48a6fdd",
-    #      :aws_size       => "100931731456" }
-    #
-    def create_volume(snapshot_id, size)
-      link = generate_request("CreateVolume", 
-                              "SnapshotId" => snapshot_id.to_s,
-                              "Size"       => size.to_s  )
-      request_info(link, QEc2CreateAndDeleteVolumeParser.new(:logger => @logger))
-    rescue Exception
-      on_exception
-    end
-
-    # Delete the specified EBS volume. 
-    # This does not deletes any snapshots created from this volume.
-    #
-    #  ec2.delete_volume('vol-b48a6fdd') #=> 
-    #    { :aws_created_at => "2008-03-28T13:03:33.000Z",
-    #      :aws_status     => "deleting",
-    #      :aws_id         => "vol-b48a6fdd",
-    #      :aws_size       => "100931731456" }
-    #
-    def delete_volume(volume_id)
-      link = generate_request("DeleteVolume", 
-                              "VolumeId" => volume_id.to_s)
-      request_info(link, QEc2CreateAndDeleteVolumeParser.new(:logger => @logger))
-    rescue Exception
-      on_exception
-    end
-    
-    # Attach the specified EBS volume to a specified instance, exposing the
-    # volume using the specified device name.
-    #
-    #  ec2.attach_volume('vol-898a6fe0', 'i-7c905415', '/dev/sdh') #=>
-    #    { :aws_instance_id => "i-7c905415",
-    #      :aws_device      => "/dev/sdh",
-    #      :aws_status      => "attaching",
-    #      :aws_attached_at => "2008-03-28T14:14:39.000Z",
-    #      :aws_id          => "vol-898a6fe0" }
-    #
-    def attach_volume(volume_id, instance_id, device)
-      link = generate_request("AttachVolume", 
-                              "VolumeId"   => volume_id.to_s,
-                              "InstanceId" => instance_id.to_s,
-                              "Device"     => device.to_s)
-      request_info(link, QEc2AttachAndDetachVolumeParser.new(:logger => @logger))
-    rescue Exception
-      on_exception
-    end
-    
-    # Detach the specified EBS volume from the instance to which it is attached.
-    # 
-    #   ec2.detach_volume('vol-898a6fe0', 'i-7c905415') #=> 
-    #     { :aws_instance_id => "i-7c905415",
-    #       :aws_device      => "/dev/sdh",
-    #       :aws_status      => "detaching",
-    #       :aws_attached_at => "2008-03-28T14:38:34.000Z",
-    #       :aws_id          => "vol-898a6fe0"}
-    #
-    def detach_volume(volume_id, instance_id)
-      link = generate_request("DetachVolume", 
-                              "VolumeId"   => volume_id.to_s,
-                              "InstanceId" => instance_id.to_s)
-      request_info(link, QEc2AttachAndDetachVolumeParser.new(:logger => @logger))
-    rescue Exception
-      on_exception
-    end
-
-    
-  #-----------------------------------------------------------------
-  #      EBS: Snapshots
-  #-----------------------------------------------------------------
-
-     # Describe all EBS snapshots.
-     #
-     # ec2.describe_snapshots #=> 
-     #   [ { :aws_progress   => "100%",
-     #       :aws_status     => "completed",
-     #       :aws_id         => "snap-72a5401b",
-     #       :aws_volume_id  => "vol-5582673c",
-     #       :aws_started_at => "2008-02-23T02:50:48.000Z"},
-     #     { :aws_progress   => "100%",
-     #       :aws_status     => "completed",
-     #       :aws_id         => "snap-75a5401c",
-     #       :aws_volume_id  => "vol-5582673c",
-     #       :aws_started_at => "2008-02-23T16:23:19.000Z" },...]
-     #
-    def describe_snapshots(list=[])
-      link = generate_request("DescribeSnapshots", 
-                              hash_params('SnapshotId',list.to_a))
-      request_cache_or_info :describe_snapshots, link,  QEc2DescribeSnapshotsParser, list.blank?
-    rescue Exception
-      on_exception
-    end
-
-    # Create a snapshot of specified volume.
-    #
-    #  ec2.create_snapshot('vol-898a6fe0') #=> 
-    #    { :aws_progress    => "",
-    #      :aws_started_at  => "2008-03-28T13:47:02.000Z",
-    #      :aws_status      => "pending",
-    #      :aws_id          => "snap-55a5403c",
-    #      :aws_volume_id   => "vol-898a6fe0" }
-    #
-    def create_snapshot(volume_id)
-      link = generate_request("CreateSnapshot", 
-                              "VolumeId" => volume_id.to_s)
-      request_info(link, QEc2CreateAndDeleteSnapshotParser.new(:logger => @logger))
-    rescue Exception
-      on_exception
-    end
-
-    # Delete the specified snapshot.
-    #
-    #  ec2.delete_snapshot('snap-55a5403c') #=> 
-    #    { :aws_progress   => "100%",
-    #      :aws_started_at => "2008-03-28T13:47:02.000Z",
-    #      :aws_status     => "deleted",
-    #      :aws_id         => "snap-55a5403c",
-    #      :aws_volume_id  => "vol-898a6fe0" }
-    #
-    def delete_snapshot(snapshot_id)
-      link = generate_request("DeleteSnapshot", 
-                              "SnapshotId" => snapshot_id.to_s)
-      request_info(link, QEc2CreateAndDeleteSnapshotParser.new(:logger => @logger))
-    rescue Exception
-      on_exception
-    end
+  
     
   #-----------------------------------------------------------------
   #      PARSERS: Boolean Response Parser
@@ -1038,9 +881,9 @@ module RightAws
       end
       def tagend(name)
         case name 
-          when 'keyName'       : @item[:aws_key_name]    = @text
-          when 'keyFingerprint': @item[:aws_fingerprint] = @text
-          when 'item'          : @result                << @item
+          when 'keyName'        then @item[:aws_key_name]    = @text
+          when 'keyFingerprint' then @item[:aws_fingerprint] = @text
+          when 'item'           then @result                << @item
         end
       end
       def reset
@@ -1054,9 +897,9 @@ module RightAws
       end
       def tagend(name)
         case name 
-          when 'keyName'       : @result[:aws_key_name]    = @text
-          when 'keyFingerprint': @result[:aws_fingerprint] = @text
-          when 'keyMaterial'   : @result[:aws_material]    = @text
+          when 'keyName'        then @result[:aws_key_name]    = @text
+          when 'keyFingerprint' then @result[:aws_fingerprint] = @text
+          when 'keyMaterial'    then @result[:aws_material]    = @text
         end
       end
     end
@@ -1104,19 +947,19 @@ module RightAws
       end
       def tagend(name)
         case name
-          when 'ownerId'          ; @group.ownerId   = @text
-          when 'groupDescription' ; @group.groupDescription = @text
+          when 'ownerId'          then @group.ownerId   = @text
+          when 'groupDescription' then @group.groupDescription = @text
           when 'groupName'
             if @xmlpath=='DescribeSecurityGroupsResponse/securityGroupInfo/item'
               @group.groupName  = @text 
             elsif @xmlpath=='DescribeSecurityGroupsResponse/securityGroupInfo/item/ipPermissions/item/groups/item'
               @sgroup.groupName = @text 
             end
-          when 'ipProtocol'       ; @perm.ipProtocol = @text
-          when 'fromPort'         ; @perm.fromPort   = @text
-          when 'toPort'           ; @perm.toPort     = @text
-          when 'userId'           ; @sgroup.userId   = @text
-          when 'cidrIp'           ; @perm.ipRanges  << @text
+          when 'ipProtocol'       then @perm.ipProtocol = @text
+          when 'fromPort'         then @perm.fromPort   = @text
+          when 'toPort'           then @perm.toPort     = @text
+          when 'userId'           then @sgroup.userId   = @text
+          when 'cidrIp'           then @perm.ipRanges  << @text
           when 'item'
             if @xmlpath=='DescribeSecurityGroupsResponse/securityGroupInfo/item/ipPermissions/item/groups'
               @perm.groups << @sgroup
@@ -1144,17 +987,17 @@ module RightAws
       end
       def tagend(name)
         case name
-          when 'imageId'       ; @image[:aws_id]       = @text
-          when 'imageLocation' ; @image[:aws_location] = @text
-          when 'imageState'    ; @image[:aws_state]    = @text
-          when 'imageOwnerId'  ; @image[:aws_owner]    = @text
-          when 'isPublic'      ; @image[:aws_is_public]= @text == 'true' ? true : false
-          when 'productCode'   ;(@image[:aws_product_codes] ||= []) << @text
-          when 'architecture'  ; @image[:aws_architecture] = @text
-          when 'imageType'     ; @image[:aws_image_type] = @text
-          when 'kernelId'      ; @image[:aws_kernel_id]  = @text
-          when 'ramdiskId'     ; @image[:aws_ramdisk_id] = @text
-          when 'item'          ; @result << @image if @xmlpath[%r{.*/imagesSet$}]
+          when 'imageId'       then @image[:aws_id]       = @text
+          when 'imageLocation' then @image[:aws_location] = @text
+          when 'imageState'    then @image[:aws_state]    = @text
+          when 'imageOwnerId'  then @image[:aws_owner]    = @text
+          when 'isPublic'      then @image[:aws_is_public]= @text == 'true' ? true : false
+          when 'productCode'   then (@image[:aws_product_codes] ||= []) << @text
+          when 'architecture'  then @image[:aws_architecture] = @text
+          when 'imageType'     then @image[:aws_image_type] = @text
+          when 'kernelId'      then @image[:aws_kernel_id]  = @text
+          when 'ramdiskId'     then @image[:aws_ramdisk_id] = @text
+          when 'item'          then @result << @image if @xmlpath[%r{.*/imagesSet$}]
         end
       end
       def reset
@@ -1187,13 +1030,13 @@ module RightAws
           # But nobody know what will they xml later as attribute. That is why we 
           # check for 'group' and 'userId' inside of 'launchPermission/item'
         case name
-          when 'imageId'            : @result[:aws_id] = @text
-          when 'group'              : @result[:groups] << @text if @xmlpath == 'DescribeImageAttributeResponse/launchPermission/item'
-          when 'userId'             : @result[:users]  << @text if @xmlpath == 'DescribeImageAttributeResponse/launchPermission/item'
-          when 'productCode'        : @result[:aws_product_codes] << @text
-          when 'kernel'             : @result[:aws_kernel]  = @text
-          when 'ramdisk'            : @result[:aws_ramdisk] = @text
-          when 'blockDeviceMapping' : @result[:block_device_mapping] = @text
+          when 'imageId'            then @result[:aws_id] = @text
+          when 'group'              then @result[:groups] << @text if @xmlpath == 'DescribeImageAttributeResponse/launchPermission/item'
+          when 'userId'             then @result[:users]  << @text if @xmlpath == 'DescribeImageAttributeResponse/launchPermission/item'
+          when 'productCode'        then @result[:aws_product_codes] << @text
+          when 'kernel'             then @result[:aws_kernel]  = @text
+          when 'ramdisk'            then @result[:aws_ramdisk] = @text
+          when 'blockDeviceMapping' then @result[:block_device_mapping] = @text
         end
       end
       def reset
@@ -1232,25 +1075,25 @@ module RightAws
       def tagend(name)
         case name 
           # reservation
-          when 'reservationId'   : @reservation[:aws_reservation_id] = @text
-          when 'ownerId'         : @reservation[:aws_owner]          = @text
-          when 'groupId'         : @reservation[:aws_groups]        << @text
+          when 'reservationId'    then @reservation[:aws_reservation_id] = @text
+          when 'ownerId'          then @reservation[:aws_owner]          = @text
+          when 'groupId'          then @reservation[:aws_groups]        << @text
           # instance  
-          when 'instanceId'      : @instance[:aws_instance_id]    = @text
-          when 'imageId'         : @instance[:aws_image_id]       = @text
-          when 'dnsName'         : @instance[:dns_name]           = @text
-          when 'privateDnsName'  : @instance[:private_dns_name]   = @text
-          when 'reason'          : @instance[:aws_reason]         = @text
-          when 'keyName'         : @instance[:ssh_key_name]       = @text
-          when 'amiLaunchIndex'  : @instance[:ami_launch_index]   = @text
-          when 'code'            : @instance[:aws_state_code]     = @text
-          when 'name'            : @instance[:aws_state]          = @text
-          when 'productCode'     : @instance[:aws_product_codes] << @text
-          when 'instanceType'    : @instance[:aws_instance_type]  = @text
-          when 'launchTime'      : @instance[:aws_launch_time]    = @text
-          when 'kernelId'        : @instance[:aws_kernel_id]      = @text
-          when 'ramdiskId'       : @instance[:aws_ramdisk_id]     = @text
-          when 'availabilityZone': @instance[:aws_availability_zone] = @text
+          when 'instanceId'       then @instance[:aws_instance_id]    = @text
+          when 'imageId'          then @instance[:aws_image_id]       = @text
+          when 'dnsName'          then @instance[:dns_name]           = @text
+          when 'privateDnsName'   then @instance[:private_dns_name]   = @text
+          when 'reason'           then @instance[:aws_reason]         = @text
+          when 'keyName'          then @instance[:ssh_key_name]       = @text
+          when 'amiLaunchIndex'   then @instance[:ami_launch_index]   = @text
+          when 'code'             then @instance[:aws_state_code]     = @text
+          when 'name'             then @instance[:aws_state]          = @text
+          when 'productCode'      then @instance[:aws_product_codes] << @text
+          when 'instanceType'     then @instance[:aws_instance_type]  = @text
+          when 'launchTime'       then @instance[:aws_launch_time]    = @text
+          when 'kernelId'         then @instance[:aws_kernel_id]      = @text
+          when 'ramdiskId'        then @instance[:aws_ramdisk_id]     = @text
+          when 'availabilityZone' then @instance[:aws_availability_zone] = @text
           when 'item'
             if @xmlpath == 'DescribeInstancesResponse/reservationSet/item/instancesSet' || # DescribeInstances property
                @xmlpath == 'RunInstancesResponse/instancesSet'            # RunInstances property
@@ -1258,7 +1101,7 @@ module RightAws
             elsif @xmlpath=='DescribeInstancesResponse/reservationSet'    # DescribeInstances property
               @result << @reservation
             end
-          when 'RunInstancesResponse': @result << @reservation            # RunInstances property
+          when 'RunInstancesResponse' then @result << @reservation            # RunInstances property
         end
       end
       def reset
@@ -1278,7 +1121,7 @@ module RightAws
       end
       def tagend(name)
         case name
-        when 'instanceId' : @instance[:aws_instance_id] = @text
+        when 'instanceId' then @instance[:aws_instance_id] = @text
         when 'code'
           if @xmlpath == 'TerminateInstancesResponse/instancesSet/item/shutdownState'
                @instance[:aws_shutdown_state_code] = @text.to_i
@@ -1287,7 +1130,7 @@ module RightAws
           if @xmlpath == 'TerminateInstancesResponse/instancesSet/item/shutdownState'
                @instance[:aws_shutdown_state] = @text
           else @instance[:aws_prev_state]     = @text end
-        when 'item'       : @result << @instance
+        when 'item'       then @result << @instance
         end
       end
       def reset
@@ -1302,10 +1145,10 @@ module RightAws
     class QEc2GetConsoleOutputParser < RightAWSParser #:nodoc:
       def tagend(name)
         case name
-        when 'instanceId' : @result[:aws_instance_id] = @text
-        when 'timestamp'  : @result[:aws_timestamp]   = @text
-                            @result[:timestamp]       = (Time.parse(@text)).utc
-        when 'output'     : @result[:aws_output]      = Base64.decode64(@text)
+        when 'instanceId' then @result[:aws_instance_id] = @text
+        when 'timestamp'  then @result[:aws_timestamp]   = @text
+                               @result[:timestamp]       = (Time.parse(@text)).utc
+        when 'output'     then @result[:aws_output]      = Base64.decode64(@text)
         end
       end
       def reset
@@ -1342,9 +1185,9 @@ module RightAws
       end
       def tagend(name)
         case name
-        when 'instanceId' ; @address[:instance_id] = @text.blank? ? nil : @text 
-        when 'publicIp'   ; @address[:public_ip]   = @text
-        when 'item'       ; @result << @address
+        when 'instanceId' then @address[:instance_id] = @text.blank? ? nil : @text 
+        when 'publicIp'   then @address[:public_ip]   = @text
+        when 'item'       then @result << @address
         end
       end
       def reset
@@ -1362,9 +1205,9 @@ module RightAws
       end
       def tagend(name)
         case name
-        when 'zoneName'  ; @zone[:zone_name]  = @text
-        when 'zoneState' ; @zone[:zone_state] = @text
-        when 'item'      ; @result << @zone
+        when 'zoneName'  then @zone[:zone_name]  = @text
+        when 'zoneState' then @zone[:zone_state] = @text
+        when 'item'      then @result << @zone
         end
       end
       def reset
@@ -1372,114 +1215,7 @@ module RightAws
       end
     end
 
-  #-----------------------------------------------------------------
-  #      PARSERS: EBS - Volumes
-  #-----------------------------------------------------------------
-  
-    class QEc2CreateAndDeleteVolumeParser < RightAWSParser #:nodoc:
-      def tagend(name)
-        case name 
-          when 'volumeId'   : @result[:aws_id]         = @text
-          when 'size'       : @result[:aws_size]       = @text
-          when 'status'     : @result[:aws_status]     = @text
-          when 'createTime' : @result[:aws_created_at] = @text
-        end
-      end
-      def reset
-        @result = {}
-      end
-    end
-
-    class QEc2AttachAndDetachVolumeParser < RightAWSParser #:nodoc:
-      def tagend(name)
-        case name 
-          when 'volumeId'   : @result[:aws_id]                = @text
-          when 'instanceId' : @result[:aws_instance_id]       = @text
-          when 'device'     : @result[:aws_device]            = @text
-          when 'status'     : @result[:aws_attachment_status] = @text
-          when 'attachTime' : @result[:aws_attached_at]       = @text
-        end
-      end
-      def reset
-        @result = {}
-      end
-    end
-    
-    class QEc2DescribeVolumesParser < RightAWSParser #:nodoc:
-      def tagstart(name, attributes)
-        case name
-        when 'item'
-          case @xmlpath
-          when 'DescribeVolumesResponse/volumeSet' : @volume = {}
-          end
-        end
-      end
-      def tagend(name)
-        case name 
-          when 'volumeId'
-            case @xmlpath
-            when 'DescribeVolumesResponse/volumeSet/item' : @volume[:aws_id] = @text
-            end
-          when 'status'
-            case @xmlpath
-            when 'DescribeVolumesResponse/volumeSet/item' : @volume[:aws_status] = @text
-            when 'DescribeVolumesResponse/volumeSet/item/attachmentSet/item' : @volume[:aws_attachment_status] = @text
-            end
-          when 'size'       : @volume[:aws_size]        = @text
-          when 'createTime' : @volume[:aws_created_at]  = @text
-          when 'instanceId' : @volume[:aws_instance_id] = @text
-          when 'device'     : @volume[:aws_device]      = @text
-          when 'attachTime' : @volume[:aws_attached_at] = @text
-          when 'item' 
-            case @xmlpath
-            when 'DescribeVolumesResponse/volumeSet' : @result << @volume
-            end
-        end
-      end
-      def reset
-        @result = []
-      end
-    end
-
-  #-----------------------------------------------------------------
-  #      PARSERS: EBS - Snapshots
-  #-----------------------------------------------------------------
-  
-    class QEc2DescribeSnapshotsParser < RightAWSParser #:nodoc:
-      def tagstart(name, attributes)
-        case name
-        when 'item' : @snapshot = {}
-        end
-      end
-      def tagend(name)
-        case name 
-          when 'volumeId'   : @snapshot[:aws_volume_id]  = @text
-          when 'snapshotId' : @snapshot[:aws_id]         = @text
-          when 'status'     : @snapshot[:aws_status]     = @text
-          when 'startTime'  : @snapshot[:aws_started_at] = @text
-          when 'progress'   : @snapshot[:aws_progress]   = @text
-          when 'item'       : @result                   << @snapshot
-        end
-      end
-      def reset
-        @result = []
-      end
-    end
-
-    class QEc2CreateAndDeleteSnapshotParser < RightAWSParser #:nodoc:
-      def tagend(name)
-        case name 
-          when 'volumeId'   : @result[:aws_volume_id]  = @text
-          when 'snapshotId' : @result[:aws_id]         = @text
-          when 'status'     : @result[:aws_status]     = @text
-          when 'startTime'  : @result[:aws_started_at] = @text
-          when 'progress'   : @result[:aws_progress]   = @text
-        end
-      end
-      def reset
-        @result = {}
-      end
-    end
+ 
     
   end
       

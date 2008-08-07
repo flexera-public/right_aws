@@ -66,5 +66,30 @@ class TestS3Stubbed < Test::Unit::TestCase
     Rightscale::HttpConnection.push(403, 'Good Luck!') 
     assert_raise(Rightscale::AwsError) { @s3.delete_bucket(@bucket) }
   end
+  
+  def test_115_copy_key
+    
+    Rightscale::HttpConnection.push(500, 'not found') 
+    #--- test COPY
+    # copy a key
+    assert_raise RightAws::AwsError do
+      @s3.copy(@bucket, @key1, @bucket, @key1_copy)
+    end
+    
+  end
+
+  def test_116_move_key
+    # move a key
+    Rightscale::HttpConnection.push(413, 'not found') 
+    assert @s3.move(@bucket, @key1, @bucket, @key1_new_name)
+    
+  end
+
+  def test_117_rename_key
+    # rename a key
+    Rightscale::HttpConnection.push(500, 'not found') 
+    assert @s3.rename(@bucket, @key2, @key2_new_name)
+    
+  end
 
 end

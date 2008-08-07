@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2007 RightScale Inc
+# Copyright (c) 2007-2008 RightScale Inc
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -132,6 +132,7 @@ module RightAws
       @aws_secret_access_key = aws_secret_access_key
       @params[:server]       ||= service_info[:default_host]
       @params[:port]         ||= service_info[:default_port]
+      @params[:service]      ||= service_info[:default_service]
       @params[:protocol]     ||= service_info[:default_protocol]
       @params[:multi_thread] ||= defined?(AWS_DAEMON)
       @logger = @params[:logger]
@@ -656,3 +657,4 @@ module RightAws
   end
 
 end
+
