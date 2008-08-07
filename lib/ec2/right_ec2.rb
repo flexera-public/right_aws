@@ -859,7 +859,168 @@ module RightAws
       on_exception
     end
 
-  
+  #-----------------------------------------------------------------
+  #      EBS: Volumes
+  #-----------------------------------------------------------------
+
+    # Describe all EBS volumes.
+    #
+    #  ec2.describe_volumes #=> 
+    #      [{:aws_size              => 94,
+    #        :aws_device            => "/dev/sdc",
+    #        :aws_attachment_status => "attached",
+    #        :zone                  => "merlot",
+    #        :snapshot_id           => nil,
+    #        :aws_attached_at       => Wed Jun 18 08:19:28 UTC 2008,
+    #        :aws_status            => "in-use",
+    #        :aws_id                => "vol-60957009",
+    #        :aws_created_at        => Wed Jun 18 08:19:20s UTC 2008,
+    #        :aws_instance_id       => "i-c014c0a9"},
+    #       {:aws_size       => 1,
+    #        :zone           => "merlot",
+    #        :snapshot_id    => nil,
+    #        :aws_status     => "available",
+    #        :aws_id         => "vol-58957031",
+    #        :aws_created_at => Wed Jun 18 08:19:21 UTC 2008,}, ... ]
+    #
+    def describe_volumes(list=[])
+      link = generate_request("DescribeVolumes", 
+                              hash_params('VolumeId',list.to_a))
+      request_cache_or_info :describe_volumes, link,  QEc2DescribeVolumesParser, list.blank?
+    rescue Exception
+      on_exception
+    end
+
+    # Create new EBS volume based on previously created snapshot. 
+    # +Size+ in Gigabytes.
+    #
+    #  ec2.create_volume('snap-000000', 10, zone) #=> 
+    #      {:snapshot_id    => "snap-e21df98b",
+    #       :aws_status     => "creating",
+    #       :aws_id         => "vol-fc9f7a95",
+    #       :zone           => "merlot",
+    #       :aws_created_at => Tue Jun 24 18:13:32 UTC 2008,
+    #       :aws_size       => 94}
+    #
+    def create_volume(snapshot_id, size, zone)
+      link = generate_request("CreateVolume", 
+                              "SnapshotId"        => snapshot_id.to_s,
+                              "Size"              => size.to_s,
+                              "AvailabilityZone"  => zone.to_s )
+      request_info(link, QEc2CreateVolumeParser.new(:logger => @logger))
+    rescue Exception
+      on_exception
+    end
+
+    # Delete the specified EBS volume. 
+    # This does not deletes any snapshots created from this volume.
+    #
+    #  ec2.delete_volume('vol-b48a6fdd') #=> true
+    #
+    def delete_volume(volume_id)
+      link = generate_request("DeleteVolume", 
+                              "VolumeId" => volume_id.to_s)
+      request_info(link, RightBoolResponseParser.new(:logger => @logger))
+    rescue Exception
+      on_exception
+    end
+    
+    # Attach the specified EBS volume to a specified instance, exposing the
+    # volume using the specified device name.
+    #
+    #  ec2.attach_volume('vol-898a6fe0', 'i-7c905415', '/dev/sdh') #=>
+    #    { :aws_instance_id => "i-7c905415",
+    #      :aws_device      => "/dev/sdh",
+    #      :aws_status      => "attaching",
+    #      :aws_attached_at => "2008-03-28T14:14:39.000Z",
+    #      :aws_id          => "vol-898a6fe0" }
+    #
+    def attach_volume(volume_id, instance_id, device)
+      link = generate_request("AttachVolume", 
+                              "VolumeId"   => volume_id.to_s,
+                              "InstanceId" => instance_id.to_s,
+                              "Device"     => device.to_s)
+      request_info(link, QEc2AttachAndDetachVolumeParser.new(:logger => @logger))
+    rescue Exception
+      on_exception
+    end
+    
+    # Detach the specified EBS volume from the instance to which it is attached.
+    # 
+    #   ec2.detach_volume('vol-898a6fe0') #=> 
+    #     { :aws_instance_id => "i-7c905415",
+    #       :aws_device      => "/dev/sdh",
+    #       :aws_status      => "detaching",
+    #       :aws_attached_at => "2008-03-28T14:38:34.000Z",
+    #       :aws_id          => "vol-898a6fe0"}
+    #
+    def detach_volume(volume_id, instance_id=nil, device=nil, force=nil)
+      hash = { "VolumeId" => volume_id.to_s }
+      hash["InstanceId"] = instance_id.to_s unless instance_id.blank?
+      hash["Device"]     = device.to_s      unless device.blank?
+      hash["Force"]      = 'true'           if     force
+      #
+      link = generate_request("DetachVolume", hash)
+      request_info(link, QEc2AttachAndDetachVolumeParser.new(:logger => @logger))
+    rescue Exception
+      on_exception
+    end
+
+    
+  #-----------------------------------------------------------------
+  #      EBS: Snapshots
+  #-----------------------------------------------------------------
+
+     # Describe all EBS snapshots.
+     #
+     # ec2.describe_snapshots #=> 
+     #   [ { :aws_progress   => "100%",
+     #       :aws_status     => "completed",
+     #       :aws_id         => "snap-72a5401b",
+     #       :aws_volume_id  => "vol-5582673c",
+     #       :aws_started_at => "2008-02-23T02:50:48.000Z"},
+     #     { :aws_progress   => "100%",
+     #       :aws_status     => "completed",
+     #       :aws_id         => "snap-75a5401c",
+     #       :aws_volume_id  => "vol-5582673c",
+     #       :aws_started_at => "2008-02-23T16:23:19.000Z" },...]
+     #
+    def describe_snapshots(list=[])
+      link = generate_request("DescribeSnapshots", 
+                              hash_params('SnapshotId',list.to_a))
+      request_cache_or_info :describe_snapshots, link,  QEc2DescribeSnapshotsParser, list.blank?
+    rescue Exception
+      on_exception
+    end
+
+    # Create a snapshot of specified volume.
+    #
+    #  ec2.create_snapshot('vol-898a6fe0') #=> 
+    #      {:aws_volume_id  => "vol-fd9f7a94",
+    #       :aws_started_at => Tue Jun 24 18:40:40 UTC 2008,
+    #       :aws_progress   => "",
+    #       :aws_status     => "pending",
+    #       :aws_id         => "snap-d56783bc"}
+    #
+    def create_snapshot(volume_id)
+      link = generate_request("CreateSnapshot", 
+                              "VolumeId" => volume_id.to_s)
+      request_info(link, QEc2CreateSnapshotParser.new(:logger => @logger))
+    rescue Exception
+      on_exception
+    end
+
+    # Delete the specified snapshot.
+    #
+    #  ec2.delete_snapshot('snap-55a5403c') #=> true
+    #
+    def delete_snapshot(snapshot_id)
+      link = generate_request("DeleteSnapshot", 
+                              "SnapshotId" => snapshot_id.to_s)
+      request_info(link, RightBoolResponseParser.new(:logger => @logger))
+    rescue Exception
+      on_exception
+    end
     
   #-----------------------------------------------------------------
   #      PARSERS: Boolean Response Parser
@@ -1215,7 +1376,116 @@ module RightAws
       end
     end
 
- 
+  #-----------------------------------------------------------------
+  #      PARSERS: EBS - Volumes
+  #-----------------------------------------------------------------
+  
+    class QEc2CreateVolumeParser < RightAWSParser #:nodoc:
+      def tagend(name)
+        case name 
+          when 'volumeId'         then @result[:aws_id]         = @text
+          when 'status'           then @result[:aws_status]     = @text
+          when 'createTime'       then @result[:aws_created_at] = Time.parse(@text)
+          when 'size'             then @result[:aws_size]       = @text.to_i ###
+          when 'snapshotId'       then @result[:snapshot_id]    = @text.blank? ? nil : @text ###
+          when 'availabilityZone' then @result[:zone]           = @text ###
+        end
+      end
+      def reset
+        @result = {}
+      end
+    end
+
+    class QEc2AttachAndDetachVolumeParser < RightAWSParser #:nodoc:
+      def tagend(name)
+        case name 
+          when 'volumeId'   then @result[:aws_id]                = @text
+          when 'instanceId' then @result[:aws_instance_id]       = @text
+          when 'device'     then @result[:aws_device]            = @text
+          when 'status'     then @result[:aws_attachment_status] = @text
+          when 'attachTime' then @result[:aws_attached_at]       = Time.parse(@text)
+        end
+      end
+      def reset
+        @result = {}
+      end
+    end
+    
+    class QEc2DescribeVolumesParser < RightAWSParser #:nodoc:
+      def tagstart(name, attributes)
+        case name
+        when 'item'
+          case @xmlpath
+          when 'DescribeVolumesResponse/volumeSet' then @volume = {}
+          end
+        end
+      end
+      def tagend(name)
+        case name 
+          when 'volumeId'
+            case @xmlpath
+            when 'DescribeVolumesResponse/volumeSet/item' then @volume[:aws_id] = @text
+            end
+          when 'status'
+            case @xmlpath
+            when 'DescribeVolumesResponse/volumeSet/item' then @volume[:aws_status] = @text
+            when 'DescribeVolumesResponse/volumeSet/item/attachmentSet/item' then @volume[:aws_attachment_status] = @text
+            end
+          when 'size'             then @volume[:aws_size]        = @text.to_i
+          when 'createTime'       then @volume[:aws_created_at]  = Time.parse(@text)
+          when 'instanceId'       then @volume[:aws_instance_id] = @text
+          when 'device'           then @volume[:aws_device]      = @text
+          when 'attachTime'       then @volume[:aws_attached_at] = Time.parse(@text)
+          when 'snapshotId'       then @volume[:snapshot_id]     = @text.blank? ? nil : @text
+          when 'availabilityZone' then @volume[:zone]            = @text
+          when 'item' 
+            case @xmlpath
+            when 'DescribeVolumesResponse/volumeSet' then @result << @volume
+            end
+        end
+      end
+      def reset
+        @result = []
+      end
+    end
+
+  #-----------------------------------------------------------------
+  #      PARSERS: EBS - Snapshots
+  #-----------------------------------------------------------------
+  
+    class QEc2DescribeSnapshotsParser < RightAWSParser #:nodoc:
+      def tagstart(name, attributes)
+        @snapshot = {} if name == 'item'
+      end
+      def tagend(name)
+        case name 
+          when 'volumeId'   then @snapshot[:aws_volume_id]  = @text
+          when 'snapshotId' then @snapshot[:aws_id]         = @text
+          when 'status'     then @snapshot[:aws_status]     = @text
+          when 'startTime'  then @snapshot[:aws_started_at] = Time.parse(@text)
+          when 'progress'   then @snapshot[:aws_progress]   = @text
+          when 'item'       then @result                   << @snapshot
+        end
+      end
+      def reset
+        @result = []
+      end
+    end
+
+    class QEc2CreateSnapshotParser < RightAWSParser #:nodoc:
+      def tagend(name)
+        case name 
+          when 'volumeId'   then @result[:aws_volume_id]  = @text
+          when 'snapshotId' then @result[:aws_id]         = @text
+          when 'status'     then @result[:aws_status]     = @text
+          when 'startTime'  then @result[:aws_started_at] = Time.parse(@text)
+          when 'progress'   then @result[:aws_progress]   = @text
+        end
+      end
+      def reset
+        @result = {}
+      end
+    end
     
   end
       
