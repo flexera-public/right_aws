@@ -446,7 +446,7 @@ module RightAws
     def copy(src_bucket, src_key, dest_bucket, dest_key=nil, directive=:copy, headers={})
       dest_key ||= src_key
       headers['x-amz-metadata-directive'] = directive.to_s.upcase
-      headers['x-amz-copy-source']        = "#{src_bucket}/#{src_key}"
+      headers['x-amz-copy-source']        = "#{src_bucket}/#{CGI::escape src_key}"
       req_hash = generate_rest_request('PUT', headers.merge(:url=>"#{dest_bucket}/#{CGI::escape dest_key}"))
       request_info(req_hash, S3CopyParser.new)
     rescue
