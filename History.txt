@@ -168,12 +168,14 @@ Initial release.
     The lstat bug was causing failure of very large file uploads on Windows [ Contributed by Benjamin Allfree ] 
   - Fixed parsing of the ETag field for S3 objects
 
--- 1.7.3
+== 1.7.3
 
   Release Notes:
 
   - Removed the 1.7.2 monkey-patch of the Ruby File class on Windows.  This patch broke Rails 2.0.
     The patch is now included in the README for anyone to use at their own risk.
   
+== 1.8.1
 
-
+* r5111, konstantin, 2008-08-19 16:19:06 +0400
+  * #1526, fixed: Right_S3 copy fails to url-encode source
