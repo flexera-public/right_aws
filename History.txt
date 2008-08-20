@@ -168,12 +168,20 @@ Initial release.
     The lstat bug was causing failure of very large file uploads on Windows [ Contributed by Benjamin Allfree ] 
   - Fixed parsing of the ETag field for S3 objects
 
--- 1.7.3
+== 1.7.3
 
   Release Notes:
 
   - Removed the 1.7.2 monkey-patch of the Ruby File class on Windows.  This patch broke Rails 2.0.
     The patch is now included in the README for anyone to use at their own risk.
-  
 
+== 1.8.0
 
+  Release Notes:
+
+  This release adds major new features to RightAws to support Amazon's new
+  Elastic Block Store (EBS).  Via the RightAws::Ec2 module, users can create
+  and delete EBS volumes, attach and detach them from instances, snapshot
+  volumes, and list the available volumes and snapshots.
+
+  Bug fixes include correction of RightAws::S3 copy's failure to url-encode the source key.
