@@ -25,7 +25,8 @@ module RightAws
 
   # = RightAWS::EC2 -- RightScale Amazon EC2 interface
   # The RightAws::EC2 class provides a complete interface to Amazon's
-  # Elastic Compute Cloud service.
+  # Elastic Compute Cloud service, as well as the associated EBS (Elastic Block
+  # Store).
   # For explanations of the semantics
   # of each call, please refer to Amazon's documentation at
   # http://developer.amazonwebservices.com/connect/kbcategory.jspa?categoryID=87
