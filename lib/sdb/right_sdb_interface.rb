@@ -39,6 +39,8 @@ module RightAws
     def self.bench_xml; @@bench.xml;     end
     def self.bench_sdb; @@bench.service; end
 
+    attr_reader :last_query_expression
+
     # Creates new RightSdb instance.
     #
     # Params:
@@ -84,8 +86,8 @@ module RightAws
       service_hash.update(params)
       # prepare string to sight
       string_to_sign = case signature_version
-                       when '0' : service_hash["Action"] + service_hash["Timestamp"]
-                       when '1' : service_hash.sort{|a,b| (a[0].to_s.downcase)<=>(b[0].to_s.downcase)}.to_s
+                       when '0' then service_hash["Action"] + service_hash["Timestamp"]
+                       when '1' then service_hash.sort{|a,b| (a[0].to_s.downcase)<=>(b[0].to_s.downcase)}.to_s
                        end
       service_hash.update('Signature' =>  AwsUtils::sign(@aws_secret_access_key, string_to_sign))
       service_string = service_hash.to_a.collect{|key,val| key + "=#{CGI::escape(val.to_s)}" }.join("&")
@@ -120,6 +122,7 @@ module RightAws
       result = {}
       if attributes
         idx = 0
+        skip_values = attributes.is_a?(Array)
         attributes.each do |attribute, values|
           # set replacement attribute
           result["Attribute.#{idx}.Replace"] = 'true' if replace
@@ -127,12 +130,12 @@ module RightAws
           unless values.nil?
             Array(values).each do |value|
               result["Attribute.#{idx}.Name"]  = attribute
-              result["Attribute.#{idx}.Value"] = ruby_to_sdb(value) 
+              result["Attribute.#{idx}.Value"] = ruby_to_sdb(value) unless skip_values
               idx += 1
             end
           else
             result["Attribute.#{idx}.Name"] = attribute
-            result["Attribute.#{idx}.Value"] = ruby_to_sdb(nil) 
+            result["Attribute.#{idx}.Value"] = ruby_to_sdb(nil) unless skip_values
             idx += 1
           end
         end
@@ -406,10 +409,15 @@ module RightAws
     #   query = [ "['cat'=?] union ['dog'=?]", "clew", "Jon's boot" ]
     #   sdb.query('family', query)
     #
+    #   query = [ "['cat'=?] union ['dog'=?] sort 'cat' desc", "clew", "Jon's boot" ]
+    #   sdb.query('family', query)
+    #
     # see: http://docs.amazonwebservices.com/AmazonSimpleDB/2007-11-07/DeveloperGuide/SDB_API_Query.html
+    #      http://docs.amazonwebservices.com/AmazonSimpleDB/2007-11-07/DeveloperGuide/index.html?SortingData.html
     #
     def query(domain_name, query_expression = nil, max_number_of_items = nil, next_token = nil)
       query_expression = query_expression_from_array(query_expression) if query_expression.is_a?(Array)
+      @last_query_expression = query_expression
       #
       request_params = { 'DomainName'       => domain_name,
                          'QueryExpression'  => query_expression,
@@ -441,10 +449,10 @@ module RightAws
       end
       def tagend(name)
         case name
-        when 'NextToken'  : @result[:next_token] =  @text
-        when 'DomainName' : @result[:domains]    << @text
-        when 'BoxUsage'   : @result[:box_usage]  =  @text
-        when 'RequestId'  : @result[:request_id] =  @text
+        when 'NextToken'  then @result[:next_token] =  @text
+        when 'DomainName' then @result[:domains]    << @text
+        when 'BoxUsage'   then @result[:box_usage]  =  @text
+        when 'RequestId'  then @result[:request_id] =  @text
         end
       end
     end
@@ -455,8 +463,8 @@ module RightAws
       end
       def tagend(name)
         case name
-        when 'BoxUsage'   : @result[:box_usage]  =  @text
-        when 'RequestId'  : @result[:request_id] =  @text
+        when 'BoxUsage'  then @result[:box_usage]  =  @text
+        when 'RequestId' then @result[:request_id] =  @text
         end
       end
     end
@@ -468,10 +476,10 @@ module RightAws
       end
       def tagend(name)
         case name
-        when 'Name'       : @last_attribute_name = @text
-        when 'Value'      : (@result[:attributes][@last_attribute_name] ||= []) << @text
-        when 'BoxUsage'   : @result[:box_usage]  =  @text
-        when 'RequestId'  : @result[:request_id] =  @text
+        when 'Name'      then @last_attribute_name = @text
+        when 'Value'     then (@result[:attributes][@last_attribute_name] ||= []) << @text
+        when 'BoxUsage'  then @result[:box_usage]  =  @text
+        when 'RequestId' then @result[:request_id] =  @text
         end
       end
     end
@@ -482,10 +490,10 @@ module RightAws
       end
       def tagend(name)
         case name
-        when 'ItemName'   : @result[:items]      << @text
-        when 'BoxUsage'   : @result[:box_usage]  =  @text
-        when 'RequestId'  : @result[:request_id] =  @text
-        when 'NextToken'  : @result[:next_token] =  @text
+        when 'ItemName'  then @result[:items]      << @text
+        when 'BoxUsage'  then @result[:box_usage]  =  @text
+        when 'RequestId' then @result[:request_id] =  @text
+        when 'NextToken' then @result[:next_token] =  @text
         end
       end
     end

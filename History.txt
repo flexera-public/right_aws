@@ -179,3 +179,12 @@ Initial release.
 
 * r5111, konstantin, 2008-08-19 16:19:06 +0400
   * #1526, fixed: Right_S3 copy fails to url-encode source
+
+* xxxx, konstantin
+  - RightAws::SdbInterface#last_query_expression added for debug puposes
+  - RightAws::ActiveSdb::Base#query :order and :auto_load options added to support query
+    result sorting and attributes auto loading
+  - RightAws::ActiveSdb::Base#find_all_by_ and find_by_ helpers improved to support
+    :order, :auto_load, :limit and :next_token options
+  - RightAws::SdbInterface#delete_attributes bug fixed (it did not realy do that)
+  - Sdb tests fixed and improved
