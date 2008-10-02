@@ -72,9 +72,9 @@ class TestS3 < Test::Unit::TestCase
   def test_08_keys
     keys = @s3.list_bucket(@bucket).map{|b| b[:key]}
     assert_equal keys.size, 3, "There should be 3 keys"
-    assert(keys.include? @key1)
-    assert(keys.include? @key2)
-    assert(keys.include? @key3)
+    assert(keys.include?(@key1))
+    assert(keys.include?(@key2))
+    assert(keys.include?(@key3))
   end
   
   def test_09_copy_key
@@ -120,18 +120,26 @@ class TestS3 < Test::Unit::TestCase
     keys = @s3.list_bucket(@bucket).map{|b| b[:key]}
     assert(!keys.include?(@key2))
   end
-  
-  def test_12_delete_folder
+  def test_12_retrieve_object
+    assert_raise(Rightscale::AwsError) { @s3.retrieve_object(:bucket => @bucket, :key => 'undefined/key') }
+    data1 = @s3.retrieve_object(:bucket => @bucket, :key => @key1_new_name)
+    assert_equal RIGHT_OBJECT_TEXT, data1[:object], "Object text must be equal to '#{RIGHT_OBJECT_TEXT}'"
+    assert_equal 'Woohoo1!', data1[:headers]['x-amz-meta-family'], "x-amz-meta-family header must be equal to 'Woohoo1!'"
+  end
+  def test_13_delete_folder
     assert_equal 1, @s3.delete_folder(@bucket, 'test').size, "Only one key(#{@key1}) must be deleted!"
   end
-
-  def test_13_delete_bucket
+ 
+  def test_14_delete_bucket
     assert_raise(Rightscale::AwsError) { @s3.delete_bucket(@bucket) }
     assert @s3.clear_bucket(@bucket), 'Clear_bucket fail'
     assert_equal 0, @s3.list_bucket(@bucket).size, 'Bucket must be empty'
     assert @s3.delete_bucket(@bucket)
     assert !@s3.list_all_my_buckets.map{|bucket| bucket[:name]}.include?(@bucket), "#{@bucket} must not exist"
   end
+  
+  
+  
 
   #---------------------------
   # Rightscale::S3 classes
@@ -312,10 +320,10 @@ class TestS3 < Test::Unit::TestCase
     assert grantee.apply
     assert !grantee.exists?
       # Check multiple perms assignment
-    assert grantee.grant 'FULL_CONTROL', 'READ', 'WRITE'
+    assert grantee.grant('FULL_CONTROL', 'READ', 'WRITE')
     assert_equal ['FULL_CONTROL','READ','WRITE'].sort, grantee.perms.sort
       # Check multiple perms removal
-    assert grantee.revoke 'FULL_CONTROL', 'WRITE'
+    assert grantee.revoke('FULL_CONTROL', 'WRITE')
     assert_equal ['READ'], grantee.perms
       # check 'Drop' method
     assert grantee.drop

@@ -50,7 +50,7 @@ module RightAws
     #      :signature_version => '0'             # The signature version : '0' or '1'(default)
     #      :multi_thread => true|false           # Multi-threaded (connection per each thread): true or false(default)
     #      :logger       => Logger Object        # Logger instance: logs to STDOUT if omitted 
-    #      :nil_representation => 'mynil'}       # interpret Ruby nil as this string value; i.e. use this string in SDB to represent nils
+    #      :nil_representation => 'mynil'}       # interpret Ruby nil as this string value; i.e. use this string in SDB to represent Ruby nils (default is the string 'nil')
     #      
     # Example:
     # 

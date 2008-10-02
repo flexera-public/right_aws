@@ -68,7 +68,7 @@ module RightAws
     include RightAwsBaseInterface
     
     # Amazon EC2 API version being used
-    API_VERSION       = "2008-02-01"
+    API_VERSION       = "2008-05-05"
     DEFAULT_HOST      = "ec2.amazonaws.com"
     DEFAULT_PATH      = '/'
     DEFAULT_PROTOCOL  = 'https'
@@ -1405,7 +1405,7 @@ module RightAws
           when 'device'     then @result[:aws_device]            = @text
           when 'status'     then @result[:aws_attachment_status] = @text
           when 'attachTime' then @result[:aws_attached_at]       = Time.parse(@text)
-  end
+        end
       end
       def reset
         @result = {}
@@ -1417,8 +1417,8 @@ module RightAws
         case name
         when 'item'
           case @xmlpath
-          when 'DescribeVolumesResponse/volumeSet' then @volume = {}
-end
+            when 'DescribeVolumesResponse/volumeSet' then @volume = {}
+          end
         end
       end
       def tagend(name)

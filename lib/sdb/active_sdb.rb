@@ -101,6 +101,15 @@ module RightAws
       # Create a new handle to an Sdb account. All handles share the same per process or per thread
       # HTTP connection to Amazon Sdb. Each handle is for a specific account.
       # The +params+ are passed through as-is to RightAws::SdbInterface.new
+      # Params:
+      #    { :server       => 'sdb.amazonaws.com'  # Amazon service host: 'sdb.amazonaws.com'(default)
+      #      :port         => 443                  # Amazon service port: 80 or 443(default)
+      #      :protocol     => 'https'              # Amazon service protocol: 'http' or 'https'(default)
+      #      :signature_version => '0'             # The signature version : '0' or '1'(default)
+      #      :multi_thread => true|false           # Multi-threaded (connection per each thread): true or false(default)
+      #      :logger       => Logger Object        # Logger instance: logs to STDOUT if omitted 
+      #      :nil_representation => 'mynil'}       # interpret Ruby nil as this string value; i.e. use this string in SDB to represent Ruby nils (default is the string 'nil')
+
       def establish_connection(aws_access_key_id=nil, aws_secret_access_key=nil, params={})
         @connection = RightAws::SdbInterface.new(aws_access_key_id, aws_secret_access_key, params)
       end
