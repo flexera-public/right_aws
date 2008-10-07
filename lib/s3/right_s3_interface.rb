@@ -95,7 +95,7 @@ module RightAws
       out_string << '?acl'      if path[/[&?]acl($|&|=)/]
       out_string << '?torrent'  if path[/[&?]torrent($|&|=)/]
       out_string << '?location' if path[/[&?]location($|&|=)/]
-#      out_string << '?logging'  if path[/[&?]logging($|&|=)/]  # this one is beta, no support for now
+      out_string << '?logging'  if path[/[&?]logging($|&|=)/]  # this one is beta, no support for now
       out_string
     end
 
@@ -211,6 +211,37 @@ module RightAws
       on_exception
     end
     
+    # Retrieves the logging configuration for a bucket. 
+      # Returns a hash of {:enabled, :targetbucket, :targetprefix}
+      # 
+      # s3.interface.get_logging_parse(:bucket => "asset_bucket")
+      #   => {:enabled=>true, :targetbucket=>"mylogbucket", :targetprefix=>"loggylogs/"}
+      #
+      #  
+    def get_logging_parse(params)
+      AwsUtils.mandatory_arguments([:bucket], params)
+      AwsUtils.allow_only([:bucket, :headers], params)
+      params[:headers] = {} unless params[:headers]
+      req_hash = generate_rest_request('GET', params[:headers].merge(:url=>"#{params[:bucket]}?logging"))
+      request_info(req_hash, S3LoggingParser.new)
+    rescue
+      on_exception
+    end
+    
+    # Sets logging configuration for a bucket from the XML configuration document.
+    #   params:
+    #    :bucket
+    #    :xmldoc
+    def put_logging(params)  
+      AwsUtils.mandatory_arguments([:bucket,:xmldoc], params)
+      AwsUtils.allow_only([:bucket,:xmldoc, :headers], params)
+      params[:headers] = {} unless params[:headers]
+      req_hash = generate_rest_request('PUT', params[:headers].merge(:url=>"#{params[:bucket]}?logging", :data => params[:xmldoc]))
+      request_info(req_hash, S3TrueParser.new)
+    rescue
+      on_exception
+    end
+
       # Deletes new bucket. Bucket must be empty! Returns +true+ or an exception.
       #
       #  s3.delete_bucket('my_awesome_bucket')  #=> true
@@ -349,6 +380,7 @@ module RightAws
       # a text mode IO object is passed to PUT, it will be converted to binary
       # mode.
       #
+      
     def put(bucket, key, data=nil, headers={})
       # On Windows, if someone opens a file in text mode, we must reset it so
       # to binary mode for streaming to work properly
@@ -363,6 +395,86 @@ module RightAws
       request_info(req_hash, S3TrueParser.new)
     rescue
       on_exception
+    end
+   
+   
+    
+    # New experimental API for uploading objects, introduced in RightAws 1.8.1.
+    # store_object is similar in function to the older function put, but returns the full response metadata.  It also allows for optional verification
+    # of object md5 checksums on upload.  Parameters are passed as hash entries and are checked for completeness as well as for spurious arguments.
+    # The hash of the response headers contains useful information like the Amazon request ID and the object ETag (MD5 checksum).
+    #
+    # If the optional :md5 argument is provided, store_object verifies that the given md5 matches the md5 returned by S3.  The :verified_md5 field in the response hash is
+    # set true or false depending on the outcome of this check.  If no :md5 argument is given, :verified_md5 will be false in the response.
+    #
+    # The optional argument of :headers allows the caller to specify arbitrary request header values.
+    #
+    # s3.store_object(:bucket => "foobucket", :key => "foo", :md5 => "a507841b1bc8115094b00bbe8c1b2954", :data => "polemonium" )
+    #   => {"x-amz-id-2"=>"SVsnS2nfDaR+ixyJUlRKM8GndRyEMS16+oZRieamuL61pPxPaTuWrWtlYaEhYrI/", 
+    #       "etag"=>"\"a507841b1bc8115094b00bbe8c1b2954\"", 
+    #       "date"=>"Mon, 29 Sep 2008 18:57:46 GMT", 
+    #       :verified_md5=>true, 
+    #       "x-amz-request-id"=>"63916465939995BA", 
+    #       "server"=>"AmazonS3", 
+    #       "content-length"=>"0"}
+    #
+    # s3.store_object(:bucket => "foobucket", :key => "foo", :data => "polemonium" )
+    #   => {"x-amz-id-2"=>"MAt9PLjgLX9UYJ5tV2fI/5dBZdpFjlzRVpWgBDpvZpl+V+gJFcBMW2L+LBstYpbR", 
+    #       "etag"=>"\"a507841b1bc8115094b00bbe8c1b2954\"", 
+    #       "date"=>"Mon, 29 Sep 2008 18:58:56 GMT", 
+    #       :verified_md5=>false, 
+    #       "x-amz-request-id"=>"3B25A996BC2CDD3B", 
+    #       "server"=>"AmazonS3", 
+    #       "content-length"=>"0"}
+    
+    def store_object(params)
+      AwsUtils.allow_only([:bucket, :key, :data, :headers, :md5], params)
+      AwsUtils.mandatory_arguments([:bucket, :key, :data], params)
+      params[:headers] = {} unless params[:headers]
+          
+      params[:data].binmode if(params[:data].respond_to?(:binmode)) # On Windows, if someone opens a file in text mode, we must reset it to binary mode for streaming to work properly
+      if (params[:data].respond_to?(:lstat) && params[:data].lstat.size >= USE_100_CONTINUE_PUT_SIZE) ||
+         (params[:data].respond_to?(:size)  && params[:data].size       >= USE_100_CONTINUE_PUT_SIZE)
+        params[:headers]['expect'] = '100-continue'
+      end
+      
+      req_hash = generate_rest_request('PUT', params[:headers].merge(:url=>"#{params[:bucket]}/#{CGI::escape params[:key]}", :data=>params[:data]))
+      resp = request_info(req_hash, S3HttpResponseHeadParser.new)
+      if(params[:md5])
+        resp[:verified_md5] = (resp['etag'].gsub(/\"/, '') == params[:md5]) ? true : false
+      else
+        resp[:verified_md5] = false
+      end
+      resp
+    rescue
+      on_exception
+    end
+    
+      # Identical in function to store_object, but requires verification that the returned ETag is identical to the checksum passed in by the user as the 'md5' argument.
+      # If the check passes, returns the response metadata with the "verified_md5" field set true.  Raises an exception if the checksums conflict.
+      # This call is implemented as a wrapper around put_object and the user may gain different semantics by creating a custom wrapper.
+      # 
+      # s3.store_object_and_verify(:bucket => "foobucket", :key => "foo", :md5 => "a507841b1bc8115094b00bbe8c1b2954", :data => "polemonium" )
+      #   => {"x-amz-id-2"=>"IZN3XsH4FlBU0+XYkFTfHwaiF1tNzrm6dIW2EM/cthKvl71nldfVC0oVQyydzWpb", 
+      #       "etag"=>"\"a507841b1bc8115094b00bbe8c1b2954\"", 
+      #       "date"=>"Mon, 29 Sep 2008 18:38:32 GMT", 
+      #       :verified_md5=>true, 
+      #       "x-amz-request-id"=>"E8D7EA4FE00F5DF7", 
+      #       "server"=>"AmazonS3", 
+      #       "content-length"=>"0"}
+      #
+      # s3.store_object_and_verify(:bucket => "foobucket", :key => "foo", :md5 => "a507841b1bc8115094b00bbe8c1b2953", :data => "polemonium" )
+      #   RightAws::AwsError: Uploaded object failed MD5 checksum verification: {"x-amz-id-2"=>"HTxVtd2bf7UHHDn+WzEH43MkEjFZ26xuYvUzbstkV6nrWvECRWQWFSx91z/bl03n", 
+      #                                                                          "etag"=>"\"a507841b1bc8115094b00bbe8c1b2954\"", 
+      #                                                                          "date"=>"Mon, 29 Sep 2008 18:38:41 GMT", 
+      #                                                                          :verified_md5=>false, 
+      #                                                                          "x-amz-request-id"=>"0D7ADE09F42606F2", 
+      #                                                                          "server"=>"AmazonS3", 
+      #                                                                          "content-length"=>"0"}
+    def store_object_and_verify(params)
+      AwsUtils.mandatory_arguments([:md5], params)
+      r = put_object(params)
+      r[:verified_md5] ? (return r) : (raise AwsError.new("Uploaded object failed MD5 checksum verification: #{r.inspect}"))
     end
     
       # Retrieves object data from Amazon. Returns a +hash+  or an exception.
@@ -397,6 +509,68 @@ module RightAws
       request_info(req_hash, S3HttpResponseBodyParser.new, &block)
     rescue
       on_exception
+    end
+    
+    # New experimental API for retrieving objects, introduced in RightAws 1.8.1.
+    # retrieve_object is similar in function to the older function get.  It allows for optional verification
+    # of object md5 checksums on retrieval.  Parameters are passed as hash entries and are checked for completeness as well as for spurious arguments.
+    #
+    # If the optional :md5 argument is provided, retrieve_object verifies that the given md5 matches the md5 returned by S3.  The :verified_md5 field in the response hash is
+    # set true or false depending on the outcome of this check.  If no :md5 argument is given, :verified_md5 will be false in the response.
+    #
+    # The optional argument of :headers allows the caller to specify arbitrary request header values.
+    # Mandatory arguments:
+    #   :bucket - the bucket in which the object is stored
+    #   :key    - the object address (or path) within the bucket
+    # Optional arguments:
+    #   :headers - hash of additional HTTP headers to include with the request
+    #   :md5     - MD5 checksum against which to verify the retrieved object
+    #
+    #  s3.retrieve_object(:bucket => "foobucket", :key => "foo") 
+    #    => {:verified_md5=>false, 
+    #        :headers=>{"last-modified"=>"Mon, 29 Sep 2008 18:58:56 GMT", 
+    #                   "x-amz-id-2"=>"2Aj3TDz6HP5109qly//18uHZ2a1TNHGLns9hyAtq2ved7wmzEXDOPGRHOYEa3Qnp", 
+    #                   "content-type"=>"", 
+    #                   "etag"=>"\"a507841b1bc8115094b00bbe8c1b2954\"", 
+    #                   "date"=>"Tue, 30 Sep 2008 00:52:44 GMT", 
+    #                   "x-amz-request-id"=>"EE4855DE27A2688C", 
+    #                   "server"=>"AmazonS3", 
+    #                   "content-length"=>"10"}, 
+    #        :object=>"polemonium"}
+    #
+    #  s3.retrieve_object(:bucket => "foobucket", :key => "foo", :md5=>'a507841b1bc8115094b00bbe8c1b2954') 
+    #    => {:verified_md5=>true, 
+    #        :headers=>{"last-modified"=>"Mon, 29 Sep 2008 18:58:56 GMT", 
+    #                   "x-amz-id-2"=>"mLWQcI+VuKVIdpTaPXEo84g0cz+vzmRLbj79TS8eFPfw19cGFOPxuLy4uGYVCvdH", 
+    #                   "content-type"=>"", "etag"=>"\"a507841b1bc8115094b00bbe8c1b2954\"", 
+    #                   "date"=>"Tue, 30 Sep 2008 00:53:08 GMT", 
+    #                   "x-amz-request-id"=>"6E7F317356580599", 
+    #                   "server"=>"AmazonS3", 
+    #                   "content-length"=>"10"}, 
+    #        :object=>"polemonium"}
+    def retrieve_object(params, &block)
+      AwsUtils.mandatory_arguments([:bucket, :key], params)
+      AwsUtils.allow_only([:bucket, :key, :headers, :md5], params)
+      params[:headers] = {} unless params[:headers]
+      req_hash = generate_rest_request('GET', params[:headers].merge(:url=>"#{params[:bucket]}/#{CGI::escape params[:key]}"))
+      resp = request_info(req_hash, S3HttpResponseBodyParser.new, &block)
+      resp[:verified_md5] = false
+      if(params[:md5] && (resp[:headers]['etag'].gsub(/\"/,'') == params[:md5]))
+        resp[:verified_md5] = true
+      end
+      resp
+    rescue
+      on_exception
+    end
+    
+      # Identical in function to retrieve_object, but requires verification that the returned ETag is identical to the checksum passed in by the user as the 'md5' argument.
+      # If the check passes, returns the response metadata with the "verified_md5" field set true.  Raises an exception if the checksums conflict.
+      # This call is implemented as a wrapper around retrieve_object and the user may gain different semantics by creating a custom wrapper.
+    def retrieve_object_and_verify(params, &block)
+      AwsUtils.mandatory_arguments([:md5], params)
+      resp = get_object(params, block)
+      return resp if resp[:verified_md5]
+      raise AwsError.new("Retrieved object failed MD5 checksum verification: #{resp.inspect}")
     end
 
       # Retrieves object metadata. Returns a +hash+ of http_response_headers.
@@ -929,6 +1103,28 @@ module RightAws
             @current_grantee[:permissions] = @text
           when 'Grant'
             @result[:grantees] << @current_grantee
+        end
+      end
+    end
+    
+    class S3LoggingParser < RightAWSParser  # :nodoc:
+      def reset
+        @result          = {:enabled => false, :targetbucket => '', :targetprefix => ''}
+        @current_grantee = {}
+      end
+      def tagend(name)
+        case name
+            # service info
+          when 'TargetBucket'
+            if @xmlpath == 'BucketLoggingStatus/LoggingEnabled'
+              @result[:targetbucket] = @text
+              @result[:enabled] = true
+            end
+          when 'TargetPrefix'
+            if @xmlpath == 'BucketLoggingStatus/LoggingEnabled'
+              @result[:targetprefix] = @text
+              @result[:enabled] = true
+            end
         end
       end
     end

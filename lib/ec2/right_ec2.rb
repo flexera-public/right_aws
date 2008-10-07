@@ -25,7 +25,8 @@ module RightAws
 
   # = RightAWS::EC2 -- RightScale Amazon EC2 interface
   # The RightAws::EC2 class provides a complete interface to Amazon's
-  # Elastic Compute Cloud service.
+  # Elastic Compute Cloud service, as well as the associated EBS (Elastic Block
+  # Store).
   # For explanations of the semantics
   # of each call, please refer to Amazon's documentation at
   # http://developer.amazonwebservices.com/connect/kbcategory.jspa?categoryID=87
@@ -67,7 +68,7 @@ module RightAws
     include RightAwsBaseInterface
     
     # Amazon EC2 API version being used
-    API_VERSION       = "2008-02-01"
+    API_VERSION       = "2008-05-05"
     DEFAULT_HOST      = "ec2.amazonaws.com"
     DEFAULT_PATH      = '/'
     DEFAULT_PROTOCOL  = 'https'
@@ -1404,7 +1405,7 @@ module RightAws
           when 'device'     then @result[:aws_device]            = @text
           when 'status'     then @result[:aws_attachment_status] = @text
           when 'attachTime' then @result[:aws_attached_at]       = Time.parse(@text)
-  end
+        end
       end
       def reset
         @result = {}
@@ -1416,8 +1417,8 @@ module RightAws
         case name
         when 'item'
           case @xmlpath
-          when 'DescribeVolumesResponse/volumeSet' then @volume = {}
-end
+            when 'DescribeVolumesResponse/volumeSet' then @volume = {}
+          end
         end
       end
       def tagend(name)

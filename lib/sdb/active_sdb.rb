@@ -101,6 +101,15 @@ module RightAws
       # Create a new handle to an Sdb account. All handles share the same per process or per thread
       # HTTP connection to Amazon Sdb. Each handle is for a specific account.
       # The +params+ are passed through as-is to RightAws::SdbInterface.new
+      # Params:
+      #    { :server       => 'sdb.amazonaws.com'  # Amazon service host: 'sdb.amazonaws.com'(default)
+      #      :port         => 443                  # Amazon service port: 80 or 443(default)
+      #      :protocol     => 'https'              # Amazon service protocol: 'http' or 'https'(default)
+      #      :signature_version => '0'             # The signature version : '0' or '1'(default)
+      #      :multi_thread => true|false           # Multi-threaded (connection per each thread): true or false(default)
+      #      :logger       => Logger Object        # Logger instance: logs to STDOUT if omitted 
+      #      :nil_representation => 'mynil'}       # interpret Ruby nil as this string value; i.e. use this string in SDB to represent Ruby nils (default is the string 'nil')
+
       def establish_connection(aws_access_key_id=nil, aws_secret_access_key=nil, params={})
         @connection = RightAws::SdbInterface.new(aws_access_key_id, aws_secret_access_key, params)
       end
@@ -259,9 +268,10 @@ module RightAws
         #  Client.find_by_name('Matias Rust')
         #  Client.find_by_name_and_city('Putin','Moscow')
         #  Client.find_by_name_and_city_and_post('Medvedev','Moscow','president')
-        #  
+        #
         #  Client.find_all_by_author('G.Bush jr')
         #  Client.find_all_by_age_and_gender_and_ethnicity('34','male','russian')
+        #  Client.find_all_by_gender_and_country('male', 'Russia', :auto_load => true, :order => 'name desc')
         #
         # Returned records have to be +reloaded+ to access their attributes.
         # 
@@ -276,37 +286,100 @@ module RightAws
         #    Client.find(:all, :limit => 10, :next_token => Client.next_token)
         #  end while Client.next_token
         #
+        #  Sort oder:
+        #    Client.find(:all, :order => 'gender')
+        #    Client.find(:all, :order => 'name desc')
+        #
+        #  Attributes auto load (be carefull - this may take lot of time for a huge bunch of records):
+        #    Client.find(:first)                      #=> #<Client:0xb77d0d40 @attributes={"id"=>"2937601a-e45d-11dc-a75f-001bfc466dd7"}, @new_record=false>
+        #    Client.find(:first, :auto_load => true)  #=> #<Client:0xb77d0d40 @attributes={"id"=>"2937601a-e45d-11dc-a75f-001bfc466dd7", "name"=>["Cat"], "toys"=>["Jons socks", "clew", "mice"]}, @new_record=false>
+        #
         def find(*args)
           options = args.last.is_a?(Hash) ? args.pop : {}
           case args.first
-            when :all   : find_every    options
-            when :first : find_initial  options
-            else          find_from_ids args, options
+            when :all   then find_every    options
+            when :first then find_initial  options
+            else             find_from_ids args, options
           end
         end
 
-        protected
-        
-        def query(query_expression=nil, max_number_of_items = nil, next_token = nil) # :nodoc:
-          @next_token = next_token
+      protected
+
+        # Returns an array of query attributes.
+        # Query_expression must be a well formated SDB query string:
+        # query_attributes("['title' starts-with 'O\\'Reily'] intersection ['year' = '2007']") #=> ["title", "year"]
+        def query_attributes(query_expression)
+          attrs = []
+          array = query_expression.scan(/['"](.*?[^\\])['"]/).flatten
+          until array.empty? do
+            attrs << array.shift # skip it's value
+            array.shift #
+          end
+          attrs
+        end
+
+        # Returns an array of [attribute_name, 'asc'|'desc']
+        def sort_options(sort_string)
+          sort_string[/['"]?(\w+)['"]? *(asc|desc)?/i]
+          [$1, ($2 || 'asc')]
+        end
+
+        # Perform a query request.
+        #
+        # Options
+        #  :query_expression     nil | string | array
+        #  :max_number_of_items  nil | integer
+        #  :next_token           nil | string
+        #  :sort_option          nil | string    "name desc|asc"
+        #
+        def query(options) # :nodoc:
+          @next_token = options[:next_token]
+          query_expression = options[:query_expression]
+          query_expression = connection.query_expression_from_array(query_expression) if query_expression.is_a?(Array)
+          # add sort_options to the query_expression
+          if options[:sort_option]
+            sort_by, sort_order = sort_options(options[:sort_option])
+            sort_query_expression = "['#{sort_by}' starts-with '']"
+            sort_by_expression    = " sort '#{sort_by}' #{sort_order}"
+            # make query_expression to be a string (it may be null)
+            query_expression = query_expression.to_s
+            # quote from Amazon:
+            # The sort attribute must be present in at least one of the predicates of the query expression.
+            if query_expression.blank?
+              query_expression = sort_query_expression
+            elsif !query_attributes(query_expression).include?(sort_by)
+              query_expression += " intersection #{sort_query_expression}"
+            end
+            query_expression += sort_by_expression
+          end
           # request items
-          query_result = self.connection.query(domain, query_expression, max_number_of_items, @next_token)
+          query_result = self.connection.query(domain, query_expression, options[:max_number_of_items], @next_token)
           @next_token = query_result[:next_token]
           items = query_result[:items].map do |name| 
             new_item = self.new('id' => name)
             new_item.mark_as_old
+            new_item.reload if options[:auto_load]
             new_item
           end
           items
         end
 
+        def reload_all_records(*list) # :nodoc:
+          list.flatten.each { |record| record.reload }
+        end
+
         def find_every(options) # :nodoc:
-          query(options[:conditions], options[:limit], options[:next_token])
+          records = query( :query_expression    => options[:conditions],
+                           :max_number_of_items => options[:limit],
+                           :next_token          => options[:next_token],
+                           :sort_option         => options[:sort] || options[:order] )
+          options[:auto_load] ? reload_all_records(records) : records
         end
 
         def find_initial(options) # :nodoc:
           options[:limit] = 1
-          find_every(options)[0]
+          record = find_every(options).first
+          options[:auto_load] ? reload_all_records(record).first : record
         end
 
         def find_from_ids(args, options) # :nodoc:
@@ -326,7 +399,7 @@ module RightAws
           result = find_every(options)
           # if one record was requested then return it
           unless bunch_of_records_requested
-            result.first
+            options[:auto_load] ? reload_all_records(result.first).first : result.first
           else
             # if a bunch of records was requested then return check that we found all of them
             # and return as an array
@@ -334,35 +407,40 @@ module RightAws
               id_list = args.map{|i| "'#{i}'"}.join(',')
               raise ActiveSdbError.new("Couldn't find all #{name} with IDs (#{id_list}) (found #{result.size} results, but was looking for #{args.size})")
             else
-              result
+              options[:auto_load] ? reload_all_records(result) : result
             end
           end
         end
 
         # find_by helpers 
-        def find_all_by_(format_str, args, limit=nil) # :nodoc:
+        def find_all_by_(format_str, args, options) # :nodoc:
           fields = format_str.to_s.sub(/^find_(all_)?by_/,'').split('_and_')
           conditions = fields.map { |field| "['#{field}'=?]" }.join(' intersection ')
-          find(:all, :conditions => [conditions, *args], :limit => limit)
+          options[:conditions] = [conditions, *args]
+          find(:all, options)
         end
 
-        def find_by_(format_str, args) # :nodoc:
-          find_all_by_(format_str, args, 1)[0]
+        def find_by_(format_str, args, options) # :nodoc:
+          options[:limit] = 1
+          find_all_by_(format_str, args, options).first
         end
 
         def method_missing(method, *args) # :nodoc:
-          if    method.to_s[/^find_all_by_/] then  return find_all_by_(method, args)
-          elsif method.to_s[/^find_by_/]     then  return find_by_(method, args)
-          else  super(method, *args)
+          if method.to_s[/^(find_all_by_|find_by_)/]
+            options = args.last.is_a?(Hash) ? args.pop : {}
+            if method.to_s[/^find_all_by_/]
+              find_all_by_(method, args, options)
+            else
+              find_by_(method, args, options)
+            end
+          else
+            super(method, *args)
           end
         end
-        
       end
       
       def self.generate_id # :nodoc:
-        result = ''
-        result = UUID.timestamp_create().to_s
-        result
+        UUID.timestamp_create().to_s
       end
       
       public

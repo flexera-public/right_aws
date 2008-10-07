@@ -54,6 +54,14 @@ module RightAws
     #   ...
     #  grantee2 = queue.grantees('another_cool_guy@email.address')
     #  grantee2.revoke('SENDMESSAGE')
+    #       
+    # Params is a hash:
+    #
+    #    {:server       => 'queue.amazonaws.com' # Amazon service host: 'queue.amazonaws.com' (default)
+    #     :port         => 443                   # Amazon service port: 80 or 443 (default)
+    #     :multi_thread => true|false            # Multi-threaded (connection per each thread): true or false (default)
+    #     :signature_version => '0'              # The signature version : '0' or '1'(default)
+    #     :logger       => Logger Object}        # Logger instance: logs to STDOUT if omitted }
     #
   class Sqs
     attr_reader :interface

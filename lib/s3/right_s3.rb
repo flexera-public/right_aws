@@ -53,6 +53,14 @@ module RightAws
     # Create a new handle to an S3 account. All handles share the same per process or per thread
     # HTTP connection to Amazon S3. Each handle is for a specific account.
     # The +params+ are passed through as-is to RightAws::S3Interface.new
+    # 
+    # Params is a hash:
+    #
+    #    {:server       => 's3.amazonaws.com'   # Amazon service host: 's3.amazonaws.com'(default)
+    #     :port         => 443                  # Amazon service port: 80 or 443(default)
+    #     :protocol     => 'https'              # Amazon service protocol: 'http' or 'https'(default)
+    #     :multi_thread => true|false           # Multi-threaded (connection per each thread): true or false(default)
+    #     :logger       => Logger Object}       # Logger instance: logs to STDOUT if omitted }
     def initialize(aws_access_key_id=nil, aws_secret_access_key=nil, params={})
       @interface = S3Interface.new(aws_access_key_id, aws_secret_access_key, params)
     end
@@ -160,6 +168,36 @@ module RightAws
         # Returns the bucket location
       def location
         @location ||= @s3.interface.bucket_location(@name)
+      end
+      
+      # Retrieves the logging configuration for a bucket. 
+      # Returns a hash of {:enabled, :targetbucket, :targetprefix}
+      # 
+      #   bucket.logging_info()
+      #   => {:enabled=>true, :targetbucket=>"mylogbucket", :targetprefix=>"loggylogs/"}
+      def logging_info
+        @s3.interface.get_logging_parse(:bucket => @name)
+      end
+      
+      # Enables S3 server access logging on a bucket.  The target bucket must have been properly configured to receive server
+      # access logs.
+      #  Params:
+      #   :targetbucket - either the target bucket object or the name of the target bucket
+      #   :targetprefix - the prefix under which all logs should be stored
+      #
+      #  bucket.enable_logging(:targetbucket=>"mylogbucket", :targetprefix=>"loggylogs/")
+      #    => true
+      def enable_logging(params)
+        AwsUtils.mandatory_arguments([:targetbucket, :targetprefix], params)
+        AwsUtils.allow_only([:targetbucket, :targetprefix], params)
+        xmldoc = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><BucketLoggingStatus xmlns=\"http://doc.s3.amazonaws.com/2006-03-01\"><LoggingEnabled><TargetBucket>#{params[:targetbucket]}</TargetBucket><TargetPrefix>#{params[:targetprefix]}</TargetPrefix></LoggingEnabled></BucketLoggingStatus>"
+        @s3.interface.put_logging(:bucket => @name, :xmldoc => xmldoc)
+      end
+      
+      # Disables S3 server access logging on a bucket.  Takes no arguments.
+      def disable_logging
+        xmldoc = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><BucketLoggingStatus xmlns=\"http://doc.s3.amazonaws.com/2006-03-01\"></BucketLoggingStatus>"
+        @s3.interface.put_logging(:bucket => @name, :xmldoc => xmldoc)
       end
 
         # Retrieve a group of keys from Amazon. 

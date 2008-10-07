@@ -127,6 +127,11 @@ class TestSdb < Test::Unit::TestCase
     assert_equal 2, Client.find_all_by_post_and_country('president','Russia').size
     # find all women in USA that love flowers
     assert_equal 2, Client.find_all_by_gender_and_country_and_hobby('female','Russia','flowers').size
+    # order and auto_load:
+    clients = Client.find_all_by_post('president', :order => 'name', :auto_load => true)
+    assert_equal [['Bush'], ['Medvedev'], ['Putin']], clients.map{|c| c['name']}
+    clients = Client.find_all_by_post('president', :order => 'name desc', :auto_load => true)
+    assert_equal [['Putin'], ['Medvedev'], ['Bush']], clients.map{|c| c['name']}
   end
   
   def test_07_find_by_helpers
@@ -135,7 +140,9 @@ class TestSdb < Test::Unit::TestCase
     # find any russian president
     assert Client.find_by_post_and_country('president','Russia')
     # find Mary in Russia that loves flowers
-    assert Client.find_by_gender_and_country_and_hobby('female','Russia','flowers')
+    # order and auto_load:
+    assert_equal ['Bush'],  Client.find_by_post('president', :order => 'name',      :auto_load => true)['name']
+    assert_equal ['Putin'], Client.find_by_post('president', :order => 'name desc', :auto_load => true)['name']
   end
   
   def test_08_reload
@@ -226,7 +233,7 @@ class TestSdb < Test::Unit::TestCase
     assert ['russian'], new_putin['language'].sort
     # --- delete_attributes
     putin.delete_attributes('language', 'hobby')
-    wait SDB_DELAY, 'test 11: after put_attributes'
+    wait SDB_DELAY, 'test 11: after delete_attributes'
     # trash hoddy and langs
     new_putin = Client.find_by_name('Putin')
     new_putin.reload

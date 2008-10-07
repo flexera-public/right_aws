@@ -5,9 +5,10 @@ For information about RightScale, see http://www.rightscale.com
 
 == DESCRIPTION:
 
-The RightScale AWS gems have been designed to provide a robust, fast, and secure interface to Amazon EC2, Amazon S3, Amazon SQS, and Amazon SDB. These gems have been used in production by RightScale since late 2006 and are being maintained to track enhancements made by Amazon. The RightScale AWS gems comprise:
+The RightScale AWS gems have been designed to provide a robust, fast, and secure interface to Amazon EC2, EBS, S3, SQS, and SDB. These gems have been used in production by RightScale since late 2006 and are being maintained to track enhancements made by Amazon. The RightScale AWS gems comprise:
 
-- RightAws::Ec2 -- interface to Amazon EC2 (Elastic Compute Cloud)
+- RightAws::Ec2 -- interface to Amazon EC2 (Elastic Compute Cloud) and the
+  associated EBS (Elastic Block Store)
 - RightAws::S3 and RightAws::S3Interface -- interface to Amazon S3 (Simple Storage Service)
 - RightAws::Sqs and RightAws::SqsInterface -- interface to first-generation Amazon SQS (Simple Queue Service) (API version 2007-05-01)
 - RightAws::SqsGen2 and RightAws::SqsGen2Interface -- interface to second-generation Amazon SQS (Simple Queue Service) (API version 2008-01-01)
@@ -15,7 +16,7 @@ The RightScale AWS gems have been designed to provide a robust, fast, and secure
 
 == FEATURES:
 
-- Full programmmatic access to EC2, S3, SQS, and SDB.
+- Full programmmatic access to EC2, EBS, S3, SQS, and SDB.
 - Complete error handling: all operations check for errors and report complete
   error information by raising an AwsError.
 - Persistent HTTP connections with robust network-level retry layer using
@@ -123,7 +124,7 @@ multithreaded mode.
   
 == REQUIREMENTS:
 
-RightAws requires REXML and the RightHttpConnection gem.
+RightAws requires REXML and the right_http_connection gem.
 If libxml and its Ruby bindings (distributed in the libxml-ruby gem) are
 present, RightAws can be configured to use them:
   RightAws::RightAWSParser.xml_lib = 'libxml'

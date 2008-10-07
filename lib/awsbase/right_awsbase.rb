@@ -24,6 +24,7 @@
 # Test
 module RightAws
   require 'md5'
+  require 'pp'
   
   class AwsUtils #:nodoc:
     @@digest = OpenSSL::Digest::Digest.new("sha1")
@@ -43,6 +44,23 @@ module RightAws
     def self.URLencode(raw)
       e = URI.escape(raw)
       e.gsub(/\+/, "%2b")
+    end
+    
+    def self.allow_only(allowed_keys, params)
+      bogus_args = []
+      params.keys.each {|p| bogus_args.push(p) unless allowed_keys.include?(p) }
+      raise AwsError.new("The following arguments were given but are not legal for the function call #{caller_method}: #{bogus_args.inspect}") if bogus_args.length > 0
+    end
+    
+    def self.mandatory_arguments(required_args, params)
+      rargs = required_args.dup
+      params.keys.each {|p| rargs.delete(p)}
+      raise AwsError.new("The following mandatory arguments were not provided to #{caller_method}: #{rargs.inspect}") if rargs.length > 0
+    end
+    
+    def self.caller_method
+      caller[1]=~/`(.*?)'/
+      $1
     end
 
   end

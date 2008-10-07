@@ -174,8 +174,33 @@ Initial release.
 
   - Removed the 1.7.2 monkey-patch of the Ruby File class on Windows.  This patch broke Rails 2.0.
     The patch is now included in the README for anyone to use at their own risk.
-  
+ 
+== 1.8.0
+
+  Release Notes:
+
+  This release adds major new features to RightAws to support Amazon's new
+  Elastic Block Store (EBS).  Via the RightAws::Ec2 module, users can create
+  and delete EBS volumes, attach and detach them from instances, snapshot
+  volumes, and list the available volumes and snapshots.
+
+  Bug fixes include correction of RightAws::S3 copy's failure to url-encode
+the source key.
+ 
 == 1.8.1
 
-* r5111, konstantin, 2008-08-19 16:19:06 +0400
-  * #1526, fixed: Right_S3 copy fails to url-encode source
+  Release Notes:
+
+  RightScale::SdbInterface & ::ActiveSdb have several enhancements, including:
+  - RightAws::SdbInterface#last_query_expression added for debug puposes
+  - RightAws::ActiveSdb::Base#query :order and :auto_load options added to support query
+    result sorting and attributes auto loading
+  - RightAws::ActiveSdb::Base#find_all_by_ and find_by_ helpers improved to support
+    :order, :auto_load, :limit and :next_token options
+  - RightAws::SdbInterface#delete_attributes bug fixed 
+  - SdbInterface allows specification of a string value to use for
+    representing Ruby nil in SDB.
+  - Sdb tests fixed and improved
+
+  The ::S3 interface now has support for S3's server access logging.
+  Amazon considers server access logging to be a beta or provisional feature.
