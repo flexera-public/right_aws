@@ -107,7 +107,8 @@ module RightAws
     # * <tt>:logger</tt>: for log messages, default: RAILS_DEFAULT_LOGGER else STDOUT
     # * <tt>:signature_version</tt>:  The signature version : '0' or '1'(default)
     # * <tt>:cache</tt>: true/false: caching for: ec2_describe_images, describe_instances,
-    # describe_security_groups, describe_key_pairs, describe_addresses, describe_availability_zones,
+    # describe_images_by_owner, describe_images_by_executable_by, describe_availability_zones,
+    # describe_security_groups, describe_key_pairs, describe_addresses, 
     # describe_volumes, describe_snapshots methods, default: false.
     #
     def initialize(aws_access_key_id=nil, aws_secret_access_key=nil, params={})
@@ -178,11 +179,19 @@ module RightAws
   #      Images
   #-----------------------------------------------------------------
 
-    def ec2_describe_images(list, list_by='ImageId', image_type=nil) #:nodoc:
-      request_hash = hash_params(list_by, list.to_a)
+    # params: 
+    #   { 'ImageId'      => ['id1', ..., 'idN'],
+    #     'Owner'        => ['self', ..., 'userN'],
+    #     'ExecutableBy' => ['self', 'all', ..., 'userN']
+    #   } 
+    def ec2_describe_images(params={}, image_type=nil, cache_for=nil) #:nodoc:
+      request_hash = {}
+      params.each do |list_by, list|
+        request_hash.merge! hash_params(list_by, list.to_a)
+      end
       request_hash['ImageType'] = image_type if image_type
       link = generate_request("DescribeImages", request_hash)
-      request_cache_or_info :describe_images, link,  QEc2DescribeImagesParser, (list.blank? && list_by == 'ImageId' && image_type.blank?)
+      request_cache_or_info cache_for, link,  QEc2DescribeImagesParser, cache_for
     rescue Exception
       on_exception
     end
@@ -213,7 +222,9 @@ module RightAws
       #      :aws_image_type => "machine"}]
       #
     def describe_images(list=[], image_type=nil)
-      ec2_describe_images(list, 'ImageId', image_type)
+      list = list.to_a
+      cache_for = list.empty? && !image_type ? :describe_images : nil
+      ec2_describe_images({ 'ImageId' => list }, image_type, cache_for)
     end
 
       #
@@ -222,8 +233,10 @@ module RightAws
       #   ec2.describe_images_by_owner('522821470517')
       #   ec2.describe_images_by_owner('self')
       #
-    def describe_images_by_owner(list, image_type=nil)
-      ec2_describe_images(list, 'Owner', image_type)
+    def describe_images_by_owner(list=['self'], image_type=nil)
+      list = list.to_a
+      cache_for = list==['self'] && !image_type ? :describe_images_by_owner : nil
+      ec2_describe_images({ 'Owner' => list }, image_type, cache_for)
     end
 
       #
@@ -231,9 +244,12 @@ module RightAws
       #
       #   ec2.describe_images_by_executable_by('522821470517')
       #   ec2.describe_images_by_executable_by('self')
+      #   ec2.describe_images_by_executable_by('all')
       #
-    def describe_images_by_executable_by(list, image_type=nil)
-      ec2_describe_images(list, 'ExecutableBy', image_type)
+    def describe_images_by_executable_by(list=['self'], image_type=nil)
+      list = list.to_a
+      cache_for = list==['self'] && !image_type ? :describe_images_by_executable_by : nil
+      ec2_describe_images({ 'ExecutableBy' => list }, image_type, cache_for)
     end
 
 
