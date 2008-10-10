@@ -182,8 +182,8 @@ module RightAws
       # Enables S3 server access logging on a bucket.  The target bucket must have been properly configured to receive server
       # access logs.
       #  Params:
-      #   :targetbucket
-      #   :targetprefix
+      #   :targetbucket - either the target bucket object or the name of the target bucket
+      #   :targetprefix - the prefix under which all logs should be stored
       #
       #  bucket.enable_logging(:targetbucket=>"mylogbucket", :targetprefix=>"loggylogs/")
       #    => true

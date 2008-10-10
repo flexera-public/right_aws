@@ -7,6 +7,7 @@ class TestS3 < Test::Unit::TestCase
   def setup
     @s3     = Rightscale::S3Interface.new(TestCredentials.aws_access_key_id, TestCredentials.aws_secret_access_key)
     @bucket = 'right_s3_awesome_test_bucket_00001'
+    @bucket2 = 'right_s3_awesome_test_bucket_00002'
     @key1   = 'test/woohoo1/'
     @key2   = 'test1/key/woohoo2'
     @key3   = 'test2/A%B@C_D&E?F+G=H"I'
@@ -391,6 +392,28 @@ class TestS3 < Test::Unit::TestCase
 
     RightAws::S3Interface.amazon_problems= nil
     assert_nil(RightAws::S3Interface.amazon_problems)
+  end
+  
+  def test_37_access_logging
+    bucket = Rightscale::S3::Bucket.create(@s, @bucket, false)
+    targetbucket = Rightscale::S3::Bucket.create(@s, @bucket2, true)
+      # Take 'AllUsers' grantee 
+    grantee = Rightscale::S3::Grantee.new(targetbucket,'http://acs.amazonaws.com/groups/s3/LogDelivery')
+ 
+    assert grantee.grant(['READ_ACP', 'WRITE'])
+    
+    assert bucket.enable_logging(:targetbucket => targetbucket, :targetprefix => "loggylogs/")
+    
+    assert_equal(bucket.logging_info, {:enabled => true, :targetbucket => @bucket2, :targetprefix => "loggylogs/"})
+    
+    assert bucket.disable_logging
+    
+      # check 'Drop' method
+    assert grantee.drop
+    
+      # Delete bucket
+    bucket.delete(true)
+    targetbucket.delete(true)
   end
 
 end

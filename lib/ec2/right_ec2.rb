@@ -106,6 +106,9 @@ module RightAws
     # * <tt>:multi_thread</tt>: true=HTTP connection per thread, false=per process
     # * <tt>:logger</tt>: for log messages, default: RAILS_DEFAULT_LOGGER else STDOUT
     # * <tt>:signature_version</tt>:  The signature version : '0' or '1'(default)
+    # * <tt>:cache</tt>: true/false: caching for: ec2_describe_images, describe_instances,
+    # describe_security_groups, describe_key_pairs, describe_addresses, describe_availability_zones,
+    # describe_volumes, describe_snapshots methods, default: false.
     #
     def initialize(aws_access_key_id=nil, aws_secret_access_key=nil, params={})
       init({ :name             => 'EC2', 
@@ -153,9 +156,9 @@ module RightAws
       # We do not want to break the logic of parsing hence will use a dummy parser to process all the standart 
       # steps (errors checking etc). The dummy parser does nothig - just returns back the params it received.
       # If the caching is enabled and hit then throw  AwsNoChange. 
-      # P.S. caching works for the whole images list only! (when the list param is blank)      response, params = request_info(link, QEc2DummyParser.new)
+      # P.S. caching works for the whole images list only! (when the list param is blank)
       # check cache
-      response, params = request_info(link, QEc2DummyParser.new)
+      response, params = request_info(link, RightDummyParser.new)
       cache_hits?(method.to_sym, response.body) if use_cache
       parser = parser_class.new(:logger => @logger)
       @@bench.xml.add!{ parser.parse(response, params) }
@@ -1317,20 +1320,7 @@ module RightAws
         @result = {}
       end
     end
-
-  #-----------------------------------------------------------------
-  #      PARSERS: Fake
-  #-----------------------------------------------------------------
   
-    # Dummy parser - does nothing
-    # Returns the original params back
-    class QEc2DummyParser  # :nodoc:
-      attr_accessor :result
-      def parse(response, params={})
-        @result = [response, params]
-      end
-    end
-    
   #-----------------------------------------------------------------
   #      PARSERS: Elastic IPs
   #-----------------------------------------------------------------

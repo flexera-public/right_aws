@@ -49,7 +49,7 @@ module RightAws
 
       # Creates new RightS3 instance.
       #
-      #  s3 = RightAws::S3Interface.new('1E3GDYEOGFJPIT7XXXXXX','hgTHt68JY07JKUY08ftHYtERkjgtfERn57XXXXXX', {:multi_thread => true, :logger => Logger.new('/tmp/x.log')}) #=> #<RightS3:0xb7b3c27c>
+      #  s3 = RightAws::S3Interface.new('1E3GDYEOGFJPIT7XXXXXX','hgTHt68JY07JKUY08ftHYtERkjgtfERn57XXXXXX', {:multi_thread => true, :logger => Logger.new('/tmp/x.log')}) #=> #<RightAws::S3Interface:0xb7b3c27c>
       #  
       # Params is a hash:
       #
@@ -99,6 +99,7 @@ module RightAws
       out_string
     end
 
+    # http://docs.amazonwebservices.com/AmazonS3/2006-03-01/index.html?BucketRestrictions.html
     def is_dns_bucket?(bucket_name)
       bucket_name = bucket_name.to_s
       return nil unless (3..63) === bucket_name.size
@@ -190,7 +191,7 @@ module RightAws
         data = "<CreateBucketConfiguration><LocationConstraint>#{headers[:location].to_s.upcase}</LocationConstraint></CreateBucketConfiguration>"
       end
       req_hash = generate_rest_request('PUT', headers.merge(:url=>bucket, :data => data))
-      request_info(req_hash, S3TrueParser.new)
+      request_info(req_hash, RightHttp2xxParser.new)
     rescue Exception => e
         # if the bucket exists AWS returns an error for the location constraint interface. Drop it
       e.is_a?(RightAws::AwsError) && e.message.include?('BucketAlreadyOwnedByYou') ? true  : on_exception
@@ -250,7 +251,7 @@ module RightAws
       #
     def delete_bucket(bucket, headers={})
       req_hash = generate_rest_request('DELETE', headers.merge(:url=>bucket))
-      request_info(req_hash, S3TrueParser.new)
+      request_info(req_hash, RightHttp2xxParser.new)
     rescue
       on_exception
     end
@@ -392,7 +393,7 @@ module RightAws
         headers['expect'] = '100-continue'
       end
       req_hash = generate_rest_request('PUT', headers.merge(:url=>"#{bucket}/#{CGI::escape key}", :data=>data))
-      request_info(req_hash, S3TrueParser.new)
+      request_info(req_hash, RightHttp2xxParser.new)
     rescue
       on_exception
     end
@@ -599,7 +600,7 @@ module RightAws
       #
     def delete(bucket, key='', headers={})
       req_hash = generate_rest_request('DELETE', headers.merge(:url=>"#{bucket}/#{CGI::escape key}"))
-      request_info(req_hash, S3TrueParser.new)
+      request_info(req_hash, RightHttp2xxParser.new)
     rescue
       on_exception
     end
@@ -1157,12 +1158,6 @@ module RightAws
           result[key] = value
         end
         result
-      end
-    end
-
-    class S3TrueParser < S3HttpResponseParser  # :nodoc:
-      def parse(response)
-        @result = response.is_a?(Net::HTTPSuccess)
       end
     end
 

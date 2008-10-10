@@ -674,5 +674,20 @@ module RightAws
     end
   end
 
+  # Dummy parser - does nothing
+  # Returns the original params back
+  class RightDummyParser  # :nodoc:
+    attr_accessor :result
+    def parse(response, params={})
+      @result = [response, params]
+    end
+  end
+
+  class RightHttp2xxParser < RightAWSParser # :nodoc:
+    def parse(response)
+      @result = response.is_a?(Net::HTTPSuccess)
+    end
+  end
+
 end
 
