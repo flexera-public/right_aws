@@ -431,7 +431,7 @@ module RightAws
       #
     def confirm_product_instance(instance, product_code)
       link = generate_request("ConfirmProductInstance", { 'ProductCode' => product_code,
-                                                          'InstanceId'  => instance })
+                                'InstanceId'  => instance })
       request_info(link, QEc2ConfirmProductInstanceParser.new(:logger => @logger))
     end
     
@@ -592,7 +592,127 @@ module RightAws
     rescue Exception
       on_exception
     end
+
+  #-----------------------------------------------------------------
+  #      Instances: Windows addons
+  #-----------------------------------------------------------------
+  
+      # Get initial Windows Server setup password from an instance console output.
+      #
+      #  my_awesome_key = ec2.create_key_pair('my_awesome_key') #=>
+      #    {:aws_key_name    => "my_awesome_key",
+      #     :aws_fingerprint => "01:02:03:f4:25:e6:97:e8:9b:02:1a:26:32:4e:58:6b:7a:8c:9f:03",
+      #     :aws_material    => "-----BEGIN RSA PRIVATE KEY-----\nMIIEpQIBAAK...Q8MDrCbuQ=\n-----END RSA PRIVATE KEY-----"}
+      #
+      #  my_awesome_instance = ec2.run_instances('ami-a000000a',1,1,['my_awesome_group'],'my_awesome_key', 'WindowsInstance!!!') #=>
+      #   [{:aws_image_id       => "ami-a000000a",
+      #     :aws_instance_id    => "i-12345678",
+      #     ...
+      #     :aws_availability_zone => "us-east-1b"
+      #     }]
+      #
+      #  # wait until instance enters 'operational' state and get it's initial password
+      #
+      #  puts ec2.get_initial_password(my_awesome_instance[:aws_instance_id], my_awesome_key[:aws_material]) #=> "MhjWcgZuY6"
+      #
+    def get_initial_password(instance_id, private_key)
+      console_output = get_console_output(instance_id)
+      crypted_password = console_output[:aws_output][%r{<Password>(.+)</Password>}m] && $1
+      unless crypted_password
+        raise AwsError.new("Initial password was not found in console output for #{instance_id}")
+      else
+        OpenSSL::PKey::RSA.new(private_key).private_decrypt(Base64.decode64(crypted_password))
+      end
+    rescue Exception
+      on_exception
+    end
+
+    # Bundle a Windows image.
+    # Internally, it queues the bundling task and shuts down the instance.
+    # It then takes a snapshot of the Windows volume bundles it, and uploads it to
+    # S3. After bundling completes, Rightaws::Ec2#register_image may be used to
+    # register the new Windows AMI for subsequent launches.
+    #
+    #   ec2.bundle_instance('i-e3e24e8a', 'my-awesome-bucket', 'my-win-image-1') #=>
+    #    [{:aws_update_time => "2008-10-16T13:58:25.000Z",
+    #      :s3_bucket       => "kd-win-1",
+    #      :s3_prefix       => "win2pr",
+    #      :aws_state       => "pending",
+    #      :aws_id          => "bun-26a7424f",
+    #      :aws_instance_id => "i-878a25ee",
+    #      :aws_start_time  => "2008-10-16T13:58:02.000Z"}]
+    #
+    def bundle_instance(instance_id, s3_bucket, s3_prefix, 
+                        s3_owner_aws_access_key_id=nil, s3_owner_aws_secret_access_key=nil,
+                        s3_expires = S3Interface::DEFAULT_EXPIRES_AFTER,
+                        s3_upload_policy='ec2-bundle-read')
+      # S3 access and signatures
+      s3_owner_aws_access_key_id     ||= @aws_access_key_id
+      s3_owner_aws_secret_access_key ||= @aws_secret_access_key
+      s3_expires = Time.now.utc + s3_expires if s3_expires.is_a?(Fixnum) && (s3_expires < S3Interface::ONE_YEAR_IN_SECONDS)
+      # policy
+      policy = { 'expiration' => s3_expires.strftime('%Y-%m-%dT%H:%M:%SZ'),
+                 'conditions' => [ { 'bucket' => s3_bucket },
+                                   { 'acl'    => s3_upload_policy },
+                                   [ 'starts-with', '$key', s3_prefix ] ] }.to_json
+      policy64        = Base64.encode64(policy).gsub("\n","")
+      signed_policy64 = AwsUtils.sign(s3_owner_aws_secret_access_key, policy64)
+      # fill request params
+      params = { 'InstanceId'                       => instance_id,
+                 'Storage.S3.AWSAccessKeyId'        => s3_owner_aws_access_key_id,
+                 'Storage.S3.UploadPolicy'          => policy64,
+                 'Storage.S3.UploadPolicySignature' => signed_policy64,
+                 'Storage.S3.Bucket'                => s3_bucket,
+                 'Storage.S3.Prefix'                => s3_prefix,
+                 }
+      link = generate_request("BundleInstance", params)
+      request_info(link, QEc2BundleInstanceParser.new)
+    rescue Exception
+      on_exception
+    end
     
+      # Describe the status of the Windows AMI bundlings.
+      # If +list+ is omitted the returns the whole list of tasks.
+      #
+      #  ec2.describe_bundle_tasks(['bun-4fa74226']) #=>
+      #    [{:s3_bucket         => "my-awesome-bucket"
+      #      :aws_id            => "bun-0fa70206",
+      #      :s3_prefix         => "win1pr",
+      #      :aws_start_time    => "2008-10-14T16:27:57.000Z",
+      #      :aws_update_time   => "2008-10-14T16:37:10.000Z",
+      #      :aws_error_code    => "Client.S3Error",
+      #      :aws_error_message =>
+      #       "AccessDenied(403)- Invalid according to Policy: Policy Condition failed: [\"eq\", \"$acl\", \"aws-exec-read\"]",
+      #      :aws_state         => "failed",
+      #      :aws_instance_id   => "i-e3e24e8a"}]
+      #
+    def describe_bundle_tasks(list=[])
+      link = generate_request("DescribeBundleTasks", hash_params('BundleId', list.to_a))
+      request_info(link, QEc2DescribeBundleTasksParser.new)
+    rescue Exception
+      on_exception
+    end
+
+      # Cancel an in‐progress or pending bundle task by id.
+      #
+      #  ec2.cancel_bundle_task('bun-73a7421a') #=>
+      #   [{:s3_bucket         => "my-awesome-bucket"
+      #     :aws_id            => "bun-0fa70206",
+      #     :s3_prefix         => "win02",
+      #     :aws_start_time    => "2008-10-14T13:00:29.000Z",
+      #     :aws_error_message => "User has requested bundling operation cancellation",
+      #     :aws_state         => "failed",
+      #     :aws_update_time   => "2008-10-14T13:01:31.000Z",
+      #     :aws_error_code    => "Client.Cancelled",
+      #     :aws_instance_id   => "i-e3e24e8a"}
+      #
+    def cancel_bundle_task(bundle_id)
+      link = generate_request("CancelBundleTask", { 'BundleId' => bundle_id })
+      request_info(link, QEc2BundleInstanceParser.new)
+    rescue Exception
+      on_exception
+    end
+
   #-----------------------------------------------------------------
   #      Security groups
   #-----------------------------------------------------------------
@@ -659,7 +779,7 @@ module RightAws
       # EC2 doesn't like an empty description...
       description = " " if description.blank?
       link = generate_request("CreateSecurityGroup", 
-                              'GroupName'        => name.to_s, 
+                              'GroupName'        => name.to_s,
                               'GroupDescription' => description.to_s)
       request_info(link, RightBoolResponseParser.new(:logger => @logger))
     rescue Exception
@@ -685,8 +805,8 @@ module RightAws
       #
     def authorize_security_group_named_ingress(name, owner, group)
       link = generate_request("AuthorizeSecurityGroupIngress", 
-                              'GroupName'                  => name.to_s, 
-                              'SourceSecurityGroupName'    => group.to_s, 
+                              'GroupName'                  => name.to_s,
+                                'SourceSecurityGroupName'    => group.to_s,
                               'SourceSecurityGroupOwnerId' => owner.to_s.gsub(/-/,''))
       request_info(link, RightBoolResponseParser.new(:logger => @logger))
     rescue Exception
@@ -699,8 +819,8 @@ module RightAws
       #
     def revoke_security_group_named_ingress(name, owner, group)
       link = generate_request("RevokeSecurityGroupIngress", 
-                              'GroupName'                  => name.to_s, 
-                              'SourceSecurityGroupName'    => group.to_s, 
+                              'GroupName'                  => name.to_s,
+                              'SourceSecurityGroupName'    => group.to_s,
                               'SourceSecurityGroupOwnerId' => owner.to_s.gsub(/-/,''))
       request_info(link, RightBoolResponseParser.new(:logger => @logger))
     rescue Exception
@@ -714,10 +834,10 @@ module RightAws
       #
     def authorize_security_group_IP_ingress(name, from_port, to_port, protocol='tcp', cidr_ip='0.0.0.0/0')
       link = generate_request("AuthorizeSecurityGroupIngress", 
-                              'GroupName'  => name.to_s, 
-                              'IpProtocol' => protocol.to_s, 
-                              'FromPort'   => from_port.to_s, 
-                              'ToPort'     => to_port.to_s, 
+                              'GroupName'  => name.to_s,
+                              'IpProtocol' => protocol.to_s,
+                              'FromPort'   => from_port.to_s,
+                              'ToPort'     => to_port.to_s,
                               'CidrIp'     => cidr_ip.to_s)
       request_info(link, RightBoolResponseParser.new(:logger => @logger))
     rescue Exception
@@ -730,10 +850,10 @@ module RightAws
       #
     def revoke_security_group_IP_ingress(name, from_port, to_port, protocol='tcp', cidr_ip='0.0.0.0/0')
       link = generate_request("RevokeSecurityGroupIngress", 
-                              'GroupName'  => name.to_s, 
-                              'IpProtocol' => protocol.to_s, 
-                              'FromPort'   => from_port.to_s, 
-                              'ToPort'     => to_port.to_s, 
+                              'GroupName'  => name.to_s,
+                              'IpProtocol' => protocol.to_s,
+                              'FromPort'   => from_port.to_s,
+                              'ToPort'     => to_port.to_s,
                               'CidrIp'     => cidr_ip.to_s)
       request_info(link, RightBoolResponseParser.new(:logger => @logger))
     rescue Exception
@@ -773,7 +893,7 @@ module RightAws
     rescue Exception
       on_exception
     end
-      
+
       # Delete a key pair. Returns +true+ or an exception.
       #
       #  ec2.delete_key_pair('my_awesome_key') #=> true
@@ -1274,6 +1394,7 @@ module RightAws
           when 'launchTime'       then @instance[:aws_launch_time]    = @text
           when 'kernelId'         then @instance[:aws_kernel_id]      = @text
           when 'ramdiskId'        then @instance[:aws_ramdisk_id]     = @text
+          when 'platform'         then @instance[:aws_platform]       = @text
           when 'availabilityZone' then @instance[:aws_availability_zone] = @text
           when 'item'
             if @xmlpath == 'DescribeInstancesResponse/reservationSet/item/instancesSet' || # DescribeInstances property
@@ -1336,7 +1457,56 @@ module RightAws
         @result = {}
       end
     end
-  
+
+  #-----------------------------------------------------------------
+  #      Instances: Wondows related part
+  #-----------------------------------------------------------------
+    class QEc2DescribeBundleTasksParser < RightAWSParser #:nodoc:
+      def tagstart(name, attributes)
+        @bundle = {} if name == 'item'
+      end
+      def tagend(name)
+        case name
+#        when 'requestId'  then @bundle[:request_id]    = @text
+        when 'instanceId' then @bundle[:aws_instance_id]   = @text
+        when 'bundleId'   then @bundle[:aws_id]            = @text
+        when 'bucket'     then @bundle[:s3_bucket]         = @text
+        when 'prefix'     then @bundle[:s3_prefix]         = @text
+        when 'startTime'  then @bundle[:aws_start_time]    = @text
+        when 'updateTime' then @bundle[:aws_update_time]   = @text
+        when 'state'      then @bundle[:aws_state]         = @text
+        when 'progress'   then @bundle[:aws_progress]      = @text
+        when 'code'       then @bundle[:aws_error_code]    = @text
+        when 'message'    then @bundle[:aws_error_message] = @text
+        when 'item'       then @result                    << @bundle
+        end
+      end
+      def reset
+        @result = []
+      end
+    end
+
+    class QEc2BundleInstanceParser < RightAWSParser #:nodoc:
+      def tagend(name)
+        case name
+#        when 'requestId'  then @result[:request_id]    = @text
+        when 'instanceId' then @result[:aws_instance_id]   = @text
+        when 'bundleId'   then @result[:aws_id]            = @text
+        when 'bucket'     then @result[:s3_bucket]         = @text
+        when 'prefix'     then @result[:s3_prefix]         = @text
+        when 'startTime'  then @result[:aws_start_time]    = @text
+        when 'updateTime' then @result[:aws_update_time]   = @text
+        when 'state'      then @result[:aws_state]         = @text
+        when 'progress'   then @result[:aws_progress]      = @text
+        when 'code'       then @result[:aws_error_code]    = @text
+        when 'message'    then @result[:aws_error_message] = @text
+        end
+      end
+      def reset
+        @result = {}
+      end
+    end
+
   #-----------------------------------------------------------------
   #      PARSERS: Elastic IPs
   #-----------------------------------------------------------------
