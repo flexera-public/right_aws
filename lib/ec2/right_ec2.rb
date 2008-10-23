@@ -68,7 +68,7 @@ module RightAws
     include RightAwsBaseInterface
     
     # Amazon EC2 API version being used
-    API_VERSION       = "2008-05-05"
+    API_VERSION       = "2008-08-08"
     DEFAULT_HOST      = "ec2.amazonaws.com"
     DEFAULT_PATH      = '/'
     DEFAULT_PROTOCOL  = 'https'
@@ -130,7 +130,7 @@ module RightAws
                       "Timestamp"         => Time.now.utc.strftime("%Y-%m-%dT%H:%M:%S.000Z"),
                       "SignatureVersion"  => signature_version }
       service_hash.update(params)
-      # prepare string to sight
+      # prepare string to sign
       string_to_sign = case signature_version
                        when '0' then service_hash["Action"] + service_hash["Timestamp"]
                        when '1' then service_hash.sort{|a,b| (a[0].to_s.downcase)<=>(b[0].to_s.downcase)}.to_s
@@ -154,7 +154,7 @@ module RightAws
     end
 
     def request_cache_or_info(method, link, parser_class, use_cache=true) #:nodoc:
-      # We do not want to break the logic of parsing hence will use a dummy parser to process all the standart 
+      # We do not want to break the logic of parsing hence will use a dummy parser to process all the standard
       # steps (errors checking etc). The dummy parser does nothig - just returns back the params it received.
       # If the caching is enabled and hit then throw  AwsNoChange. 
       # P.S. caching works for the whole images list only! (when the list param is blank)
