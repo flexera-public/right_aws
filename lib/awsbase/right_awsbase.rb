@@ -175,10 +175,13 @@ module RightAws
     def cache_hits?(function, response, do_raise=:raise)
       result = false
       if caching?
-        function     = function.to_sym
+        function = function.to_sym
+        # get rid of requestId (this bad boy was added for API 2008-08-08+ and it is uniq for every response)
+        response = response.sub(%r{<requestId>.+?</requestId>}, '')
         response_md5 = MD5.md5(response).to_s
-        # well, the response is new, reset cache data
+        # check for changes
         unless @cache[function] && @cache[function][:response_md5] == response_md5
+          # well, the response is new, reset cache data
           update_cache(function, {:response_md5 => response_md5, 
                                   :timestamp    => Time.now, 
                                   :hits         => 0, 
@@ -280,6 +283,11 @@ module RightAws
     rescue
       @error_handler = nil
       raise
+    end
+
+    # Returns Amazons request ID for the latest request
+    def last_request_id
+      @last_response && @last_response.body.to_s[%r{<requestId>(.+?)</requestId>}] && $1
     end
 
   end
