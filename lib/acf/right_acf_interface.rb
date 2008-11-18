@@ -23,19 +23,19 @@
 
 module RightAws
 
-  # = RightAws::Aws100Interface -- RightScale Amazon AWS100 interface
-  # The Aws100Interface class provides a complete interface to Amazon's
-  # AWS100 service.
+  # = RightAws::AcfInterface -- RightScale Amazon's CloudFront interface
+  # The AcfInterface class provides a complete interface to Amazon's
+  # CloudFront service.
   #
   # For explanations of the semantics of each call, please refer to
   # Amazon's documentation at
-  # http://...
+  # http://developer.amazonwebservices.com/connect/kbcategory.jspa?categoryID=211
   #
   # Example:
   #
-  #  aws100 = RightAws::Aws100Interface.new('1E3GDYEOGFJPIT7XXXXXX','hgTHt68JY07JKUY08ftHYtERkjgtfERn57XXXXXX')
+  #  acf = RightAws::AcfInterface.new('1E3GDYEOGFJPIT7XXXXXX','hgTHt68JY07JKUY08ftHYtERkjgtfERn57XXXXXX')
   #
-  #  list = aws100.list_distributions #=>
+  #  list = acf.list_distributions #=>
   #    [{:status             => "Deployed",
   #      :domain_name        => "d74zzrxmpmygb.6hops.net",
   #      :aws_id             => "E4U91HCJHGXVC",
@@ -46,7 +46,7 @@ module RightAws
   #
   #  distibution = list.first
   #
-  #  info = aws100.get_distribution(distibution[:aws_id]) #=>
+  #  info = acf.get_distribution(distibution[:aws_id]) #=>
   #    {:enabled            => true,
   #     :caller_reference   => "200809102100536497863003",
   #     :e_tag              => "E39OHHU1ON65SI",
@@ -58,7 +58,7 @@ module RightAws
   #     :origin             => "my-bucket.s3.amazonaws.com",
   #     :last_modified_time => Wed Sep 10 17:00:54 UTC 2008 }
   #
-  #  config = aws100.get_distribution_config(distibution[:aws_id]) #=>
+  #  config = acf.get_distribution_config(distibution[:aws_id]) #=>
   #    {:enabled          => true,
   #     :caller_reference => "200809102100536497863003",
   #     :e_tag            => "E39OHHU1ON65SI",
@@ -70,9 +70,9 @@ module RightAws
   #  config[:enabled] = false
   #  config[:cnames] << "web3.my-awesome-site.net"
   #
-  #  aws100.set_distribution_config(distibution[:aws_id], config) #=> true
+  #  acf.set_distribution_config(distibution[:aws_id], config) #=> true
   #
-  class Aws100Interface < RightAwsBase
+  class AcfInterface < RightAwsBase
     
     include RightAwsBaseInterface
 
@@ -90,25 +90,25 @@ module RightAws
       @@bench.service
     end
 
-    # Create a new handle to an AWS100 account. All handles share the same per process or per thread
-    # HTTP connection to Amazon AWS100. Each handle is for a specific account. The params have the
+    # Create a new handle to a CloudFront account. All handles share the same per process or per thread
+    # HTTP connection to CloudFront. Each handle is for a specific account. The params have the
     # following options:
-    # * <tt>:server</tt>: AWS100 service host, default: DEFAULT_HOST
-    # * <tt>:port</tt>: AWS100 service port, default: DEFAULT_PORT
+    # * <tt>:server</tt>: CloudFront service host, default: DEFAULT_HOST
+    # * <tt>:port</tt>: CloudFront service port, default: DEFAULT_PORT
     # * <tt>:protocol</tt>: 'http' or 'https', default: DEFAULT_PROTOCOL
     # * <tt>:multi_thread</tt>: true=HTTP connection per thread, false=per process
     # * <tt>:logger</tt>: for log messages, default: RAILS_DEFAULT_LOGGER else STDOUT
     # * <tt>:cache</tt>: true/false: caching for list_distributions method, default: false.
     #
-    #  aws100 = RightAws::Aws100Interface.new('1E3GDYEOGFJPIT7XXXXXX','hgTHt68JY07JKUY08ftHYtERkjgtfERn57XXXXXX',
-    #    {:multi_thread => true, :logger => Logger.new('/tmp/x.log')}) #=>  #<RightAws::Aws100Interface::0xb7b3c30c>
+    #  acf = RightAws::AcfInterface.new('1E3GDYEOGFJPIT7XXXXXX','hgTHt68JY07JKUY08ftHYtERkjgtfERn57XXXXXX',
+    #    {:multi_thread => true, :logger => Logger.new('/tmp/x.log')}) #=>  #<RightAws::AcfInterface::0xb7b3c30c>
     #
     def initialize(aws_access_key_id=nil, aws_secret_access_key=nil, params={})
-      init({ :name             => 'AWS100',
-             :default_host     => ENV['AWS100_URL'] ? URI.parse(ENV['AWS100_URL']).host   : DEFAULT_HOST,
-             :default_port     => ENV['AWS100_URL'] ? URI.parse(ENV['AWS100_URL']).port   : DEFAULT_PORT,
-             :default_service  => ENV['AWS100_URL'] ? URI.parse(ENV['AWS100_URL']).path   : DEFAULT_PATH,
-             :default_protocol => ENV['AWS100_URL'] ? URI.parse(ENV['AWS100_URL']).scheme : DEFAULT_PROTOCOL },
+      init({ :name             => 'ACF',
+             :default_host     => ENV['ACF_URL'] ? URI.parse(ENV['ACF_URL']).host   : DEFAULT_HOST,
+             :default_port     => ENV['ACF_URL'] ? URI.parse(ENV['ACF_URL']).port   : DEFAULT_PORT,
+             :default_service  => ENV['ACF_URL'] ? URI.parse(ENV['ACF_URL']).path   : DEFAULT_PATH,
+             :default_protocol => ENV['ACF_URL'] ? URI.parse(ENV['ACF_URL']).scheme : DEFAULT_PROTOCOL },
            aws_access_key_id     || ENV['AWS_ACCESS_KEY_ID'], 
            aws_secret_access_key || ENV['AWS_SECRET_ACCESS_KEY'], 
            params)
@@ -142,8 +142,8 @@ module RightAws
       # Raises AwsError if any banana happened.
     def request_info(request, parser, &block) # :nodoc:
       thread = @params[:multi_thread] ? Thread.current : Thread.main
-      thread[:aws100_connection] ||= Rightscale::HttpConnection.new(:exception => RightAws::AwsError, :logger => @logger)
-      request_info_impl(thread[:aws100_connection], @@bench, request, parser, &block)
+      thread[:acf_connection] ||= Rightscale::HttpConnection.new(:exception => RightAws::AwsError, :logger => @logger)
+      request_info_impl(thread[:acf_connection], @@bench, request, parser, &block)
     end
 
     def request_cache_or_info(method, request_hast, parser_class, use_cache=true) #:nodoc:
@@ -197,7 +197,7 @@ module RightAws
     # List distributions.
     # Returns an array of distributions or RightAws::AwsError exception.
     #
-    #  aws100.list_distributions #=>
+    #  acf.list_distributions #=>
     #    [{:status             => "Deployed",
     #      :domain_name        => "d74zzrxmpmygb.6hops.net",
     #      :aws_id             => "E4U91HCJHGXVC",
@@ -208,13 +208,13 @@ module RightAws
     #
     def list_distributions
       request_hash = generate_request('GET', 'distribution')
-      request_cache_or_info :list_distributions, request_hash,  Aws100DistributionListParser
+      request_cache_or_info :list_distributions, request_hash,  AcfDistributionListParser
     end
 
     # Create a new distribution.
     # Returns the just created distribution or RightAws::AwsError exception.
     #
-    #  aws100.create_distribution('bucket-for-k-dzreyev.s3.amazonaws.com', 'Woo-Hoo!', ['web1.my-awesome-site.net'] ) #=>
+    #  acf.create_distribution('bucket-for-k-dzreyev.s3.amazonaws.com', 'Woo-Hoo!', ['web1.my-awesome-site.net'] ) #=>
     #    {:comment            => "Woo-Hoo!",
     #     :enabled            => true,
     #     :location           => "E2REJM3VUN5RSI",
@@ -240,18 +240,18 @@ module RightAws
            <Origin>#{origin}</Origin>
            <CallerReference>#{caller_reference}</CallerReference>
            #{cnames_str.lstrip}
-           <Comment>#{Aws100Interface::escape(comment)}</Comment>
+           <Comment>#{AcfInterface::escape(comment.to_s)}</Comment>
            <Enabled>#{enabled}</Enabled>
         </DistributionConfig>
       EOXML
       request_hash = generate_request('POST', 'distribution', body.strip)
-      merge_headers(request_info(request_hash, Aws100DistributionParser.new))
+      merge_headers(request_info(request_hash, AcfDistributionParser.new))
     end
 
     # Get a distribution's information.
     # Returns a distribution's information or RightAws::AwsError exception.
     #
-    #  aws100.get_distribution('E2REJM3VUN5RSI') #=>
+    #  acf.get_distribution('E2REJM3VUN5RSI') #=>
     #    {:enabled            => true,
     #     :caller_reference   => "200809102100536497863003",
     #     :e_tag              => "E39OHHU1ON65SI",
@@ -265,13 +265,13 @@ module RightAws
     #
     def get_distribution(aws_id)
       request_hash = generate_request('GET', "distribution/#{aws_id}")
-      merge_headers(request_info(request_hash, Aws100DistributionParser.new))
+      merge_headers(request_info(request_hash, AcfDistributionParser.new))
     end
 
     # Get a distribution's configuration.
     # Returns a distribution's configuration or RightAws::AwsError exception.
     #
-    #  aws100.get_distribution_config('E2REJM3VUN5RSI') #=>
+    #  acf.get_distribution_config('E2REJM3VUN5RSI') #=>
     #    {:enabled          => true,
     #     :caller_reference => "200809102100536497863003",
     #     :e_tag            => "E39OHHU1ON65SI",
@@ -281,14 +281,14 @@ module RightAws
     #
     def get_distribution_config(aws_id)
       request_hash = generate_request('GET', "distribution/#{aws_id}/config")
-      merge_headers(request_info(request_hash, Aws100DistributionConfigParser.new))
+      merge_headers(request_info(request_hash, AcfDistributionConfigParser.new))
     end
 
     # Set a distribution's configuration 
     # (the :origin and the :caller_reference cannot be changed).
     # Returns +true+ on success or RightAws::AwsError exception.
     #
-    #  config = aws100.get_distribution_config('E2REJM3VUN5RSI') #=>
+    #  config = acf.get_distribution_config('E2REJM3VUN5RSI') #=>
     #    {:enabled          => true,
     #     :caller_reference => "200809102100536497863003",
     #     :e_tag            => "E39OHHU1ON65SI",
@@ -297,7 +297,7 @@ module RightAws
     #     :origin           => "my-bucket.s3.amazonaws.com"}
     #  config[:comment] = 'Olah-lah!'
     #  config[:enabled] = false
-    #  aws100.set_distribution_config('E2REJM3VUN5RSI', config) #=> true
+    #  acf.set_distribution_config('E2REJM3VUN5RSI', config) #=> true
     #
     def set_distribution_config(aws_id, config)
       # join CNAMES
@@ -312,7 +312,7 @@ module RightAws
            <Origin>#{config[:origin]}</Origin>
            <CallerReference>#{config[:caller_reference]}</CallerReference>
            #{cnames_str.lstrip}
-           <Comment>#{Aws100Interface::escape(config[:comment])}</Comment>
+           <Comment>#{AcfInterface::escape(config[:comment].to_s)}</Comment>
            <Enabled>#{config[:enabled]}</Enabled>
         </DistributionConfig>
       EOXML
@@ -324,7 +324,7 @@ module RightAws
     # Delete a distribution. The enabled distribution cannot be deleted.
     # Returns +true+ on success or RightAws::AwsError exception.
     #
-    #  aws100.delete_distribution('E2REJM3VUN5RSI', 'E39OHHU1ON65SI') #=> true
+    #  acf.delete_distribution('E2REJM3VUN5RSI', 'E39OHHU1ON65SI') #=> true
     #
     def delete_distribution(aws_id, e_tag)
       request_hash = generate_request('DELETE', "distribution/#{aws_id}", nil,
@@ -336,7 +336,7 @@ module RightAws
     #      PARSERS:
     #-----------------------------------------------------------------
 
-    class Aws100DistributionListParser < RightAWSParser # :nodoc:
+    class AcfDistributionListParser < RightAWSParser # :nodoc:
       def reset
         @result = []
       end
@@ -350,14 +350,14 @@ module RightAws
           when 'LastModifiedTime'    then @distribution[:last_modified_time] = Time.parse(@text)
           when 'DomainName'          then @distribution[:domain_name]        = @text
           when 'Origin'              then @distribution[:origin]             = @text
-          when 'Comment'             then @distribution[:comment]            = Aws100Interface::unescape(@text)
+          when 'Comment'             then @distribution[:comment]            = AcfInterface::unescape(@text)
           when 'CNAME'               then @distribution[:cnames]            << @text
           when 'DistributionSummary' then @result << @distribution
         end
       end
     end
 
-    class Aws100DistributionParser < RightAWSParser # :nodoc:
+    class AcfDistributionParser < RightAWSParser # :nodoc:
       def reset
         @result = { :cnames => [] }
       end
@@ -369,14 +369,14 @@ module RightAws
           when 'DomainName'       then @result[:domain_name]        = @text
           when 'Origin'           then @result[:origin]             = @text
           when 'CallerReference'  then @result[:caller_reference]   = @text
-          when 'Comment'          then @result[:comment]            = Aws100Interface::unescape(@text)
+          when 'Comment'          then @result[:comment]            = AcfInterface::unescape(@text)
           when 'Enabled'          then @result[:enabled]            = @text == 'true' ? true : false
           when 'CNAME'            then @result[:cnames]            << @text
         end
       end
     end
 
-    class Aws100DistributionConfigParser < RightAWSParser # :nodoc:
+    class AcfDistributionConfigParser < RightAWSParser # :nodoc:
       def reset
         @result = { :cnames => [] }
       end
@@ -384,7 +384,7 @@ module RightAws
         case name
           when 'Origin'           then @result[:origin]           = @text
           when 'CallerReference'  then @result[:caller_reference] = @text
-          when 'Comment'          then @result[:comment]          = Aws100Interface::unescape(@text)
+          when 'Comment'          then @result[:comment]          = AcfInterface::unescape(@text)
           when 'Enabled'          then @result[:enabled]          = @text == 'true' ? true : false
           when 'CNAME'            then @result[:cnames]          << @text
         end
