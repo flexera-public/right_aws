@@ -204,3 +204,9 @@ the source key.
 
   The ::S3 interface now has support for S3's server access logging.
   Amazon considers server access logging to be a beta or provisional feature.
+
+=== X.Y.Z
+
+  Release Notes:
+  - RightAws::Ec2 now supports Windows instances
+  - Amazon CloudFront support added with RightAws::AcfInterface

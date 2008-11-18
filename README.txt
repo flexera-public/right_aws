@@ -5,7 +5,9 @@ For information about RightScale, see http://www.rightscale.com
 
 == DESCRIPTION:
 
-The RightScale AWS gems have been designed to provide a robust, fast, and secure interface to Amazon EC2, EBS, S3, SQS, and SDB. These gems have been used in production by RightScale since late 2006 and are being maintained to track enhancements made by Amazon. The RightScale AWS gems comprise:
+The RightScale AWS gems have been designed to provide a robust, fast, and secure interface to Amazon EC2, EBS, S3, SQS, SDB, and CloudFront. 
+These gems have been used in production by RightScale since late 2006 and are being maintained to track enhancements made by Amazon. 
+The RightScale AWS gems comprise:
 
 - RightAws::Ec2 -- interface to Amazon EC2 (Elastic Compute Cloud) and the
   associated EBS (Elastic Block Store)
@@ -13,10 +15,11 @@ The RightScale AWS gems have been designed to provide a robust, fast, and secure
 - RightAws::Sqs and RightAws::SqsInterface -- interface to first-generation Amazon SQS (Simple Queue Service) (API version 2007-05-01)
 - RightAws::SqsGen2 and RightAws::SqsGen2Interface -- interface to second-generation Amazon SQS (Simple Queue Service) (API version 2008-01-01)
 - RightAws::SdbInterface and RightAws::ActiveSdb -- interface to Amazon SDB (SimpleDB)
+- RightAws::AcfInterface -- interface to Amazon CloudFront, a content distribution service
 
 == FEATURES:
 
-- Full programmmatic access to EC2, EBS, S3, SQS, and SDB.
+- Full programmmatic access to EC2, EBS, S3, SQS, SDB, and CloudFront.
 - Complete error handling: all operations check for errors and report complete
   error information by raising an AwsError.
 - Persistent HTTP connections with robust network-level retry layer using
@@ -62,7 +65,7 @@ concurrent requests to AWS. The way this plays out in practice is:
 Note that due to limitations in the I/O of the Ruby interpreter you
 may not get the degree of parallelism you may expect with the multi-threaded setting.
 
-By default, EC2/S3/SQS/SDB interface instances are created in single-threaded mode.  Set
+By default, EC2/S3/SQS/SDB/ACF interface instances are created in single-threaded mode.  Set
 "params[:multi_thread]" to "true" in the initialization arguments to use
 multithreaded mode.
 
@@ -82,6 +85,8 @@ multithreaded mode.
   http://developer.amazonwebservices.com/connect/entry.jspa?externalID=1148
 * For SDB read RightAws::SdbInterface, RightAws::ActiveSdb, and consult the Amazon SDB API documentation at
   http://developer.amazonwebservices.com/connect/kbcategory.jspa?categoryID=141
+* For CloudFront (ACF) read RightAws::AcfInterface and consult the Amazon CloudFront API documentation at 
+  http://developer.amazonwebservices.com/connect/kbcategory.jspa?categoryID=213
 
 == KNOWN ISSUES:
 
