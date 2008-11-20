@@ -146,22 +146,6 @@ module RightAws
       request_info_impl(thread[:acf_connection], @@bench, request, parser, &block)
     end
 
-    def request_cache_or_info(method, request_hast, parser_class, use_cache=true) #:nodoc:
-      # We do not want to break the logic of parsing hence will use a dummy parser to process all the standart
-      # steps (errors checking etc). The dummy parser does nothig - just returns back the params it received.
-      # If the caching is enabled and hit then throw  AwsNoChange.
-      # P.S. caching works for the whole images list only! (when the list param is blank)      response, params = request_info(link, QEc2DummyParser.new)
-      # check cache
-      response, params = request_info(request_hast, RightDummyParser.new)
-      cache_hits?(method.to_sym, response.body) if use_cache
-      parser = parser_class.new(:logger => @logger)
-      @@bench.xml.add!{ parser.parse(response, params) }
-      result = block_given? ? yield(parser) : parser.result
-      # update parsed data
-      update_cache(method.to_sym, :parsed => result) if use_cache
-      result
-    end
-
     #-----------------------------------------------------------------
     #      Helpers:
     #-----------------------------------------------------------------
@@ -208,7 +192,7 @@ module RightAws
     #
     def list_distributions
       request_hash = generate_request('GET', 'distribution')
-      request_cache_or_info :list_distributions, request_hash,  AcfDistributionListParser
+      request_cache_or_info :list_distributions, request_hash,  AcfDistributionListParser, @@bench
     end
 
     # Create a new distribution.
@@ -217,7 +201,7 @@ module RightAws
     #  acf.create_distribution('bucket-for-k-dzreyev.s3.amazonaws.com', 'Woo-Hoo!', ['web1.my-awesome-site.net'] ) #=>
     #    {:comment            => "Woo-Hoo!",
     #     :enabled            => true,
-    #     :location           => "E2REJM3VUN5RSI",
+    #     :location           => "https://cloudfront.amazonaws.com/2008-06-30/distribution/E2REJM3VUN5RSI",
     #     :status             => "InProgress",
     #     :aws_id             => "E2REJM3VUN5RSI",
     #     :domain_name        => "d3dxv71tbbt6cd.6hops.net",

@@ -120,7 +120,7 @@ module RightAws
     def self.caching=(caching)
       @@caching = caching
     end
-    
+
       # Current aws_access_key_id
     attr_reader :aws_access_key_id
       # Last HTTP request object
@@ -283,6 +283,22 @@ module RightAws
     rescue
       @error_handler = nil
       raise
+    end
+
+    def request_cache_or_info(method, link, parser_class, benchblock, use_cache=true) #:nodoc:
+      # We do not want to break the logic of parsing hence will use a dummy parser to process all the standard
+      # steps (errors checking etc). The dummy parser does nothig - just returns back the params it received.
+      # If the caching is enabled and hit then throw  AwsNoChange.
+      # P.S. caching works for the whole images list only! (when the list param is blank)
+      # check cache
+      response, params = request_info(link, RightDummyParser.new)
+      cache_hits?(method.to_sym, response.body) if use_cache
+      parser = parser_class.new(:logger => @logger)
+      benchblock.xml.add!{ parser.parse(response, params) }
+      result = block_given? ? yield(parser) : parser.result
+      # update parsed data
+      update_cache(method.to_sym, :parsed => result) if use_cache
+      result
     end
 
     # Returns Amazons request ID for the latest request

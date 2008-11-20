@@ -93,4 +93,11 @@ task :testactivesdb do
   require 'test/sdb/test_active_sdb.rb'
 end
 
+desc "Test CloudFront interface"
+task :testacf do
+  require 'test/test_credentials'
+  TestCredentials.get_credentials
+  require 'test/acf/test_right_acf.rb'
+end
+
 # vim: syntax=Ruby

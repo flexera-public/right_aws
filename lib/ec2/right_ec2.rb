@@ -153,22 +153,6 @@ module RightAws
       request_info_impl(thread[:ec2_connection], @@bench, request, parser)
     end
 
-    def request_cache_or_info(method, link, parser_class, use_cache=true) #:nodoc:
-      # We do not want to break the logic of parsing hence will use a dummy parser to process all the standard
-      # steps (errors checking etc). The dummy parser does nothig - just returns back the params it received.
-      # If the caching is enabled and hit then throw  AwsNoChange. 
-      # P.S. caching works for the whole images list only! (when the list param is blank)
-      # check cache
-      response, params = request_info(link, RightDummyParser.new)
-      cache_hits?(method.to_sym, response.body) if use_cache
-      parser = parser_class.new(:logger => @logger)
-      @@bench.xml.add!{ parser.parse(response, params) }
-      result = block_given? ? yield(parser) : parser.result
-      # update parsed data
-      update_cache(method.to_sym, :parsed => result) if use_cache
-      result
-    end
-
     def hash_params(prefix, list) #:nodoc:
       groups = {}
       list.each_index{|i| groups.update("#{prefix}.#{i+1}"=>list[i])} if list
@@ -191,7 +175,7 @@ module RightAws
       end
       request_hash['ImageType'] = image_type if image_type
       link = generate_request("DescribeImages", request_hash)
-      request_cache_or_info cache_for, link,  QEc2DescribeImagesParser, cache_for
+      request_cache_or_info cache_for, link,  QEc2DescribeImagesParser, @@bench, cache_for
     rescue Exception
       on_exception
     end
@@ -417,7 +401,7 @@ module RightAws
       #
     def describe_instances(list=[])
       link = generate_request("DescribeInstances", hash_params('InstanceId',list.to_a))
-      request_cache_or_info(:describe_instances, link,  QEc2DescribeInstancesParser, list.blank?) do |parser|
+      request_cache_or_info(:describe_instances, link,  QEc2DescribeInstancesParser, @@bench, list.blank?) do |parser|
         get_desc_instances(parser.result)
       end
     rescue Exception
@@ -734,7 +718,7 @@ module RightAws
       #
     def describe_security_groups(list=[])
       link = generate_request("DescribeSecurityGroups", hash_params('GroupName',list.to_a))
-      request_cache_or_info( :describe_security_groups, link,  QEc2DescribeSecurityGroupsParser, list.blank?) do |parser|
+      request_cache_or_info( :describe_security_groups, link,  QEc2DescribeSecurityGroupsParser, @@bench, list.blank?) do |parser|
         result = []     
         parser.result.each do |item|
           perms = []
@@ -874,7 +858,7 @@ module RightAws
       #
     def describe_key_pairs(list=[])
       link = generate_request("DescribeKeyPairs", hash_params('KeyName',list.to_a))
-      request_cache_or_info :describe_key_pairs, link,  QEc2DescribeKeyPairParser, list.blank?
+      request_cache_or_info :describe_key_pairs, link,  QEc2DescribeKeyPairParser, @@bench, list.blank?
     rescue Exception
       on_exception
     end
@@ -947,7 +931,7 @@ module RightAws
     def describe_addresses(list=[])
       link = generate_request("DescribeAddresses", 
                               hash_params('PublicIp',list.to_a))
-      request_cache_or_info :describe_addresses, link,  QEc2DescribeAddressesParser, list.blank?
+      request_cache_or_info :describe_addresses, link,  QEc2DescribeAddressesParser, @@bench, list.blank?
     rescue Exception
       on_exception
     end
@@ -994,7 +978,7 @@ module RightAws
     def describe_availability_zones(list=[])
       link = generate_request("DescribeAvailabilityZones", 
                               hash_params('ZoneName',list.to_a))
-      request_cache_or_info :describe_availability_zones, link,  QEc2DescribeAvailabilityZonesParser, list.blank?
+      request_cache_or_info :describe_availability_zones, link,  QEc2DescribeAvailabilityZonesParser, @@bench, list.blank?
     rescue Exception
       on_exception
     end
@@ -1026,7 +1010,7 @@ module RightAws
     def describe_volumes(list=[])
       link = generate_request("DescribeVolumes", 
                               hash_params('VolumeId',list.to_a))
-      request_cache_or_info :describe_volumes, link,  QEc2DescribeVolumesParser, list.blank?
+      request_cache_or_info :describe_volumes, link,  QEc2DescribeVolumesParser, @@bench, list.blank?
     rescue Exception
       on_exception
     end
@@ -1128,7 +1112,7 @@ module RightAws
     def describe_snapshots(list=[])
       link = generate_request("DescribeSnapshots", 
                               hash_params('SnapshotId',list.to_a))
-      request_cache_or_info :describe_snapshots, link,  QEc2DescribeSnapshotsParser, list.blank?
+      request_cache_or_info :describe_snapshots, link,  QEc2DescribeSnapshotsParser, @@bench, list.blank?
     rescue Exception
       on_exception
     end
