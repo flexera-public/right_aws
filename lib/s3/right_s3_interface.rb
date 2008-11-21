@@ -549,6 +549,10 @@ module RightAws
     #                   "server"=>"AmazonS3", 
     #                   "content-length"=>"10"}, 
     #        :object=>"polemonium"}
+    # If a block is provided, yields incrementally to the block as
+    # the response is read.  For large responses, this function is ideal as
+    # the response can be 'streamed'.  The hash containing header fields is
+    # still returned.
     def retrieve_object(params, &block)
       AwsUtils.mandatory_arguments([:bucket, :key], params)
       AwsUtils.allow_only([:bucket, :key, :headers, :md5], params)
@@ -569,7 +573,7 @@ module RightAws
       # This call is implemented as a wrapper around retrieve_object and the user may gain different semantics by creating a custom wrapper.
     def retrieve_object_and_verify(params, &block)
       AwsUtils.mandatory_arguments([:md5], params)
-      resp = retrieve_object(params, block)
+      resp = retrieve_object(params, &block)
       return resp if resp[:verified_md5]
       raise AwsError.new("Retrieved object failed MD5 checksum verification: #{resp.inspect}")
     end

@@ -205,8 +205,17 @@ the source key.
   The ::S3 interface now has support for S3's server access logging.
   Amazon considers server access logging to be a beta or provisional feature.
 
-=== X.Y.Z
+=== 1.9.0
 
   Release Notes:
-  - RightAws::Ec2 now supports Windows instances
-  - Amazon CloudFront support added with RightAws::AcfInterface
+  - RightAws::Ec2 now supports Windows instances. Added:
+   - Ec2::get_initial_password
+   - Ec2::bundle_instance
+   - Ec2::describe_bundle_tasks
+   - Ec::cancel_bundle_task
+
+  - Full Amazon CloudFront support added with RightAws::AcfInterface
+  - Bug fixes to S3Interface::store_object_and_verify and 
+    S3Interface::retrieve_object_and_verify (thanks to numerous user reports)
+  - Updates to caching for Ec2::describe_images_by methods
+  - Ec2 now has Ec2::last_request_id
