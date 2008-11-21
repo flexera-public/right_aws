@@ -453,7 +453,7 @@ module RightAws
     
       # Identical in function to store_object, but requires verification that the returned ETag is identical to the checksum passed in by the user as the 'md5' argument.
       # If the check passes, returns the response metadata with the "verified_md5" field set true.  Raises an exception if the checksums conflict.
-      # This call is implemented as a wrapper around put_object and the user may gain different semantics by creating a custom wrapper.
+      # This call is implemented as a wrapper around store_object and the user may gain different semantics by creating a custom wrapper.
       # 
       # s3.store_object_and_verify(:bucket => "foobucket", :key => "foo", :md5 => "a507841b1bc8115094b00bbe8c1b2954", :data => "polemonium" )
       #   => {"x-amz-id-2"=>"IZN3XsH4FlBU0+XYkFTfHwaiF1tNzrm6dIW2EM/cthKvl71nldfVC0oVQyydzWpb", 
@@ -474,7 +474,7 @@ module RightAws
       #                                                                          "content-length"=>"0"}
     def store_object_and_verify(params)
       AwsUtils.mandatory_arguments([:md5], params)
-      r = put_object(params)
+      r = store_object(params)
       r[:verified_md5] ? (return r) : (raise AwsError.new("Uploaded object failed MD5 checksum verification: #{r.inspect}"))
     end
     
@@ -569,7 +569,7 @@ module RightAws
       # This call is implemented as a wrapper around retrieve_object and the user may gain different semantics by creating a custom wrapper.
     def retrieve_object_and_verify(params, &block)
       AwsUtils.mandatory_arguments([:md5], params)
-      resp = get_object(params, block)
+      resp = retrieve_object(params, block)
       return resp if resp[:verified_md5]
       raise AwsError.new("Retrieved object failed MD5 checksum verification: #{resp.inspect}")
     end
