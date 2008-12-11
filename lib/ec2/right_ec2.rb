@@ -1133,6 +1133,45 @@ module RightAws
     rescue Exception
       on_exception
     end
+    
+    # Create a snapshot of specified volume, but with the normal retry algorithms disabled.
+    # This method will return immediately upon error.  The user can specify connect and read timeouts (in s)
+    # for the connection to AWS.  If the user does not specify timeouts, try_create_snapshot uses the default values
+    # in Rightscale::HttpConnection.
+    #
+    #  ec2.try_create_snapshot('vol-898a6fe0') #=> 
+    #      {:aws_volume_id  => "vol-fd9f7a94",
+    #       :aws_started_at => Tue Jun 24 18:40:40 UTC 2008,
+    #       :aws_progress   => "",
+    #       :aws_status     => "pending",
+    #       :aws_id         => "snap-d56783bc"}
+    #
+    def try_create_snapshot(volume_id, connect_timeout = nil, read_timeout = nil)
+      # For safety in the ensure block...we don't want to restore values 
+      # if we never read them in the first place
+      orig_reiteration_time = nil
+      orig_http_params = nil
+      
+      orig_reiteration_time = RightAws::AWSErrorHandler::reiteration_time
+      RightAws::AWSErrorHandler::reiteration_time = 0
+      
+      orig_http_params = Rightscale::HttpConnection::params()
+      new_http_params = orig_http_params.dup
+      new_http_params[:http_connection_retry_count] = 0
+      new_http_params[:http_connection_open_timeout] = connect_timeout if !connect_timeout.nil?
+      new_http_params[:http_connection_read_timeout] = read_timeout if !read_timeout.nil?
+      Rightscale::HttpConnection::params = new_http_params
+      
+      link = generate_request("CreateSnapshot", 
+                              "VolumeId" => volume_id.to_s)
+      request_info(link, QEc2CreateSnapshotParser.new(:logger => @logger))
+     
+    rescue Exception
+      on_exception
+    ensure
+      RightAws::AWSErrorHandler::reiteration_time = orig_reiteration_time if orig_reiteration_time
+      Rightscale::HttpConnection::params = orig_http_params if orig_http_params
+    end
 
     # Delete the specified snapshot.
     #
