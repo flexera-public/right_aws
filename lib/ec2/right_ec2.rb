@@ -68,7 +68,7 @@ module RightAws
     include RightAwsBaseInterface
     
     # Amazon EC2 API version being used
-    API_VERSION       = "2008-08-08"
+    API_VERSION       = "2008-12-01"
     DEFAULT_HOST      = "ec2.amazonaws.com"
     DEFAULT_PATH      = '/'
     DEFAULT_PROTOCOL  = 'https'
@@ -100,7 +100,9 @@ module RightAws
     # Create a new handle to an EC2 account. All handles share the same per process or per thread
     # HTTP connection to Amazon EC2. Each handle is for a specific account. The params have the
     # following options:
+    # * <tt>:endpoint_url</tt> a fully qualified url to Amazon API endpoint (this overwrites: :server, :port, :service, :protocol and :region). Example: 'https://eu-west-1.ec2.amazonaws.com/'
     # * <tt>:server</tt>: EC2 service host, default: DEFAULT_HOST
+    # * <tt>:region</tt>: EC2 region (North America by default)
     # * <tt>:port</tt>: EC2 service port, default: DEFAULT_PORT
     # * <tt>:protocol</tt>: 'http' or 'https', default: DEFAULT_PROTOCOL
     # * <tt>:multi_thread</tt>: true=HTTP connection per thread, false=per process
@@ -984,6 +986,28 @@ module RightAws
     end
 
   #-----------------------------------------------------------------
+  #      Availability zones
+  #-----------------------------------------------------------------
+
+    # Describes availability zones that are currently available to the account and their states.
+    # Returns an array of 2 keys (:zone_name and :zone_state) hashes:
+    #
+    #  ec2.describe_availability_zones  #=> [{:zone_state=>"available", :zone_name=>"us-east-1a"},
+    #                                        {:zone_state=>"available", :zone_name=>"us-east-1b"},
+    #                                        {:zone_state=>"available", :zone_name=>"us-east-1c"}]
+    #
+    #  ec2.describe_availability_zones('us-east-1c') #=> [{:zone_state=>"available", :zone_name=>"us-east-1c"}]
+    #
+    def describe_regions(list=[])
+      link = generate_request("DescribeRegions",
+                              hash_params('RegionName',list.to_a))
+      request_cache_or_info :describe_regions, link,  QEc2DescribeRegionsParser, @@bench, list.blank?
+    rescue Exception
+      on_exception
+    end
+
+
+  #-----------------------------------------------------------------
   #      EBS: Volumes
   #-----------------------------------------------------------------
   
@@ -1570,6 +1594,19 @@ module RightAws
         when 'zoneState' then @zone[:zone_state] = @text
         when 'item'      then @result << @zone
         end
+      end
+      def reset
+        @result = []
+      end
+    end
+
+  #-----------------------------------------------------------------
+  #      PARSERS: AvailabilityZones
+  #-----------------------------------------------------------------
+
+    class QEc2DescribeRegionsParser < RightAWSParser #:nodoc:
+      def tagend(name)
+        @result << @text if name == 'regionName'
       end
       def reset
         @result = []

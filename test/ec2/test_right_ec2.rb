@@ -72,5 +72,37 @@ class TestEc2 < Test::Unit::TestCase
     # check that the request has correct signature version
     assert ec2.last_request.path.include?('SignatureVersion=0')
   end
+
+  def test_11_regions
+    regions = nil
+    assert_nothing_raised do
+      regions = @ec2.describe_regions
+    end
+    # check we got more that 0 regions
+    assert regions.size > 0
+    # check an access to regions
+    regions.each do |region|
+      regional_ec2 = Rightscale::Ec2.new(TestCredentials.aws_access_key_id, TestCredentials.aws_secret_access_key, :region => region)
+      # do we have a correct endpoint server?
+      assert_equal "#{region}.ec2.amazonaws.com", regional_ec2.params[:server]
+      # get a list of images from every region
+      images = nil
+      assert_nothing_raised do
+        images = regional_ec2.describe_regions
+      end
+      # every region must have images
+      assert images.size > 0
+    end
+  end
   
+  def test_12_endpoint_url
+    ec2 = Rightscale::Ec2.new(TestCredentials.aws_access_key_id, TestCredentials.aws_secret_access_key, :endpoint_url => 'a://b.c:0/d/', :region => 'z')
+    # :endpoint_url has a priority hence :region should be ommitted
+    assert_equal 'a',   ec2.params[:protocol]
+    assert_equal 'b.c', ec2.params[:server]
+    assert_equal '/d/', ec2.params[:service]
+    assert_equal 0,     ec2.params[:port]
+    assert_nil          ec2.params[:region]
+  end
+
 end

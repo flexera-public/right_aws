@@ -148,10 +148,20 @@ module RightAws
         if aws_access_key_id.blank? || aws_secret_access_key.blank?
       @aws_access_key_id     = aws_access_key_id
       @aws_secret_access_key = aws_secret_access_key
-      @params[:server]       ||= service_info[:default_host]
-      @params[:port]         ||= service_info[:default_port]
-      @params[:service]      ||= service_info[:default_service]
-      @params[:protocol]     ||= service_info[:default_protocol]
+      # if the endpoint was explicitly defined - then use it
+      if @params[:endpoint_url]
+        @params[:server]   = URI.parse(@params[:endpoint_url]).host
+        @params[:port]     = URI.parse(@params[:endpoint_url]).port
+        @params[:service]  = URI.parse(@params[:endpoint_url]).path
+        @params[:protocol] = URI.parse(@params[:endpoint_url]).scheme
+        @params[:region]   = nil
+      else
+        @params[:server]   ||= service_info[:default_host]
+        @params[:server]     = "#{@params[:region]}.#{@params[:server]}" if @params[:region]
+        @params[:port]     ||= service_info[:default_port]
+        @params[:service]  ||= service_info[:default_service]
+        @params[:protocol] ||= service_info[:default_protocol]
+      end
       @params[:multi_thread] ||= defined?(AWS_DAEMON)
       @logger = @params[:logger]
       @logger = RAILS_DEFAULT_LOGGER if !@logger && defined?(RAILS_DEFAULT_LOGGER)
