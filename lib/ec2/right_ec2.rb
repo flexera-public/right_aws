@@ -986,17 +986,12 @@ module RightAws
     end
 
   #-----------------------------------------------------------------
-  #      Availability zones
+  #      Regions
   #-----------------------------------------------------------------
 
-    # Describes availability zones that are currently available to the account and their states.
-    # Returns an array of 2 keys (:zone_name and :zone_state) hashes:
+    # Describe regions.
     #
-    #  ec2.describe_availability_zones  #=> [{:zone_state=>"available", :zone_name=>"us-east-1a"},
-    #                                        {:zone_state=>"available", :zone_name=>"us-east-1b"},
-    #                                        {:zone_state=>"available", :zone_name=>"us-east-1c"}]
-    #
-    #  ec2.describe_availability_zones('us-east-1c') #=> [{:zone_state=>"available", :zone_name=>"us-east-1c"}]
+    #  ec2.describe_regions  #=> ["eu-west-1", "us-east-1"]
     #
     def describe_regions(list=[])
       link = generate_request("DescribeRegions",
