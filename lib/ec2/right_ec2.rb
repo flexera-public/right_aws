@@ -971,11 +971,13 @@ module RightAws
     # Describes availability zones that are currently available to the account and their states.
     # Returns an array of 2 keys (:zone_name and :zone_state) hashes:
     #
-    #  ec2.describe_availability_zones  #=> [{:zone_state=>"available", :zone_name=>"us-east-1a"}, 
-    #                                        {:zone_state=>"available", :zone_name=>"us-east-1b"}, 
-    #                                        {:zone_state=>"available", :zone_name=>"us-east-1c"}]
+    #  ec2.describe_availability_zones  #=> [{:region_name=>"us-east-1",
+    #                                         :zone_name=>"us-east-1a",
+    #                                         :zone_state=>"available"}, ... ]
     #
-    #  ec2.describe_availability_zones('us-east-1c') #=> [{:zone_state=>"available", :zone_name=>"us-east-1c"}]
+    #  ec2.describe_availability_zones('us-east-1c') #=> [{:region_name=>"us-east-1", 
+    #                                                      :zone_state=>"available",
+    #                                                      :zone_name=>"us-east-1c"}]
     #
     def describe_availability_zones(list=[])
       link = generate_request("DescribeAvailabilityZones", 
@@ -1585,8 +1587,9 @@ module RightAws
       end
       def tagend(name)
         case name
-        when 'zoneName'  then @zone[:zone_name]  = @text
-        when 'zoneState' then @zone[:zone_state] = @text
+        when 'regionName' then @zone[:region_name] = @text
+        when 'zoneName'   then @zone[:zone_name]   = @text
+        when 'zoneState'  then @zone[:zone_state]  = @text
         when 'item'      then @result << @zone
         end
       end
@@ -1596,7 +1599,7 @@ module RightAws
     end
 
   #-----------------------------------------------------------------
-  #      PARSERS: AvailabilityZones
+  #      PARSERS: Regions
   #-----------------------------------------------------------------
 
     class QEc2DescribeRegionsParser < RightAWSParser #:nodoc:
