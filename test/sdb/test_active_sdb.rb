@@ -228,8 +228,12 @@ class TestSdb < Test::Unit::TestCase
     putin = Client.find_by_name('Putin')
     putin.reload
     # --- delete_values
+    # remove an unknown attribute
+    # should return an empty hash
+    assert_equal( {}, putin.delete_values('undefined_attribute' => 'ohoho'))
     # remove 2 languages
-    putin.delete_values('language' => ['english', 'german'])
+    lang_hash = {'language' => ['english', 'german']}
+    assert_equal lang_hash, putin.delete_values(lang_hash)
     wait SDB_DELAY, 'test 11: after put_attributes'
     # now Putin must know only russian lang
     new_putin = Client.find_by_name('Putin')

@@ -703,7 +703,15 @@ module RightAws
         attrs.delete('id')
         unless attrs.blank?
           connection.delete_attributes(domain, id, attrs)
-          attrs.each { |attribute, values| @attributes[attribute] -= values }
+          attrs.each do |attribute, values|
+            # remove the values from the attribute
+            if @attributes[attribute]
+              @attributes[attribute] -= values
+            else
+              # if the attribute is unknown remove it from a resulting list of fixed attributes
+              attrs.delete(attribute)
+            end
+          end
         end
         attrs
       end
