@@ -198,7 +198,7 @@ module RightAws
     # Create a new distribution.
     # Returns the just created distribution or RightAws::AwsError exception.
     #
-    #  acf.create_distribution('bucket-for-k-dzreyev.s3.amazonaws.com', 'Woo-Hoo!', ['web1.my-awesome-site.net'] ) #=>
+    #  acf.create_distribution('bucket-for-k-dzreyev.s3.amazonaws.com', 'Woo-Hoo!', true, ['web1.my-awesome-site.net'] ) #=>
     #    {:comment            => "Woo-Hoo!",
     #     :enabled            => true,
     #     :location           => "https://cloudfront.amazonaws.com/2008-06-30/distribution/E2REJM3VUN5RSI",
