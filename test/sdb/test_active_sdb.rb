@@ -107,6 +107,10 @@ class TestSdb < Test::Unit::TestCase
     assert_raise(RightAws::ActiveSdb::ActiveSdbError) do 
       Client.find(ids)
     end
+    # find one record by unknown id
+    assert_raise(RightAws::ActiveSdb::ActiveSdbError) do
+      Client.find('dummy_id')
+    end
   end
 
   def test_05_find_first

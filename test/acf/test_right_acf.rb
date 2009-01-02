@@ -1,6 +1,6 @@
 require File.dirname(__FILE__) + '/test_helper.rb'
 
-class TestS3 < Test::Unit::TestCase
+class TestAcf < Test::Unit::TestCase
 
   RIGHT_OBJECT_TEXT     = 'Right test message'
   

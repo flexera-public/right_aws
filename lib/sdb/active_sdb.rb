@@ -24,7 +24,7 @@
 begin
   require 'uuidtools'
 rescue LoadError => e
-  STDERR.puts("RightSDB Alpha requires the uuidtools gem.  Run \'gem install uuidtools\' and try again.")
+  STDERR.puts("RightSDB requires the uuidtools gem.  Run \'gem install uuidtools\' and try again.")
   exit
 end
 
@@ -358,14 +358,19 @@ module RightAws
           items = query_result[:items].map do |name| 
             new_item = self.new('id' => name)
             new_item.mark_as_old
-            new_item.reload if options[:auto_load]
+            reload_if_exists(record) if options[:auto_load]
             new_item
           end
           items
         end
 
+        # reload a record unless it is nil
+        def reload_if_exists(record) # :nodoc:
+          record && record.reload
+        end
+
         def reload_all_records(*list) # :nodoc:
-          list.flatten.each { |record| record.reload }
+          list.flatten.each { |record| reload_if_exists(record) }
         end
 
         def find_every(options) # :nodoc:
@@ -399,7 +404,10 @@ module RightAws
           result = find_every(options)
           # if one record was requested then return it
           unless bunch_of_records_requested
-            options[:auto_load] ? reload_all_records(result.first).first : result.first
+            record = result.first
+            # railse if nothing was found
+            raise ActiveSdbError.new("Couldn't find #{name} with ID #{args}") unless record
+            options[:auto_load] ? reload_all_records(record).first : record
           else
             # if a bunch of records was requested then return check that we found all of them
             # and return as an array
