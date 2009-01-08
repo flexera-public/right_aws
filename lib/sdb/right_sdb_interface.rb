@@ -437,6 +437,77 @@ module RightAws
       on_exception
     end
     
+    # Perform a query and fetch specified attributes.
+    # If attributes are not specified then fetches the whole list of attributes.
+    #
+    #
+    # Returns a hash:
+    #   { :box_usage  => string,
+    #     :request_id => string,
+    #     :next_token => string,
+    #     :items      => { ItemName1 =>
+    #                        { attribute1 => value1, ...  attributeM => valueM },
+    #                      ItemName2 => ... }
+    #
+    # Example:
+    #
+    #   sdb.query_with_attributes(domain, ['hobby', 'country'], "['gender'='female'] intersection ['name' starts-with ''] sort 'name'") #=>
+    #     { :request_id=>"06057228-70d0-4487-89fb-fd9c028580d3",
+    #       :items=>
+    #         { "035f1ba8-dbd8-11dd-80bd-001bfc466dd7"=>
+    #           { "hobby"=>["cooking", "flowers", "cats"], "country"=>["Russia"]},
+    #           "0327614a-dbd8-11dd-80bd-001bfc466dd7"=>
+    #           { "hobby"=>["patchwork", "bundle jumping"], "country"=>["USA"]}, ... },
+    #        :box_usage=>"0.0000504786"}
+    #
+    #   sdb.query_with_attributes(domain, [], "['gender'='female'] intersection ['name' starts-with ''] sort 'name'") #=>
+    #     { :request_id=>"75bb19db-a529-4f69-b86f-5e3800f79a45",
+    #       :items=>
+    #       { "035f1ba8-dbd8-11dd-80bd-001bfc466dd7"=>
+    #         { "hobby"=>["cooking", "flowers", "cats"],
+    #           "name"=>["Mary"],
+    #           "country"=>["Russia"],
+    #           "gender"=>["female"],
+    #           "id"=>["035f1ba8-dbd8-11dd-80bd-001bfc466dd7"]},
+    #         "0327614a-dbd8-11dd-80bd-001bfc466dd7"=>
+    #         { "hobby"=>["patchwork", "bundle jumping"],
+    #           "name"=>["Mary"],
+    #           "country"=>["USA"],
+    #           "gender"=>["female"],
+    #           "id"=>["0327614a-dbd8-11dd-80bd-001bfc466dd7"]}, ... },
+    #      :box_usage=>"0.0000506668"}
+    #
+    # see: http://docs.amazonwebservices.com/AmazonSimpleDB/2007-11-07/DeveloperGuide/index.html?SDB_API_QueryWithAttributes.html
+    #
+    def query_with_attributes(domain_name, attributes=[], query_expression = nil, max_number_of_items = nil, next_token = nil)
+      attributes = attributes.to_a
+      query_expression = query_expression_from_array(query_expression) if query_expression.is_a?(Array)
+      @last_query_expression = query_expression
+      #
+      request_params = { 'DomainName'       => domain_name,
+                         'QueryExpression'  => query_expression,
+                         'MaxNumberOfItems' => max_number_of_items,
+                         'NextToken'        => next_token }
+      attributes.each_with_index do |attribute, idx|
+        request_params["AttributeName.#{idx+1}"] = attribute
+      end
+      link   = generate_request("QueryWithAttributes", request_params)
+      result = request_info( link, QSdbQueryWithAttributesRarser.new )
+      # return result if no block given
+      return result unless block_given?
+      # loop if block if given
+      begin
+        # the block must return true if it wanna continue
+        break unless yield(result) && result[:next_token]
+        # make new request
+        request_params['NextToken'] = result[:next_token]
+        link   = generate_request("QueryWithAttributes", request_params)
+        result = request_info( link, QSdbQueryWithAttributesRarser.new )
+      end while true
+    rescue Exception
+      on_exception
+    end
+
     #-----------------------------------------------------------------
     #      PARSERS:
     #-----------------------------------------------------------------
@@ -491,6 +562,29 @@ module RightAws
         when 'BoxUsage'  then @result[:box_usage]  =  @text
         when 'RequestId' then @result[:request_id] =  @text
         when 'NextToken' then @result[:next_token] =  @text
+        end
+      end
+    end
+
+    class QSdbQueryWithAttributesRarser < RightAWSParser #:nodoc:
+      def reset
+        @result = { :items => {} }
+      end
+      def tagend(name)
+        case name
+        when 'Name'
+          case @xmlpath
+          when 'QueryWithAttributesResponse/QueryWithAttributesResult/Item'
+            @item = @text
+            @result[:items][@item] = {}
+          when 'QueryWithAttributesResponse/QueryWithAttributesResult/Item/Attribute'
+            @attribute = @text
+            @result[:items][@item][@attribute] ||= []
+          end
+        when 'RequestId' then @result[:request_id] = @text
+        when 'BoxUsage'  then @result[:box_usage]  = @text
+        when 'NextToken' then @result[:next_token] = @text
+        when 'Value'     then @result[:items][@item][@attribute] << @text
         end
       end
     end
