@@ -74,7 +74,12 @@ module RightAws
     def self.sign_request_v2(aws_secret_access_key, service_hash, http_verb, host, uri)
       fix_service_params(service_hash, '2')
       # select a signing method
-      service_hash['SignatureMethod'] ||= 'HmacSHA256'
+      if OpenSSL::OPENSSL_VERSION_NUMBER > 0x00908000
+        service_hash['SignatureMethod'] ||= 'HmacSHA256'
+      else
+        # make an old openssl working with sha1
+        service_hash['SignatureMethod'] = 'HmacSHA1'
+      end
       if service_hash['SignatureMethod'] == 'HmacSHA256'
         digest = @@digest256
       else
