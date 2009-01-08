@@ -176,7 +176,7 @@ module RightAws
         end
       end
     end
-    
+
     # Retrieve a list of SDB domains from Amazon.
     # 
     # Returns a hash:
@@ -492,7 +492,7 @@ module RightAws
         request_params["AttributeName.#{idx+1}"] = attribute
       end
       link   = generate_request("QueryWithAttributes", request_params)
-      result = request_info( link, QSdbQueryWithAttributesRarser.new )
+      result = request_info( link, QSdbQueryWithAttributesParser.new )
       # return result if no block given
       return result unless block_given?
       # loop if block if given
@@ -502,7 +502,74 @@ module RightAws
         # make new request
         request_params['NextToken'] = result[:next_token]
         link   = generate_request("QueryWithAttributes", request_params)
-        result = request_info( link, QSdbQueryWithAttributesRarser.new )
+        result = request_info( link, QSdbQueryWithAttributesParser.new )
+      end while true
+    rescue Exception
+      on_exception
+    end
+
+    # SQL-like select.
+    # Attribute values must be quoted with a single or double quote. If a quote appears within the attribute value, it must be escaped with the same quote symbol as shown in the following example.
+    # (Use array to pass select_expression params to avoid manual escaping).
+    #
+    #  sdb.select(["select * from my_domain where gender=?", 'female']) #=>
+    #    {:request_id=>"8241b843-0fb9-4d66-9100-effae12249ec",
+    #     :items=>
+    #      {"035f1ba8-dbd8-11dd-80bd-001bfc466dd7"=>
+    #        {"hobby"=>["cooking", "flowers", "cats"],
+    #         "name"=>["Mary"],
+    #         "country"=>["Russia"],
+    #         "gender"=>["female"],
+    #         "id"=>["035f1ba8-dbd8-11dd-80bd-001bfc466dd7"]},
+    #       "0327614a-dbd8-11dd-80bd-001bfc466dd7"=>
+    #        {"hobby"=>["patchwork", "bundle jumping"],
+    #         "name"=>["Mary"],
+    #         "country"=>["USA"],
+    #         "gender"=>["female"],
+    #         "id"=>["0327614a-dbd8-11dd-80bd-001bfc466dd7"]}, ... }
+    #     :box_usage=>"0.0000506197"}
+    #
+    #   sdb.select('select country, name from my_domain') #=>
+    #    {:request_id=>"b1600198-c317-413f-a8dc-4e7f864a940a",
+    #     :items=>
+    #      {"035f1ba8-dbd8-11dd-80bd-001bfc466dd7"=>
+    #        {"name"=>["Mary"], "country"=>["Russia"]},
+    #       "376d2e00-75b0-11dd-9557-001bfc466dd7"=>
+    #        {"name"=>["Putin"], "country"=>["Russia"]},
+    #       "0327614a-dbd8-11dd-80bd-001bfc466dd7"=>
+    #        {"name"=>["Mary"], "country"=>["USA"]},
+    #       "372ebbd4-75b0-11dd-9557-001bfc466dd7"=>
+    #        {"name"=>["Bush"], "country"=>["USA"]},
+    #       "37a4e552-75b0-11dd-9557-001bfc466dd7"=>
+    #        {"name"=>["Medvedev"], "country"=>["Russia"]},
+    #       "38278dfe-75b0-11dd-9557-001bfc466dd7"=>
+    #        {"name"=>["Mary"], "country"=>["Russia"]},
+    #       "37df6c36-75b0-11dd-9557-001bfc466dd7"=>
+    #        {"name"=>["Mary"], "country"=>["USA"]}},
+    #     :box_usage=>"0.0000777663"}
+    #
+    # see: http://docs.amazonwebservices.com/AmazonSimpleDB/2007-11-07/DeveloperGuide/index.html?SDB_API_Select.html
+    #      http://docs.amazonwebservices.com/AmazonSimpleDB/2007-11-07/DeveloperGuide/index.html?UsingSelect.html
+    #      http://docs.amazonwebservices.com/AmazonSimpleDB/2007-11-07/DeveloperGuide/index.html?SDBLimits.html
+    #
+    def select(select_expression, next_token = nil)
+      select_expression      = query_expression_from_array(select_expression) if select_expression.is_a?(Array)
+      @last_query_expression = select_expression
+      #
+      request_params = { 'SelectExpression' => select_expression,
+                         'NextToken'        => next_token }
+      link   = generate_request("Select", request_params)
+      result = request_info( link, QSdbSelectParser.new )
+      # return result if no block given
+      return result unless block_given?
+      # loop if block if given
+      begin
+        # the block must return true if it wanna continue
+        break unless yield(result) && result[:next_token]
+        # make new request
+        request_params['NextToken'] = result[:next_token]
+        link   = generate_request("Select", request_params)
+        result = request_info( link, QSdbSelectParser.new )
       end while true
     rescue Exception
       on_exception
@@ -566,7 +633,7 @@ module RightAws
       end
     end
 
-    class QSdbQueryWithAttributesRarser < RightAWSParser #:nodoc:
+    class QSdbQueryWithAttributesParser < RightAWSParser #:nodoc:
       def reset
         @result = { :items => {} }
       end
@@ -578,6 +645,29 @@ module RightAws
             @item = @text
             @result[:items][@item] = {}
           when 'QueryWithAttributesResponse/QueryWithAttributesResult/Item/Attribute'
+            @attribute = @text
+            @result[:items][@item][@attribute] ||= []
+          end
+        when 'RequestId' then @result[:request_id] = @text
+        when 'BoxUsage'  then @result[:box_usage]  = @text
+        when 'NextToken' then @result[:next_token] = @text
+        when 'Value'     then @result[:items][@item][@attribute] << @text
+        end
+      end
+    end
+
+    class QSdbSelectParser < RightAWSParser #:nodoc:
+      def reset
+        @result = { :items => {} }
+      end
+      def tagend(name)
+        case name
+        when 'Name'
+          case @xmlpath
+          when 'SelectResponse/SelectResult/Item'
+            @item = @text
+            @result[:items][@item] = {}
+          when 'SelectResponse/SelectResult/Item/Attribute'
             @attribute = @text
             @result[:items][@item][@attribute] ||= []
           end
