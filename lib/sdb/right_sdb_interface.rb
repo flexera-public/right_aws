@@ -78,28 +78,25 @@ module RightAws
       params.delete_if {|key,value| value.nil? }
       #params_string  = params.to_a.collect{|key,val| key + "=#{CGI::escape(val.to_s)}" }.join("&")
       # prepare service data
-      service_hash = {"Action"            => action,
-                      "AWSAccessKeyId"    => @aws_access_key_id,
-                      "Version"           => API_VERSION,
-                      "Timestamp"         => Time.now.utc.strftime("%Y-%m-%dT%H:%M:%S.000Z"),
-                      "SignatureVersion"  => signature_version }
+      service = '/'
+      service_hash = {"Action"         => action,
+                      "AWSAccessKeyId" => @aws_access_key_id,
+                      "Version"        => API_VERSION }
       service_hash.update(params)
-      # prepare string to sight
-      string_to_sign = case signature_version
-                       when '0' then service_hash["Action"] + service_hash["Timestamp"]
-                       when '1' then service_hash.sort{|a,b| (a[0].to_s.downcase)<=>(b[0].to_s.downcase)}.to_s
-                       end
-      service_hash.update('Signature' =>  AwsUtils::sign(@aws_secret_access_key, string_to_sign))
-      service_string = service_hash.to_a.collect{|key,val| key + "=#{CGI::escape(val.to_s)}" }.join("&")
+      service_params = signed_service_params(@aws_secret_access_key, service_hash, :get, @params[:server], service)
       #
       # use POST method if the length of the query string is too large
       # see http://docs.amazonwebservices.com/AmazonSimpleDB/2007-11-07/DeveloperGuide/MakingRESTRequests.html
-      if service_string.size > 2000
-        request      = Net::HTTP::Post.new("/")
-        request.body = service_string
+      if service_params.size > 2000
+        if signature_version == '2'
+          # resign the request because HTTP verb is included into signature
+          service_params = signed_service_params(@aws_secret_access_key, service_hash, :post, @params[:server], service)
+        end
+        request      = Net::HTTP::Post.new(service)
+        request.body = service_params
+        request['Content-Type'] = 'application/x-www-form-urlencoded'
       else
-        #params_string = "&#{params_string}" unless params_string.blank?
-        request       = Net::HTTP::Get.new("/?#{service_string}")
+        request = Net::HTTP::Get.new("#{service}?#{service_params}")
       end
       # prepare output hash
       { :request  => request, 

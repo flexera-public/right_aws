@@ -126,20 +126,12 @@ module RightAws
 
 
     def generate_request(action, params={}) #:nodoc:
-      service_hash = {"Action"            => action,
-                      "AWSAccessKeyId"    => @aws_access_key_id,
-                      "Version"           => @@api,
-                      "Timestamp"         => Time.now.utc.strftime("%Y-%m-%dT%H:%M:%S.000Z"),
-                      "SignatureVersion"  => signature_version }
+      service_hash = {"Action"         => action,
+                      "AWSAccessKeyId" => @aws_access_key_id,
+                      "Version"        => @@api }
       service_hash.update(params)
-      # prepare string to sign
-      string_to_sign = case signature_version
-                       when '0' then service_hash["Action"] + service_hash["Timestamp"]
-                       when '1' then service_hash.sort{|a,b| (a[0].to_s.downcase)<=>(b[0].to_s.downcase)}.to_s
-                       end
-      service_hash.update('Signature' =>  AwsUtils::sign(@aws_secret_access_key, string_to_sign))
-      request_params = service_hash.to_a.collect{|key,val| key + "=" + CGI::escape(val) }.join("&")
-      request        = Net::HTTP::Get.new("#{@params[:service]}?#{request_params}")
+      service_params = signed_service_params(@aws_secret_access_key, service_hash, :get, @params[:server], @params[:service])
+      request        = Net::HTTP::Get.new("#{@params[:service]}?#{service_params}")
         # prepare output hash
       { :request  => request, 
         :server   => @params[:server],

@@ -27,9 +27,68 @@ module RightAws
   require 'pp'
   
   class AwsUtils #:nodoc:
-    @@digest = OpenSSL::Digest::Digest.new("sha1")
+    @@digest1   = OpenSSL::Digest::Digest.new("sha1")
+    @@digest256 = OpenSSL::Digest::Digest.new("sha256")
+    
     def self.sign(aws_secret_access_key, auth_string)
-      Base64.encode64(OpenSSL::HMAC.digest(@@digest, aws_secret_access_key, auth_string)).strip
+      Base64.encode64(OpenSSL::HMAC.digest(@@digest1, aws_secret_access_key, auth_string)).strip
+    end
+
+    # Escape a string accordingly Amazon rulles
+    # http://docs.amazonwebservices.com/AmazonSimpleDB/2007-11-07/DeveloperGuide/index.html?REST_RESTAuth.html
+    def self.amz_escape(param)
+      param.to_s.gsub(/([^a-zA-Z0-9-._~]+)/n) do
+        '%' + $1.unpack('H2' * $1.size).join('%').upcase
+      end
+    end
+
+    # Set a timestamp and a signature version
+    def self.fix_service_params(service_hash, signature)
+      service_hash["Timestamp"] ||= Time.now.utc.strftime("%Y-%m-%dT%H:%M:%S.000Z") unless service_hash["Expires"]
+      service_hash["SignatureVersion"] = signature
+      service_hash
+    end
+
+    # Signature Version 0
+    # A deprecated guy (should work till septemper 2009)
+    def self.sign_request_v0(aws_secret_access_key, service_hash)
+      fix_service_params(service_hash, '0')
+      string_to_sign = "#{service_hash['Action']}#{service_hash['Timestamp'] || service_hash['Expires']}"
+      service_hash['Signature'] = AwsUtils::sign(aws_secret_access_key, string_to_sign)
+      service_hash.to_a.collect{|key,val| "#{amz_escape(key)}=#{amz_escape(val.to_s)}" }.join("&")
+    end
+
+    # Signature Version 1
+    # Another deprecated guy (should work till septemper 2009)
+    def self.sign_request_v1(aws_secret_access_key, service_hash)
+      fix_service_params(service_hash, '1')
+      string_to_sign = service_hash.sort{|a,b| (a[0].to_s.downcase)<=>(b[0].to_s.downcase)}.to_s
+      service_hash['Signature'] = AwsUtils::sign(aws_secret_access_key, string_to_sign)
+      service_hash.to_a.collect{|key,val| "#{amz_escape(key)}=#{amz_escape(val.to_s)}" }.join("&")
+    end
+
+    # Signature Version 2
+    # EC2, SQS and SDB requests must be signed by this guy.
+    # See:  http://docs.amazonwebservices.com/AmazonSimpleDB/2007-11-07/DeveloperGuide/index.html?REST_RESTAuth.html
+    #       http://developer.amazonwebservices.com/connect/entry.jspa?externalID=1928
+    def self.sign_request_v2(aws_secret_access_key, service_hash, http_verb, host, uri)
+      fix_service_params(service_hash, '2')
+      # select a signing method
+      service_hash['SignatureMethod'] ||= 'HmacSHA256'
+      if service_hash['SignatureMethod'] == 'HmacSHA256'
+        digest = @@digest256
+      else
+        service_hash['SignatureMethod'] == 'HmacSHA1'
+        digest = @@digest1
+      end
+      # form string to sign
+      canonical_string = service_hash.keys.sort.map do |key|
+        "#{amz_escape(key)}=#{amz_escape(service_hash[key])}"
+      end.join('&')
+      string_to_sign = "#{http_verb.to_s.upcase}\n#{host.downcase}\n#{uri}\n#{canonical_string}"
+      # sign the string
+      signature      = amz_escape(Base64.encode64(OpenSSL::HMAC.digest(digest, aws_secret_access_key, string_to_sign)).strip)
+      "#{canonical_string}&Signature=#{signature}"
     end
 
     # From Amazon's SQS Dev Guide, a brief description of how to escape:
@@ -111,7 +170,7 @@ module RightAws
   end
 
   module RightAwsBaseInterface
-    DEFAULT_SIGNATURE_VERSION = '1'
+    DEFAULT_SIGNATURE_VERSION = '2'
     
     @@caching = false
     def self.caching
@@ -170,6 +229,15 @@ module RightAws
       @error_handler = nil
       @cache = {}
       @signature_version = (params[:signature_version] || DEFAULT_SIGNATURE_VERSION).to_s
+    end
+
+    def signed_service_params(aws_secret_access_key, service_hash, http_verb=nil, host=nil, service=nil )
+      case signature_version.to_s
+      when '0' then AwsUtils::sign_request_v0(aws_secret_access_key, service_hash)
+      when '1' then AwsUtils::sign_request_v1(aws_secret_access_key, service_hash)
+      when '2' then AwsUtils::sign_request_v2(aws_secret_access_key, service_hash, http_verb, host, service)
+      else raise AwsError.new("Unknown signature version (#{signature_version.to_s}) requested")
+      end
     end
 
     # Returns +true+ if the describe_xxx responses are being cached 

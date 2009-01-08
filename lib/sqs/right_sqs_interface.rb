@@ -78,24 +78,17 @@ module RightAws
     def generate_request(action, params={})  # :nodoc:
         # Sometimes we need to use queue uri (delete queue etc)
         # In that case we will use Symbol key: 'param[:queue_url]'
-      queue_uri = params[:queue_url] ? URI(params[:queue_url]).path : '/'
+      service = params[:queue_url] ? URI(params[:queue_url]).path : '/'
         # remove unset(=optional) and symbolyc keys
       params.each{ |key, value| params.delete(key) if (value.nil? || key.is_a?(Symbol)) }
         # prepare output hash
       service_hash = { "Action"           => action,
                        "Expires"          => (Time.now + REQUEST_TTL).utc.strftime("%Y-%m-%dT%H:%M:%SZ"),
                        "AWSAccessKeyId"   => @aws_access_key_id,
-                       "Version"          => API_VERSION,
-                       "SignatureVersion" => signature_version }
+                       "Version"          => API_VERSION }
       service_hash.update(params)
-      # prepare string to sight
-      string_to_sign = case signature_version
-                       when '0' : service_hash["Action"] + service_hash["Expires"]
-                       when '1' : service_hash.sort{|a,b| (a[0].to_s.downcase)<=>(b[0].to_s.downcase)}.to_s
-                       end
-      service_hash['Signature'] = AwsUtils::sign(@aws_secret_access_key, string_to_sign)
-      request_params = service_hash.to_a.collect{|key,val| key.to_s + "=" + CGI::escape(val.to_s) }.join("&")
-      request        = Net::HTTP::Get.new("#{queue_uri}?#{request_params}")
+      service_params = signed_service_params(@aws_secret_access_key, service_hash, :get, @params[:server], service)
+      request        = Net::HTTP::Get.new("#{AwsUtils::URLencode(service)}?#{service_params}")
         # prepare output hash
       { :request  => request, 
         :server   => @params[:server],

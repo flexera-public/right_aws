@@ -38,7 +38,6 @@ module RightAws
   class SqsGen2Interface < RightAwsBase
     include RightAwsBaseInterface
     
-    SIGNATURE_VERSION = "1"
     API_VERSION       = "2008-01-01"
     DEFAULT_HOST      = "queue.amazonaws.com"
     DEFAULT_PORT      = 443
@@ -99,18 +98,15 @@ module RightAws
       # fields required in all requests, and then the headers passed in as
       # params.  We sort the header fields alphabetically and then generate the
       # signature before URL escaping the resulting query and sending it.
-      queue_uri = param[:queue_url] ? URI(param[:queue_url]).path : '/'
+      service = param[:queue_url] ? URI(param[:queue_url]).path : '/'
       param.each{ |key, value| param.delete(key) if (value.nil? || key.is_a?(Symbol)) }
-      request_hash = { "Action"           => action,
+      service_hash = { "Action"           => action,
                        "Expires"          => (Time.now + REQUEST_TTL).utc.strftime("%Y-%m-%dT%H:%M:%SZ"),
                        "AWSAccessKeyId"   => @aws_access_key_id,
-                       "Version"          => API_VERSION,
-                       "SignatureVersion" => SIGNATURE_VERSION }
-      request_hash.update(param)
-      request_data   = request_hash.sort{|a,b| (a[0].to_s.downcase)<=>(b[0].to_s.downcase)}.to_s
-      request_hash['Signature'] = AwsUtils::sign(@aws_secret_access_key, request_data)
-      request_params = request_hash.to_a.collect{|key,val| key.to_s + "=" + val.to_s }.join("&")
-      request        = Net::HTTP::Get.new(AwsUtils.URLencode("#{queue_uri}?#{request_params}"))
+                       "Version"          => API_VERSION }
+      service_hash.update(param)
+      service_params = signed_service_params(@aws_secret_access_key, service_hash, :get, @params[:server], service)
+      request        = Net::HTTP::Get.new("#{AwsUtils.URLencode(service)}?#{service_params}")
         # prepare output hash
       { :request  => request, 
         :server   => @params[:server],
@@ -119,22 +115,20 @@ module RightAws
     end
 
     def generate_post_request(action, param={})  # :nodoc:
-      queue_uri = param[:queue_url] ? URI(param[:queue_url]).path : '/'
+      service = param[:queue_url] ? URI(param[:queue_url]).path : '/'
       message   = param[:message]                # extract message body if nesessary
       param.each{ |key, value| param.delete(key) if (value.nil? || key.is_a?(Symbol)) }
-      request_hash = { "Action"           => action,
+      service_hash = { "Action"           => action,
                        "Expires"          => (Time.now + REQUEST_TTL).utc.strftime("%Y-%m-%dT%H:%M:%SZ"),
                        "AWSAccessKeyId"   => @aws_access_key_id,
                        "MessageBody"      => message,
-                       "Version"          => API_VERSION,
-                       "SignatureVersion" => SIGNATURE_VERSION }
-      request_hash.update(param)
-      request_data   = request_hash.sort{|a,b| (a[0].to_s.downcase)<=>(b[0].to_s.downcase)}.to_s
-      request_hash['Signature'] = AwsUtils::sign(@aws_secret_access_key, request_data)
-      request_body = request_hash.to_a.collect{|key,val| CGI.escape(key.to_s) + "=" + CGI.escape(val.to_s) }.join("&")
-      request        = Net::HTTP::Post.new(AwsUtils.URLencode(queue_uri))
+                       "Version"          => API_VERSION }
+      service_hash.update(param)
+      #
+      service_params = signed_service_params(@aws_secret_access_key, service_hash, :post, @params[:server], service)
+      request        = Net::HTTP::Post.new(AwsUtils::URLencode(service))
       request['Content-Type'] = 'application/x-www-form-urlencoded' 
-      request.body = request_body
+      request.body = service_params
         # prepare output hash
       { :request  => request, 
         :server   => @params[:server],
