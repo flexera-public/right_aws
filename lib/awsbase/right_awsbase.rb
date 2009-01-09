@@ -28,7 +28,10 @@ module RightAws
   
   class AwsUtils #:nodoc:
     @@digest1   = OpenSSL::Digest::Digest.new("sha1")
-    @@digest256 = OpenSSL::Digest::Digest.new("sha256") rescue nil # Some installation may not support sha256
+    @@digest256 = nil
+    if OpenSSL::OPENSSL_VERSION_NUMBER > 0x00908000
+      @@digest256 = OpenSSL::Digest::Digest.new("sha256") rescue nil # Some installation may not support sha256
+    end
     
     def self.sign(aws_secret_access_key, auth_string)
       Base64.encode64(OpenSSL::HMAC.digest(@@digest1, aws_secret_access_key, auth_string)).strip
@@ -73,19 +76,12 @@ module RightAws
     #       http://developer.amazonwebservices.com/connect/entry.jspa?externalID=1928
     def self.sign_request_v2(aws_secret_access_key, service_hash, http_verb, host, uri)
       fix_service_params(service_hash, '2')
-      # select a signing method
-      if OpenSSL::OPENSSL_VERSION_NUMBER > 0x00908000
-        service_hash['SignatureMethod'] ||= 'HmacSHA256'
-      else
-        # make an old openssl working with sha1
-        service_hash['SignatureMethod'] = 'HmacSHA1'
-      end
-      if service_hash['SignatureMethod'] == 'HmacSHA256'
-        digest = @@digest256
-      else
-        service_hash['SignatureMethod'] == 'HmacSHA1'
-        digest = @@digest1
-      end
+      # select a signing method (make an old openssl working with sha1)
+      # make 'HmacSHA256' to be a default one
+      service_hash['SignatureMethod'] = 'HmacSHA256' unless ['HmacSHA256', 'HmacSHA1'].include?(service_hash['SignatureMethod'])
+      service_hash['SignatureMethod'] = 'HmacSHA1'   unless @@digest256
+      # select a digest
+      digest = (service_hash['SignatureMethod'] == 'HmacSHA256' ? @@digest256 : @@digest1)
       # form string to sign
       canonical_string = service_hash.keys.sort.map do |key|
         "#{amz_escape(key)}=#{amz_escape(service_hash[key])}"
