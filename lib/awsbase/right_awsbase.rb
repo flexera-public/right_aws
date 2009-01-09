@@ -28,7 +28,7 @@ module RightAws
   
   class AwsUtils #:nodoc:
     @@digest1   = OpenSSL::Digest::Digest.new("sha1")
-    @@digest256 = OpenSSL::Digest::Digest.new("sha256")
+    @@digest256 = OpenSSL::Digest::Digest.new("sha256") rescue nil # Some installation may not support sha256
     
     def self.sign(aws_secret_access_key, auth_string)
       Base64.encode64(OpenSSL::HMAC.digest(@@digest1, aws_secret_access_key, auth_string)).strip
