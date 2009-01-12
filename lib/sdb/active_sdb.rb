@@ -294,6 +294,8 @@ module RightAws
         #    Client.find(:first)                      #=> #<Client:0xb77d0d40 @attributes={"id"=>"2937601a-e45d-11dc-a75f-001bfc466dd7"}, @new_record=false>
         #    Client.find(:first, :auto_load => true)  #=> #<Client:0xb77d0d40 @attributes={"id"=>"2937601a-e45d-11dc-a75f-001bfc466dd7", "name"=>["Cat"], "toys"=>["Jons socks", "clew", "mice"]}, @new_record=false>
         #
+        # see http://docs.amazonwebservices.com/AmazonSimpleDB/2007-11-07/DeveloperGuide/index.html?UsingQuery.html
+        #
         def find(*args)
           options = args.last.is_a?(Hash) ? args.pop : {}
           case args.first
@@ -303,12 +305,137 @@ module RightAws
           end
         end
 
+        # Perform a SQL-like select request.
+        #
+        # Single record:
+        #
+        #  Client.select(:first)
+        #  Client.select(:first, :conditions=> [ "name=? AND wife=?", "Jon", "Sandy"])
+        #  Client.select(:first, :conditions=> { :name=>"Jon", :wife=>"Sandy" }, :select => :girfriends)
+        #
+        # Bunch of records:
+        #
+        #  Client.select(:all)
+        #  Client.select(:all, :limit => 10)
+        #  Client.select(:all, :conditions=> [ "name=? AND 'girlfriend'=?", "Jon", "Judy"])
+        #  Client.select(:all, :conditions=> { :name=>"Sandy" }, :limit => 3)
+        #
+        # Records by ids:
+        #
+        #  Client.select('1')
+        #  Client.select('1234987b4583475347523948')
+        #  Client.select('1','2','3','4', :conditions=> ["toys=?", "beer"])
+        #
+        # Find helpers: RightAws::ActiveSdb::Base.select_by_... and RightAws::ActiveSdb::Base.select_all_by_...
+        #
+        #  Client.select_by_name('Matias Rust')
+        #  Client.select_by_name_and_city('Putin','Moscow')
+        #  Client.select_by_name_and_city_and_post('Medvedev','Moscow','president')
+        #
+        #  Client.select_all_by_author('G.Bush jr')
+        #  Client.select_all_by_age_and_gender_and_ethnicity('34','male','russian')
+        #  Client.select_all_by_gender_and_country('male', 'Russia', :order => 'name')
+        #
+        # Continue listing:
+        #
+        #  # initial listing
+        #  Client.select(:all, :limit => 10)
+        #  # continue listing
+        #  begin
+        #    Client.select(:all, :limit => 10, :next_token => Client.next_token)
+        #  end while Client.next_token
+        #
+        #  Sort oder:
+        #  If :order=>'attribute' option is specified then result response (ordered by 'attribute') will contain only items where attribute is defined (is not null).
+        #  
+        #    Client.select(:all)                         # returns all records
+        #    Client.select(:all, :order => 'gender')     # returns all records ordered by gender where gender attribute exists
+        #    Client.select(:all, :order => 'name desc')  # returns all records ordered by name in desc order where name attribute exists
+        #
+        # see http://docs.amazonwebservices.com/AmazonSimpleDB/2007-11-07/DeveloperGuide/index.html?UsingSelect.html
+        #
+        def select(*args)
+          options = args.last.is_a?(Hash) ? args.pop : {}
+          case args.first
+            when :all   then sql_select(options)
+            when :first then sql_select(options.merge(:limit => 1)).first
+            else             select_from_ids args, options
+          end
+        end
+
+        def generate_id # :nodoc:
+          UUID.timestamp_create().to_s
+        end
+
       protected
+
+        # Select
+
+        def select_from_ids(args, options) # :nodoc:
+          cond = []
+          # detect amount of records requested
+          bunch_of_records_requested = args.size > 1 || args.first.is_a?(Array)
+          # flatten ids
+          args = args.to_a.flatten
+          args.each { |id| cond << "id=#{self.connection.escape(id)}" }
+          ids_cond = "(#{cond.join(' OR ')})"
+          # user defined :conditions to string (if it was defined)
+          options[:conditions] = build_conditions(options[:conditions])
+          # join ids condition and user defined conditions
+          options[:conditions] = options[:conditions].blank? ? ids_cond : "(#{options[:conditions]}) AND #{ids_cond}"
+          result = sql_select(options)
+          # if one record was requested then return it
+          unless bunch_of_records_requested
+            record = result.first
+            # railse if nothing was found
+            raise ActiveSdbError.new("Couldn't find #{name} with ID #{args}") unless record
+            record
+          else
+            # if a bunch of records was requested then return check that we found all of them
+            # and return as an array
+            unless args.size == result.size
+              id_list = args.map{|i| "'#{i}'"}.join(',')
+              raise ActiveSdbError.new("Couldn't find all #{name} with IDs (#{id_list}) (found #{result.size} results, but was looking for #{args.size})")
+            else
+              result
+            end
+          end
+        end
+
+        def sql_select(options) # :nodoc:
+          @next_token = options[:next_token]
+          select_expression = build_select(options)
+          # request items
+          query_result = self.connection.select(select_expression, @next_token)
+          @next_token = query_result[:next_token]
+          items = query_result[:items].map do |hash|
+            id, attributes = hash.shift
+            new_item = self.new( attributes.merge({ 'id' => id }))
+            new_item.mark_as_old
+            new_item
+          end
+          items
+        end
+
+        # select_by helpers
+        def select_all_by_(format_str, args, options) # :nodoc:
+          fields = format_str.to_s.sub(/^select_(all_)?by_/,'').split('_and_')
+          conditions = fields.map { |field| "#{field}=?" }.join(' AND ')
+          options[:conditions] = [conditions, *args]
+          select(:all, options)
+        end
+
+        def select_by_(format_str, args, options) # :nodoc:
+          options[:limit] = 1
+          select_all_by_(format_str, args, options).first
+        end
+
+        # Query
 
         # Returns an array of query attributes.
         # Query_expression must be a well formated SDB query string:
         # query_attributes("['title' starts-with 'O\\'Reily'] intersection ['year' = '2007']") #=> ["title", "year"]
-        def query_attributes(query_expression)
+        def query_attributes(query_expression) # :nodoc:
           attrs = []
           array = query_expression.scan(/['"](.*?[^\\])['"]/).flatten
           until array.empty? do
@@ -334,8 +461,7 @@ module RightAws
         #
         def query(options) # :nodoc:
           @next_token = options[:next_token]
-          query_expression = options[:query_expression]
-          query_expression = connection.query_expression_from_array(query_expression) if query_expression.is_a?(Array)
+          query_expression = build_conditions(options[:query_expression])
           # add sort_options to the query_expression
           if options[:sort_option]
             sort_by, sort_order = sort_options(options[:sort_option])
@@ -396,9 +522,7 @@ module RightAws
           args.each { |id| cond << "'id'=#{self.connection.escape(id)}" }
           ids_cond = "[#{cond.join(' OR ')}]"
           # user defined :conditions to string (if it was defined)
-          if options[:conditions].is_a?(Array)
-            options[:conditions] = connection.query_expression_from_array(options[:conditions])
-          end
+          options[:conditions] = build_conditions(options[:conditions])
           # join ids condition and user defined conditions
           options[:conditions] = options[:conditions].blank? ? ids_cond : "#{options[:conditions]} intersection #{ids_cond}"
           result = find_every(options)
@@ -433,22 +557,39 @@ module RightAws
           find_all_by_(format_str, args, options).first
         end
 
+        # Misc
+
         def method_missing(method, *args) # :nodoc:
-          if method.to_s[/^(find_all_by_|find_by_)/]
+          if method.to_s[/^(find_all_by_|find_by_|select_all_by_|select_by_)/]
             options = args.last.is_a?(Hash) ? args.pop : {}
-            if method.to_s[/^find_all_by_/]
-              find_all_by_(method, args, options)
-            else
-              find_by_(method, args, options)
-            end
+            __send__($1, method, args, options)
           else
             super(method, *args)
           end
         end
-      end
-      
-      def self.generate_id # :nodoc:
-        UUID.timestamp_create().to_s
+
+        def build_select(options) # :nodoc:
+          select     = options[:select]    || '*'
+          from       = options[:from]      || domain
+          conditions = options[:conditions] ? " WHERE #{build_conditions(options[:conditions])}" : ''
+          order      = options[:order]      ? " ORDER BY #{options[:order]}"                     : ''
+          limit      = options[:limit]      ? " LIMIT #{options[:limit]}"                        : ''
+          # mix sort by argument (it must present in response)
+          unless order.blank?
+            sort_by, sort_order = sort_options(options[:order])
+            conditions << (conditions.blank? ? " WHERE " : " AND ") << "(#{sort_by} IS NOT NULL)"
+          end
+          "SELECT #{select} FROM #{from}#{conditions}#{order}#{limit}"
+        end
+
+        def build_conditions(conditions) # :nodoc:
+          case
+          when conditions.is_a?(Array) then connection.query_expression_from_array(conditions)
+          when conditions.is_a?(Hash)  then connection.query_expression_from_hash(conditions)
+          else                              conditions
+          end
+        end
+
       end
       
       public

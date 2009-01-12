@@ -160,21 +160,42 @@ module RightAws
     def sdb_to_ruby(value)
       value.eql?(@nil_rep) ? nil : value
     end
-    
+
+    # Convert select and query_with_attributes responses to a Ruby language values by replacing the user's chosen string representation of nil with Ruby nil.
+    # (This method affects on a passed response value)
+    def select_response_to_ruby(response) #:nodoc:
+      response[:items].each_with_index do |item, idx|
+        item.each do |key, attributes|
+          attributes.each do |name, values|
+            values.collect! { |value| sdb_to_ruby(value) }
+          end
+        end
+      end
+      response
+    end
+
     # Create query expression from an array.
     # (similar to ActiveRecord::Base#find using :conditions => ['query', param1, .., paramN])
     #
     def query_expression_from_array(params) #:nodoc:
-      unless params.blank?
-        query = params.shift.to_s
-        query.gsub(/(\\)?(\?)/) do
-          if $1 # if escaped '\?' is found - replace it by '?' without backslash
-            "?"
-          else  # well, if no backslash precedes '?' then replace it by next param from the list
-            escape(params.shift)
-          end
+      return '' if params.blank?
+      query = params.shift.to_s
+      query.gsub(/(\\)?(\?)/) do
+        if $1 # if escaped '\?' is found - replace it by '?' without backslash
+          "?"
+        else  # well, if no backslash precedes '?' then replace it by next param from the list
+          escape(params.shift)
         end
       end
+    end
+
+    def query_expression_from_hash(hash)
+      return '' if hash.blank?
+      expression = []
+      hash.each do |key, value|
+        expression << "#{key}=#{escape(value)}"
+      end
+      expression.join(' AND ')
     end
 
     # Retrieve a list of SDB domains from Amazon.
@@ -445,36 +466,37 @@ module RightAws
     #   { :box_usage  => string,
     #     :request_id => string,
     #     :next_token => string,
-    #     :items      => { ItemName1 =>
-    #                        { attribute1 => value1, ...  attributeM => valueM },
-    #                      ItemName2 => ... }
+    #     :items      => [ { ItemName1 => { attribute1 => value1, ...  attributeM => valueM } },
+    #                      { ItemName2 => {...}}, ... ]
     #
     # Example:
     #
     #   sdb.query_with_attributes(domain, ['hobby', 'country'], "['gender'='female'] intersection ['name' starts-with ''] sort 'name'") #=>
-    #     { :request_id=>"06057228-70d0-4487-89fb-fd9c028580d3",
-    #       :items=>
-    #         { "035f1ba8-dbd8-11dd-80bd-001bfc466dd7"=>
-    #           { "hobby"=>["cooking", "flowers", "cats"], "country"=>["Russia"]},
-    #           "0327614a-dbd8-11dd-80bd-001bfc466dd7"=>
-    #           { "hobby"=>["patchwork", "bundle jumping"], "country"=>["USA"]}, ... },
+    #     { :request_id => "06057228-70d0-4487-89fb-fd9c028580d3",
+    #       :items =>
+    #         [ { "035f1ba8-dbd8-11dd-80bd-001bfc466dd7"=>
+    #             { "hobby"   => ["cooking", "flowers", "cats"],
+    #               "country" => ["Russia"]}},
+    #           { "0327614a-dbd8-11dd-80bd-001bfc466dd7"=>
+    #             { "hobby"   => ["patchwork", "bundle jumping"],
+    #               "country" => ["USA"]}}, ... ],
     #        :box_usage=>"0.0000504786"}
     #
     #   sdb.query_with_attributes(domain, [], "['gender'='female'] intersection ['name' starts-with ''] sort 'name'") #=>
-    #     { :request_id=>"75bb19db-a529-4f69-b86f-5e3800f79a45",
-    #       :items=>
-    #       { "035f1ba8-dbd8-11dd-80bd-001bfc466dd7"=>
-    #         { "hobby"=>["cooking", "flowers", "cats"],
-    #           "name"=>["Mary"],
-    #           "country"=>["Russia"],
-    #           "gender"=>["female"],
-    #           "id"=>["035f1ba8-dbd8-11dd-80bd-001bfc466dd7"]},
-    #         "0327614a-dbd8-11dd-80bd-001bfc466dd7"=>
-    #         { "hobby"=>["patchwork", "bundle jumping"],
-    #           "name"=>["Mary"],
-    #           "country"=>["USA"],
-    #           "gender"=>["female"],
-    #           "id"=>["0327614a-dbd8-11dd-80bd-001bfc466dd7"]}, ... },
+    #     { :request_id => "75bb19db-a529-4f69-b86f-5e3800f79a45",
+    #       :items =>
+    #       [ { "035f1ba8-dbd8-11dd-80bd-001bfc466dd7"=>
+    #           { "hobby"   => ["cooking", "flowers", "cats"],
+    #             "name"    => ["Mary"],
+    #             "country" => ["Russia"],
+    #             "gender"  => ["female"],
+    #             "id"      => ["035f1ba8-dbd8-11dd-80bd-001bfc466dd7"]}},
+    #         { "0327614a-dbd8-11dd-80bd-001bfc466dd7"=>
+    #           { "hobby"   => ["patchwork", "bundle jumping"],
+    #             "name"    => ["Mary"],
+    #             "country" => ["USA"],
+    #             "gender"  => ["female"],
+    #             "id"      => ["0327614a-dbd8-11dd-80bd-001bfc466dd7"]}}, ... ],
     #      :box_usage=>"0.0000506668"}
     #
     # see: http://docs.amazonwebservices.com/AmazonSimpleDB/2007-11-07/DeveloperGuide/index.html?SDB_API_QueryWithAttributes.html
@@ -492,7 +514,7 @@ module RightAws
         request_params["AttributeName.#{idx+1}"] = attribute
       end
       link   = generate_request("QueryWithAttributes", request_params)
-      result = request_info( link, QSdbQueryWithAttributesParser.new )
+      result = select_response_to_ruby(request_info( link, QSdbQueryWithAttributesParser.new ))
       # return result if no block given
       return result unless block_given?
       # loop if block if given
@@ -502,50 +524,43 @@ module RightAws
         # make new request
         request_params['NextToken'] = result[:next_token]
         link   = generate_request("QueryWithAttributes", request_params)
-        result = request_info( link, QSdbQueryWithAttributesParser.new )
+        result = select_response_to_ruby(request_info( link, QSdbQueryWithAttributesParser.new ))
       end while true
     rescue Exception
       on_exception
     end
 
-    # SQL-like select.
+    # Perform SQL-like select and fetch attributes.
     # Attribute values must be quoted with a single or double quote. If a quote appears within the attribute value, it must be escaped with the same quote symbol as shown in the following example.
     # (Use array to pass select_expression params to avoid manual escaping).
     #
     #  sdb.select(["select * from my_domain where gender=?", 'female']) #=>
-    #    {:request_id=>"8241b843-0fb9-4d66-9100-effae12249ec",
-    #     :items=>
-    #      {"035f1ba8-dbd8-11dd-80bd-001bfc466dd7"=>
-    #        {"hobby"=>["cooking", "flowers", "cats"],
-    #         "name"=>["Mary"],
-    #         "country"=>["Russia"],
-    #         "gender"=>["female"],
-    #         "id"=>["035f1ba8-dbd8-11dd-80bd-001bfc466dd7"]},
-    #       "0327614a-dbd8-11dd-80bd-001bfc466dd7"=>
-    #        {"hobby"=>["patchwork", "bundle jumping"],
-    #         "name"=>["Mary"],
-    #         "country"=>["USA"],
-    #         "gender"=>["female"],
-    #         "id"=>["0327614a-dbd8-11dd-80bd-001bfc466dd7"]}, ... }
-    #     :box_usage=>"0.0000506197"}
+    #    {:request_id =>"8241b843-0fb9-4d66-9100-effae12249ec",
+    #     :items =>
+    #      [ { "035f1ba8-dbd8-11dd-80bd-001bfc466dd7"=>
+    #          {"hobby"   => ["cooking", "flowers", "cats"],
+    #           "name"    => ["Mary"],
+    #           "country" => ["Russia"],
+    #           "gender"  => ["female"],
+    #           "id"      => ["035f1ba8-dbd8-11dd-80bd-001bfc466dd7"]}},
+    #        { "0327614a-dbd8-11dd-80bd-001bfc466dd7"=>
+    #          {"hobby"   => ["patchwork", "bundle jumping"],
+    #           "name"    => ["Mary"],
+    #           "country" => ["USA"],
+    #           "gender"  => ["female"],
+    #           "id"      => ["0327614a-dbd8-11dd-80bd-001bfc466dd7"]}}, ... ]
+    #     :box_usage =>"0.0000506197"}
     #
     #   sdb.select('select country, name from my_domain') #=>
     #    {:request_id=>"b1600198-c317-413f-a8dc-4e7f864a940a",
     #     :items=>
-    #      {"035f1ba8-dbd8-11dd-80bd-001bfc466dd7"=>
-    #        {"name"=>["Mary"], "country"=>["Russia"]},
-    #       "376d2e00-75b0-11dd-9557-001bfc466dd7"=>
-    #        {"name"=>["Putin"], "country"=>["Russia"]},
-    #       "0327614a-dbd8-11dd-80bd-001bfc466dd7"=>
-    #        {"name"=>["Mary"], "country"=>["USA"]},
-    #       "372ebbd4-75b0-11dd-9557-001bfc466dd7"=>
-    #        {"name"=>["Bush"], "country"=>["USA"]},
-    #       "37a4e552-75b0-11dd-9557-001bfc466dd7"=>
-    #        {"name"=>["Medvedev"], "country"=>["Russia"]},
-    #       "38278dfe-75b0-11dd-9557-001bfc466dd7"=>
-    #        {"name"=>["Mary"], "country"=>["Russia"]},
-    #       "37df6c36-75b0-11dd-9557-001bfc466dd7"=>
-    #        {"name"=>["Mary"], "country"=>["USA"]}},
+    #      [ { "035f1ba8-dbd8-11dd-80bd-001bfc466dd7"=> {"name"=>["Mary"],     "country"=>["Russia"]} },
+    #        { "376d2e00-75b0-11dd-9557-001bfc466dd7"=> {"name"=>["Putin"],    "country"=>["Russia"]} },
+    #        { "0327614a-dbd8-11dd-80bd-001bfc466dd7"=> {"name"=>["Mary"],     "country"=>["USA"]}    },
+    #        { "372ebbd4-75b0-11dd-9557-001bfc466dd7"=> {"name"=>["Bush"],     "country"=>["USA"]}    },
+    #        { "37a4e552-75b0-11dd-9557-001bfc466dd7"=> {"name"=>["Medvedev"], "country"=>["Russia"]} },
+    #        { "38278dfe-75b0-11dd-9557-001bfc466dd7"=> {"name"=>["Mary"],     "country"=>["Russia"]} },
+    #        { "37df6c36-75b0-11dd-9557-001bfc466dd7"=> {"name"=>["Mary"],     "country"=>["USA"]}    } ],
     #     :box_usage=>"0.0000777663"}
     #
     # see: http://docs.amazonwebservices.com/AmazonSimpleDB/2007-11-07/DeveloperGuide/index.html?SDB_API_Select.html
@@ -559,8 +574,7 @@ module RightAws
       request_params = { 'SelectExpression' => select_expression,
                          'NextToken'        => next_token }
       link   = generate_request("Select", request_params)
-      result = request_info( link, QSdbSelectParser.new )
-      # return result if no block given
+      result = select_response_to_ruby(request_info( link, QSdbSelectParser.new ))
       return result unless block_given?
       # loop if block if given
       begin
@@ -569,7 +583,7 @@ module RightAws
         # make new request
         request_params['NextToken'] = result[:next_token]
         link   = generate_request("Select", request_params)
-        result = request_info( link, QSdbSelectParser.new )
+        result = select_response_to_ruby(request_info( link, QSdbSelectParser.new ))
       end while true
     rescue Exception
       on_exception
@@ -635,7 +649,7 @@ module RightAws
 
     class QSdbQueryWithAttributesParser < RightAWSParser #:nodoc:
       def reset
-        @result = { :items => {} }
+        @result = { :items => [] }
       end
       def tagend(name)
         case name
@@ -643,22 +657,22 @@ module RightAws
           case @xmlpath
           when 'QueryWithAttributesResponse/QueryWithAttributesResult/Item'
             @item = @text
-            @result[:items][@item] = {}
+            @result[:items] << { @item => {} }
           when 'QueryWithAttributesResponse/QueryWithAttributesResult/Item/Attribute'
             @attribute = @text
-            @result[:items][@item][@attribute] ||= []
+            @result[:items].last[@item][@attribute] ||= []
           end
         when 'RequestId' then @result[:request_id] = @text
         when 'BoxUsage'  then @result[:box_usage]  = @text
         when 'NextToken' then @result[:next_token] = @text
-        when 'Value'     then @result[:items][@item][@attribute] << @text
+        when 'Value'     then @result[:items].last[@item][@attribute] << @text
         end
       end
     end
 
     class QSdbSelectParser < RightAWSParser #:nodoc:
       def reset
-        @result = { :items => {} }
+        @result = { :items => [] }
       end
       def tagend(name)
         case name
@@ -666,15 +680,15 @@ module RightAws
           case @xmlpath
           when 'SelectResponse/SelectResult/Item'
             @item = @text
-            @result[:items][@item] = {}
+            @result[:items] << { @item => {} }
           when 'SelectResponse/SelectResult/Item/Attribute'
             @attribute = @text
-            @result[:items][@item][@attribute] ||= []
+            @result[:items].last[@item][@attribute] ||= []
           end
         when 'RequestId' then @result[:request_id] = @text
         when 'BoxUsage'  then @result[:box_usage]  = @text
         when 'NextToken' then @result[:next_token] = @text
-        when 'Value'     then @result[:items][@item][@attribute] << @text
+        when 'Value'     then @result[:items].last[@item][@attribute] << @text
         end
       end
     end

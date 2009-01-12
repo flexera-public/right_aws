@@ -40,7 +40,7 @@ module RightAws
     # Escape a string accordingly Amazon rulles
     # http://docs.amazonwebservices.com/AmazonSimpleDB/2007-11-07/DeveloperGuide/index.html?REST_RESTAuth.html
     def self.amz_escape(param)
-      param.to_s.gsub(/([^a-zA-Z0-9-._~]+)/n) do
+      param.to_s.gsub(/([^a-zA-Z0-9._~-]+)/n) do
         '%' + $1.unpack('H2' * $1.size).join('%').upcase
       end
     end
