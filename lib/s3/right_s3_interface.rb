@@ -32,6 +32,7 @@ module RightAws
     DEFAULT_HOST           = 's3.amazonaws.com'
     DEFAULT_PORT           = 443
     DEFAULT_PROTOCOL       = 'https'
+    DEFAULT_SERVICE        = '/'
     REQUEST_TTL            = 30
     DEFAULT_EXPIRES_AFTER  =   1 * 24 * 60 * 60 # One day's worth of seconds
     ONE_YEAR_IN_SECONDS    = 365 * 24 * 60 * 60
@@ -62,7 +63,8 @@ module RightAws
     def initialize(aws_access_key_id=nil, aws_secret_access_key=nil, params={})
       init({ :name             => 'S3', 
              :default_host     => ENV['S3_URL'] ? URI.parse(ENV['S3_URL']).host   : DEFAULT_HOST, 
-             :default_port     => ENV['S3_URL'] ? URI.parse(ENV['S3_URL']).port   : DEFAULT_PORT, 
+             :default_port     => ENV['S3_URL'] ? URI.parse(ENV['S3_URL']).port   : DEFAULT_PORT,
+             :default_service  => ENV['S3_URL'] ? URI.parse(ENV['S3_URL']).path   : DEFAULT_SERVICE,
              :default_protocol => ENV['S3_URL'] ? URI.parse(ENV['S3_URL']).scheme : DEFAULT_PROTOCOL }, 
            aws_access_key_id     || ENV['AWS_ACCESS_KEY_ID'], 
            aws_secret_access_key || ENV['AWS_SECRET_ACCESS_KEY'], 
@@ -113,21 +115,18 @@ module RightAws
       # Assumes that headers[:url] is URL encoded (use CGI::escape)
     def generate_rest_request(method, headers)  # :nodoc:
       # default server to use
-      server = @params[:server]
-      # fix path
-      path_to_sign = headers[:url]
-      path_to_sign = "/#{path_to_sign}" unless path_to_sign[/^\//]
+      server  = @params[:server]
+      service = @params[:service] || '/'
+      path_to_sign = "#{service}#{headers[:url]}"
       # extract bucket name and check it's dns compartibility
-      path_to_sign[%r{^/([a-z0-9._-]*)(/[^?]*)?(\?.+)?}i]
+      headers[:url].to_s[%r{^([a-z0-9._-]*)(/[^?]*)?(\?.+)?}i]
       bucket_name, key_path, params_list = $1, $2, $3
       # select request model
       if is_dns_bucket?(bucket_name)
         # add backet to a server name
         server = "#{bucket_name}.#{server}"
         # remove bucket from the path
-        path = "#{key_path || '/'}#{params_list}"
-        # refactor the path (add '/' before params_list if the key is empty)
-        path_to_sign = "/#{bucket_name}#{path}"
+        path = "#{service}#{key_path}#{params_list}"
       else
         path = path_to_sign
       end
