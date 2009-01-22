@@ -110,26 +110,34 @@ module RightAws
       end
       true
     end
-    
-      # Generates request hash for REST API.
-      # Assumes that headers[:url] is URL encoded (use CGI::escape)
-    def generate_rest_request(method, headers)  # :nodoc:
+
+    def fetch_request_params(headers) #:nodoc:
       # default server to use
       server  = @params[:server]
-      service = @params[:service] || '/'
+      service = @params[:service].to_s
+      service.chop! if service[%r{/$}] # remove trailing '/' from service
       # extract bucket name and check it's dns compartibility
       headers[:url].to_s[%r{^([a-z0-9._-]*)(/[^?]*)?(\?.+)?}i]
       bucket_name, key_path, params_list = $1, $2, $3
       # select request model
       if is_dns_bucket?(bucket_name)
-        # add backet to a server name
+        # fix a path
         server = "#{bucket_name}.#{server}"
-        # remove bucket from the path
-        path_to_sign = "#{service}#{bucket_name}#{key_path || '/'}#{params_list}"
-        path         = "#{service}#{key_path}#{params_list}"
+        key_path ||= '/'
+        path = "#{service}#{key_path}#{params_list}"
       else
-        path = path_to_sign = "#{service}#{headers[:url]}"
+        path = "#{service}/#{bucket_name}#{key_path}#{params_list}"
       end
+    #  path_to_sign = "#{service}/#{bucket_name}#{key_path}#{params_list}"
+      path_to_sign = "/#{bucket_name}#{key_path}#{params_list}"
+      [ server, path, path_to_sign ]
+    end
+
+      # Generates request hash for REST API.
+      # Assumes that headers[:url] is URL encoded (use CGI::escape)
+    def generate_rest_request(method, headers)  # :nodoc:
+        # calculate request data
+      server, path, path_to_sign = fetch_request_params(headers)
       data = headers[:data]
         # remove unset(==optional) and symbolyc keys
       headers.each{ |key, value| headers.delete(key) if (value.nil? || key.is_a?(Symbol)) }
@@ -807,22 +815,9 @@ module RightAws
 
       # Generates link for QUERY API
     def generate_link(method, headers={}, expires=nil) #:nodoc:
-      server  = @params[:server]
-      service = @params[:service] || '/'
-      # extract bucket name and check it's dns compartibility
-      headers[:url].to_s[%r{^([a-z0-9._-]*)(/[^?]*)?(\?.+)?}i]
-      bucket_name, key_path, params_list = $1, $2, $3
-      # select request model
-      if is_dns_bucket?(bucket_name)
-        # add backet to a server name
-        server = "#{bucket_name}.#{server}"
-        # remove bucket from the path
-        path_to_sign = "#{service}#{bucket_name}#{key_path || '/'}#{params_list}"
-        path         = "#{service}#{key_path}#{params_list}"
-      else
-        path = path_to_sign = "#{service}#{headers[:url]}"
-      end
-       # expiration time
+        # calculate request data
+      server, path, path_to_sign = fetch_request_params(headers)
+        # expiration time
       expires ||= DEFAULT_EXPIRES_AFTER
       expires   = Time.now.utc + expires if expires.is_a?(Fixnum) && (expires < ONE_YEAR_IN_SECONDS)
       expires   = expires.to_i
