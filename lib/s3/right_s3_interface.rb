@@ -128,8 +128,8 @@ module RightAws
       else
         path = "#{service}/#{bucket_name}#{key_path}#{params_list}"
       end
-    #  path_to_sign = "#{service}/#{bucket_name}#{key_path}#{params_list}"
-      path_to_sign = "/#{bucket_name}#{key_path}#{params_list}"
+      path_to_sign = "#{service}/#{bucket_name}#{key_path}#{params_list}"
+#      path_to_sign = "/#{bucket_name}#{key_path}#{params_list}"
       [ server, path, path_to_sign ]
     end
 
