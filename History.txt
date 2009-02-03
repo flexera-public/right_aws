@@ -219,3 +219,13 @@ the source key.
     S3Interface::retrieve_object_and_verify (thanks to numerous user reports)
   - Updates to caching for Ec2::describe_images_by methods
   - Ec2 now has Ec2::last_request_id
+
+=== 1.10.0
+
+  Release Notes:
+  - AwsBase: signature v2 support added
+  - Ec2: describe_availability_zones improved to support regions
+  - CloudFront: docs fixes
+  - SDB: added: SQL-like query, select and query_with_attributes support
+  - SDB: fixed no method error when searching for id that doesn't exist
+  

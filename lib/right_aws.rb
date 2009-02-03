@@ -52,7 +52,7 @@ require 'acf/right_acf_interface'
 module RightAws #:nodoc:
   module VERSION #:nodoc:
     MAJOR = 1
-    MINOR = 9
+    MINOR = 10
     TINY  = 0
 
     STRING = [MAJOR, MINOR, TINY].join('.')
