@@ -104,11 +104,12 @@ module RightAws
     #    {:multi_thread => true, :logger => Logger.new('/tmp/x.log')}) #=>  #<RightAws::AcfInterface::0xb7b3c30c>
     #
     def initialize(aws_access_key_id=nil, aws_secret_access_key=nil, params={})
-      init({ :name             => 'ACF',
-             :default_host     => ENV['ACF_URL'] ? URI.parse(ENV['ACF_URL']).host   : DEFAULT_HOST,
-             :default_port     => ENV['ACF_URL'] ? URI.parse(ENV['ACF_URL']).port   : DEFAULT_PORT,
-             :default_service  => ENV['ACF_URL'] ? URI.parse(ENV['ACF_URL']).path   : DEFAULT_PATH,
-             :default_protocol => ENV['ACF_URL'] ? URI.parse(ENV['ACF_URL']).scheme : DEFAULT_PROTOCOL },
+      init({ :name                => 'ACF',
+             :default_host        => ENV['ACF_URL'] ? URI.parse(ENV['ACF_URL']).host   : DEFAULT_HOST,
+             :default_port        => ENV['ACF_URL'] ? URI.parse(ENV['ACF_URL']).port   : DEFAULT_PORT,
+             :default_service     => ENV['ACF_URL'] ? URI.parse(ENV['ACF_URL']).path   : DEFAULT_PATH,
+             :default_protocol    => ENV['ACF_URL'] ? URI.parse(ENV['ACF_URL']).scheme : DEFAULT_PROTOCOL,
+             :default_api_version => ENV['ACF_API_VERSION'] || API_VERSION },
            aws_access_key_id     || ENV['AWS_ACCESS_KEY_ID'], 
            aws_secret_access_key || ENV['AWS_SECRET_ACCESS_KEY'], 
            params)
@@ -126,7 +127,7 @@ module RightAws
       signature = AwsUtils::sign(@aws_secret_access_key, headers['date'])
       headers['Authorization'] = "AWS #{@aws_access_key_id}:#{signature}"
       # Request
-      path    = "#{@params[:default_service]}/#{API_VERSION}/#{path}"
+      path    = "#{@params[:service]}#{@params[:api_version]}/#{path}"
       request = "Net::HTTP::#{method.capitalize}".constantize.new(path)
       request.body = body if body
       # Set request headers
@@ -141,9 +142,7 @@ module RightAws
       # Sends request to Amazon and parses the response.
       # Raises AwsError if any banana happened.
     def request_info(request, parser, &block) # :nodoc:
-      thread = @params[:multi_thread] ? Thread.current : Thread.main
-      thread[:acf_connection] ||= Rightscale::HttpConnection.new(:exception => RightAws::AwsError, :logger => @logger)
-      request_info_impl(thread[:acf_connection], @@bench, request, parser, &block)
+      request_info_impl(:acf_connection, @@bench, request, parser, &block)
     end
 
     #-----------------------------------------------------------------

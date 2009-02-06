@@ -223,6 +223,7 @@ module RightAws
         @params[:protocol] ||= service_info[:default_protocol]
       end
       @params[:multi_thread] ||= defined?(AWS_DAEMON)
+      @params[:api_version]  ||= service_info[:default_api_version]
       @logger = @params[:logger]
       @logger = RAILS_DEFAULT_LOGGER if !@logger && defined?(RAILS_DEFAULT_LOGGER)
       @logger = Logger.new(STDOUT)   if !@logger
@@ -256,7 +257,8 @@ module RightAws
       if caching?
         function = function.to_sym
         # get rid of requestId (this bad boy was added for API 2008-08-08+ and it is uniq for every response)
-        response = response.sub(%r{<requestId>.+?</requestId>}, '')
+        # feb 04, 2009 (load balancer uses 'RequestId' hence use 'i' modifier to hit it also)
+        response = response.sub(%r{<requestId>.+?</requestId>}i, '')
         response_md5 = MD5.md5(response).to_s
         # check for changes
         unless @cache[function] && @cache[function][:response_md5] == response_md5
@@ -294,8 +296,51 @@ module RightAws
       @params[:multi_thread]
     end
 
-    def request_info_impl(connection, benchblock, request, parser, &block) #:nodoc:
-      @connection    = connection
+    # ACF, AMS, EC2, LBS and SDB uses this guy
+    # SQS and S3 use their own methods
+    def generate_request_impl(verb, action, options={}) #:nodoc:
+      # Form a valid http verb: 'GET' or 'POST' (all the other are not supported now)
+      http_verb = verb.to_s.upcase
+      # remove empty keys from request options
+      options.delete_if { |key, value| value.nil? }
+      # prepare service data
+      service_hash = {"Action"         => action,
+                      "AWSAccessKeyId" => @aws_access_key_id,
+                      "Version"        => @params[:api_version] }
+      service_hash.merge!(options)
+      # Sign request options
+      service_params = signed_service_params(@aws_secret_access_key, service_hash, http_verb, @params[:server], @params[:service])
+      # Use POST if the length of the query string is too large
+      # see http://docs.amazonwebservices.com/AmazonSimpleDB/2007-11-07/DeveloperGuide/MakingRESTRequests.html
+      if http_verb != 'POST' && service_params.size > 2000
+        http_verb = 'POST'
+        if signature_version == '2'
+          service_params = signed_service_params(@aws_secret_access_key, service_hash, http_verb, @params[:server], @params[:service])
+        end
+      end
+      # create a request
+      case http_verb
+      when 'GET'
+        request = Net::HTTP::Get.new("#{@params[:service]}?#{service_params}")
+      when 'POST'
+        request      = Net::HTTP::Post.new(@params[:service])
+        request.body = service_params
+        request['Content-Type'] = 'application/x-www-form-urlencoded'
+      else
+        raise "Unsupported HTTP verb #{verb.inspect}!"
+      end
+      # prepare output hash
+      { :request  => request,
+        :server   => @params[:server],
+        :port     => @params[:port],
+        :protocol => @params[:protocol] }
+    end
+
+    # All services uses this guy.
+    def request_info_impl(aws_service, benchblock, request, parser, &block) #:nodoc:
+      thread = @params[:multi_thread] ? Thread.current : Thread.main
+      thread[aws_service] ||= Rightscale::HttpConnection.new(:exception => RightAws::AwsError, :logger => @logger)
+      @connection    = thread[aws_service]
       @last_request  = request[:request]
       @last_response = nil
       response=nil
@@ -382,9 +427,36 @@ module RightAws
 
     # Returns Amazons request ID for the latest request
     def last_request_id
-      @last_response && @last_response.body.to_s[%r{<requestId>(.+?)</requestId>}] && $1
+      @last_response && @last_response.body.to_s[%r{<requestId>(.+?)</requestId>}i] && $1
     end
 
+    # Format array of items into Amazons handy hash ('?' is a place holder):
+    #
+    #  amazonize_list('Item', ['a', 'b', 'c']) =>
+    #    { 'Item.1' => 'a', 'Item.2' => 'b', 'Item.3' => 'c' }
+    #
+    #  amazonize_list('Item.?.instance', ['a', 'c']) #=>
+    #    { 'Item.1.instance' => 'a', 'Item.2.instance' => 'c' }
+    #
+    #  amazonize_list(['Item.?.Name', 'Item.?.Value'], {'A' => 'a', 'B' => 'b'}) #=>
+    #    { 'Item.1.Name' => 'A', 'Item.1.Value' => 'a',
+    #      'Item.2.Name' => 'B', 'Item.2.Value' => 'b'  }
+    #
+    #  amazonize_list(['Item.?.Name', 'Item.?.Value'], [['A','a'], ['B','b']]) #=>
+    #    { 'Item.1.Name' => 'A', 'Item.1.Value' => 'a',
+    #      'Item.2.Name' => 'B', 'Item.2.Value' => 'b'  }
+    #
+    def amazonize_list(masks, list) #:nodoc:
+      groups = {}
+      list.to_a.each_with_index do |list_item, i|
+        masks.to_a.each_with_index do |mask, mask_idx|
+          key = mask[/\?/] ? mask.dup : mask.dup + '.?'
+          key.gsub!('?', (i+1).to_s)
+          groups[key] = list_item.to_a[mask_idx]
+        end
+      end
+      groups
+    end
   end
 
 
@@ -529,7 +601,7 @@ module RightAws
         @aws.logger.warn("##### #{@aws.class.name} request: #{request_text_data} ####")
       end
         # Check response body: if it is an Amazon XML document or not:
-      if redirect_detected || (response.body && response.body[/<\?xml/])   # ... it is a xml document
+      if redirect_detected || (response.body && response.body[/^(<\?xml|<ErrorResponse)/])   # ... it is a xml document
         @aws.class.bench_xml.add! do
           error_parser = RightErrorResponseParser.new
           error_parser.parse(response)

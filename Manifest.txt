@@ -8,6 +8,8 @@ lib/awsbase/support.rb
 lib/ec2/right_ec2.rb
 lib/right_aws.rb
 lib/s3/right_s3.rb
+lib/ams/right_ams.rb
+lib/lbs/right_lbs.rb
 lib/s3/right_s3_interface.rb
 lib/sdb/active_sdb.rb
 lib/sdb/right_sdb_interface.rb

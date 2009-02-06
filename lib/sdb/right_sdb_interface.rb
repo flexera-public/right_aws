@@ -32,6 +32,7 @@ module RightAws
     DEFAULT_HOST      = 'sdb.amazonaws.com'
     DEFAULT_PORT      = 443
     DEFAULT_PROTOCOL  = 'https'
+    DEFAULT_PATH      = '/'
     API_VERSION       = '2007-11-07'
     DEFAULT_NIL_REPRESENTATION = 'nil'
 
@@ -47,7 +48,7 @@ module RightAws
     #    { :server       => 'sdb.amazonaws.com'  # Amazon service host: 'sdb.amazonaws.com'(default)
     #      :port         => 443                  # Amazon service port: 80 or 443(default)
     #      :protocol     => 'https'              # Amazon service protocol: 'http' or 'https'(default)
-    #      :signature_version => '0'             # The signature version : '0' or '1'(default)
+    #      :signature_version => '0'             # The signature version : '0','1 or '2'(default)
     #      :multi_thread => true|false           # Multi-threaded (connection per each thread): true or false(default)
     #      :logger       => Logger Object        # Logger instance: logs to STDOUT if omitted 
     #      :nil_representation => 'mynil'}       # interpret Ruby nil as this string value; i.e. use this string in SDB to represent Ruby nils (default is the string 'nil')
@@ -61,10 +62,12 @@ module RightAws
     def initialize(aws_access_key_id=nil, aws_secret_access_key=nil, params={})
       @nil_rep = params[:nil_representation] ? params[:nil_representation] : DEFAULT_NIL_REPRESENTATION
       params.delete(:nil_representation)
-      init({ :name             => 'SDB', 
-             :default_host     => ENV['SDB_URL'] ? URI.parse(ENV['SDB_URL']).host   : DEFAULT_HOST, 
-             :default_port     => ENV['SDB_URL'] ? URI.parse(ENV['SDB_URL']).port   : DEFAULT_PORT, 
-             :default_protocol => ENV['SDB_URL'] ? URI.parse(ENV['SDB_URL']).scheme : DEFAULT_PROTOCOL }, 
+      init({ :name                => 'SDB',
+             :default_host        => ENV['SDB_URL'] ? URI.parse(ENV['SDB_URL']).host   : DEFAULT_HOST,
+             :default_port        => ENV['SDB_URL'] ? URI.parse(ENV['SDB_URL']).port   : DEFAULT_PORT,
+             :default_service     => ENV['SDB_URL'] ? URI.parse(ENV['SDB_URL']).path   : DEFAULT_PATH,
+             :default_protocol    => ENV['SDB_URL'] ? URI.parse(ENV['SDB_URL']).scheme : DEFAULT_PROTOCOL,
+             :default_api_version => ENV['SDB_API_VERSION'] || API_VERSION },
            aws_access_key_id     || ENV['AWS_ACCESS_KEY_ID'], 
            aws_secret_access_key || ENV['AWS_SECRET_ACCESS_KEY'], 
            params)
@@ -73,44 +76,15 @@ module RightAws
     #-----------------------------------------------------------------
     #      Requests
     #-----------------------------------------------------------------
+    
     def generate_request(action, params={}) #:nodoc:
-      # remove empty params from request
-      params.delete_if {|key,value| value.nil? }
-      #params_string  = params.to_a.collect{|key,val| key + "=#{CGI::escape(val.to_s)}" }.join("&")
-      # prepare service data
-      service = '/'
-      service_hash = {"Action"         => action,
-                      "AWSAccessKeyId" => @aws_access_key_id,
-                      "Version"        => API_VERSION }
-      service_hash.update(params)
-      service_params = signed_service_params(@aws_secret_access_key, service_hash, :get, @params[:server], service)
-      #
-      # use POST method if the length of the query string is too large
-      # see http://docs.amazonwebservices.com/AmazonSimpleDB/2007-11-07/DeveloperGuide/MakingRESTRequests.html
-      if service_params.size > 2000
-        if signature_version == '2'
-          # resign the request because HTTP verb is included into signature
-          service_params = signed_service_params(@aws_secret_access_key, service_hash, :post, @params[:server], service)
-        end
-        request      = Net::HTTP::Post.new(service)
-        request.body = service_params
-        request['Content-Type'] = 'application/x-www-form-urlencoded'
-      else
-        request = Net::HTTP::Get.new("#{service}?#{service_params}")
-      end
-      # prepare output hash
-      { :request  => request, 
-        :server   => @params[:server],
-        :port     => @params[:port],
-        :protocol => @params[:protocol] }
+      generate_request_impl(:get, action, params )
     end
 
     # Sends request to Amazon and parses the response
     # Raises AwsError if any banana happened
     def request_info(request, parser)  #:nodoc:
-      thread = @params[:multi_thread] ? Thread.current : Thread.main
-      thread[:sdb_connection] ||= Rightscale::HttpConnection.new(:exception => AwsError, :logger => @logger)
-      request_info_impl(thread[:sdb_connection], @@bench, request, parser)
+      request_info_impl(:sdb_connection, @@bench, request, parser)
     end
 
     # Prepare attributes for putting.

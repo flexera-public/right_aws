@@ -47,6 +47,10 @@ unless defined? ActiveSupport::CoreExtensions
       Object.module_eval("::#{$1}", __FILE__, __LINE__)
     end
 
+    def camelize()
+      self.dup.split(/_/).map{ |word| word.capitalize }.join('')
+    end
+
   end
 
 

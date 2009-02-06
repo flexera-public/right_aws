@@ -56,7 +56,7 @@ module RightAws
       #    {:server       => 'queue.amazonaws.com' # Amazon service host: 'queue.amazonaws.com'(default)
       #     :port         => 443                   # Amazon service port: 80 or 443(default)
       #     :multi_thread => true|false            # Multi-threaded (connection per each thread): true or false(default)
-      #     :signature_version => '0'              # The signature version : '0' or '1'(default)
+      #     :signature_version => '0'              # The signature version : '0', '1' or '2'(default)
       #     :logger       => Logger Object}        # Logger instance: logs to STDOUT if omitted }
       #
     def initialize(aws_access_key_id=nil, aws_secret_access_key=nil, params={})
@@ -128,9 +128,7 @@ module RightAws
       # Sends request to Amazon and parses the response
       # Raises AwsError if any banana happened
     def request_info(request, parser) # :nodoc:
-      thread = @params[:multi_thread] ? Thread.current : Thread.main
-      thread[:sqs_connection] ||= Rightscale::HttpConnection.new(:exception => AwsError, :logger => @logger)
-      request_info_impl(thread[:sqs_connection], @@bench, request, parser)
+      request_info_impl(:sqs_connection, @@bench, request, parser)
     end
 
 

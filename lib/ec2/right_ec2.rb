@@ -107,50 +107,32 @@ module RightAws
     # * <tt>:protocol</tt>: 'http' or 'https', default: DEFAULT_PROTOCOL
     # * <tt>:multi_thread</tt>: true=HTTP connection per thread, false=per process
     # * <tt>:logger</tt>: for log messages, default: RAILS_DEFAULT_LOGGER else STDOUT
-    # * <tt>:signature_version</tt>:  The signature version : '0' or '1'(default)
+    # * <tt>:signature_version</tt>:  The signature version : '0','1' or '2'(default)
     # * <tt>:cache</tt>: true/false: caching for: ec2_describe_images, describe_instances,
     # describe_images_by_owner, describe_images_by_executable_by, describe_availability_zones,
     # describe_security_groups, describe_key_pairs, describe_addresses, 
     # describe_volumes, describe_snapshots methods, default: false.
     #
     def initialize(aws_access_key_id=nil, aws_secret_access_key=nil, params={})
-      init({ :name             => 'EC2', 
-             :default_host     => ENV['EC2_URL'] ? URI.parse(ENV['EC2_URL']).host   : DEFAULT_HOST, 
-             :default_port     => ENV['EC2_URL'] ? URI.parse(ENV['EC2_URL']).port   : DEFAULT_PORT,
-             :default_service  => ENV['EC2_URL'] ? URI.parse(ENV['EC2_URL']).path   : DEFAULT_PATH,             
-             :default_protocol => ENV['EC2_URL'] ? URI.parse(ENV['EC2_URL']).scheme : DEFAULT_PROTOCOL }, 
+      init({ :name                => 'EC2',
+             :default_host        => ENV['EC2_URL'] ? URI.parse(ENV['EC2_URL']).host   : DEFAULT_HOST,
+             :default_port        => ENV['EC2_URL'] ? URI.parse(ENV['EC2_URL']).port   : DEFAULT_PORT,
+             :default_service     => ENV['EC2_URL'] ? URI.parse(ENV['EC2_URL']).path   : DEFAULT_PATH,
+             :default_protocol    => ENV['EC2_URL'] ? URI.parse(ENV['EC2_URL']).scheme : DEFAULT_PROTOCOL,
+             :default_api_version => @@api },
            aws_access_key_id    || ENV['AWS_ACCESS_KEY_ID'] , 
            aws_secret_access_key|| ENV['AWS_SECRET_ACCESS_KEY'],
            params)
     end
 
-
     def generate_request(action, params={}) #:nodoc:
-      service_hash = {"Action"         => action,
-                      "AWSAccessKeyId" => @aws_access_key_id,
-                      "Version"        => @@api }
-      service_hash.update(params)
-      service_params = signed_service_params(@aws_secret_access_key, service_hash, :get, @params[:server], @params[:service])
-      request        = Net::HTTP::Get.new("#{@params[:service]}?#{service_params}")
-        # prepare output hash
-      { :request  => request, 
-        :server   => @params[:server],
-        :port     => @params[:port],
-        :protocol => @params[:protocol] }
+      generate_request_impl(:get, action, params )
     end
 
       # Sends request to Amazon and parses the response
       # Raises AwsError if any banana happened
     def request_info(request, parser)  #:nodoc:
-      thread = @params[:multi_thread] ? Thread.current : Thread.main
-      thread[:ec2_connection] ||= Rightscale::HttpConnection.new(:exception => AwsError, :logger => @logger)
-      request_info_impl(thread[:ec2_connection], @@bench, request, parser)
-    end
-
-    def hash_params(prefix, list) #:nodoc:
-      groups = {}
-      list.each_index{|i| groups.update("#{prefix}.#{i+1}"=>list[i])} if list
-      return groups
+      request_info_impl(:ec2_connection, @@bench, request, parser)
     end
 
   #-----------------------------------------------------------------
@@ -165,7 +147,7 @@ module RightAws
     def ec2_describe_images(params={}, image_type=nil, cache_for=nil) #:nodoc:
       request_hash = {}
       params.each do |list_by, list|
-        request_hash.merge! hash_params(list_by, list.to_a)
+        request_hash.merge! amazonize_list(list_by, list.to_a)
       end
       request_hash['ImageType'] = image_type if image_type
       link = generate_request("DescribeImages", request_hash)
@@ -298,9 +280,9 @@ module RightAws
       params =  {'ImageId'   => image_id,
                  'Attribute' => attribute}
       params['OperationType'] = operation_type if operation_type
-      params.update(hash_params('UserId',      vars[:user_id].to_a))    if vars[:user_id]
-      params.update(hash_params('UserGroup',   vars[:user_group].to_a)) if vars[:user_group]
-      params.update(hash_params('ProductCode', vars[:product_code]))    if vars[:product_code]
+      params.update(amazonize_list('UserId',      vars[:user_id].to_a))    if vars[:user_id]
+      params.update(amazonize_list('UserGroup',   vars[:user_group].to_a)) if vars[:user_group]
+      params.update(amazonize_list('ProductCode', vars[:product_code]))    if vars[:product_code]
       link = generate_request("ModifyImageAttribute", params)
       request_info(link, RightBoolResponseParser.new(:logger => @logger))
     rescue Exception
@@ -394,7 +376,7 @@ module RightAws
       #       ..., {...}]
       #
     def describe_instances(list=[])
-      link = generate_request("DescribeInstances", hash_params('InstanceId',list.to_a))
+      link = generate_request("DescribeInstances", amazonize_list('InstanceId',list.to_a))
       request_cache_or_info(:describe_instances, link,  QEc2DescribeInstancesParser, @@bench, list.blank?) do |parser|
         get_desc_instances(parser.result)
       end
@@ -497,7 +479,7 @@ module RightAws
       @logger.info("Launching instance of image #{image_id} for #{@aws_access_key_id}, " + 
                    "key: #{lparams[:key_name]}, groups: #{(lparams[:group_ids]).to_a.join(',')}")
       # careful: keyName and securityGroups may be nil
-      params = hash_params('SecurityGroup', lparams[:group_ids].to_a)
+      params = amazonize_list('SecurityGroup', lparams[:group_ids].to_a)
       params.update( {'ImageId'        => image_id,
                       'MinCount'       => (lparams[:min_count] || 1).to_s, 
                       'MaxCount'       => (lparams[:max_count] || 1).to_s, 
@@ -540,7 +522,7 @@ module RightAws
       #      :aws_prev_state_code     => 16}]
       #
     def terminate_instances(list=[])
-      link = generate_request("TerminateInstances", hash_params('InstanceId',list.to_a))
+      link = generate_request("TerminateInstances", amazonize_list('InstanceId',list.to_a))
       request_info(link, QEc2TerminateInstancesParser.new(:logger => @logger))
     rescue Exception
       on_exception
@@ -565,7 +547,7 @@ module RightAws
       #  ec2.reboot_instances(['i-f222222d','i-f222222e']) #=> true
       #
     def reboot_instances(list)
-      link = generate_request("RebootInstances", hash_params('InstanceId', list.to_a))
+      link = generate_request("RebootInstances", amazonize_list('InstanceId', list.to_a))
       request_info(link, RightBoolResponseParser.new(:logger => @logger))
     rescue Exception
       on_exception
@@ -665,7 +647,7 @@ module RightAws
       #      :aws_instance_id   => "i-e3e24e8a"}]
       #
     def describe_bundle_tasks(list=[])
-      link = generate_request("DescribeBundleTasks", hash_params('BundleId', list.to_a))
+      link = generate_request("DescribeBundleTasks", amazonize_list('BundleId', list.to_a))
       request_info(link, QEc2DescribeBundleTasksParser.new)
     rescue Exception
       on_exception
@@ -711,7 +693,7 @@ module RightAws
       #    ..., {...}]
       #
     def describe_security_groups(list=[])
-      link = generate_request("DescribeSecurityGroups", hash_params('GroupName',list.to_a))
+      link = generate_request("DescribeSecurityGroups", amazonize_list('GroupName',list.to_a))
       request_cache_or_info( :describe_security_groups, link,  QEc2DescribeSecurityGroupsParser, @@bench, list.blank?) do |parser|
         result = []     
         parser.result.each do |item|
@@ -851,7 +833,7 @@ module RightAws
       #      ..., {...} ]
       #
     def describe_key_pairs(list=[])
-      link = generate_request("DescribeKeyPairs", hash_params('KeyName',list.to_a))
+      link = generate_request("DescribeKeyPairs", amazonize_list('KeyName',list.to_a))
       request_cache_or_info :describe_key_pairs, link,  QEc2DescribeKeyPairParser, @@bench, list.blank?
     rescue Exception
       on_exception
@@ -924,7 +906,7 @@ module RightAws
     #
     def describe_addresses(list=[])
       link = generate_request("DescribeAddresses", 
-                              hash_params('PublicIp',list.to_a))
+                              amazonize_list('PublicIp',list.to_a))
       request_cache_or_info :describe_addresses, link,  QEc2DescribeAddressesParser, @@bench, list.blank?
     rescue Exception
       on_exception
@@ -973,7 +955,7 @@ module RightAws
     #
     def describe_availability_zones(list=[])
       link = generate_request("DescribeAvailabilityZones", 
-                              hash_params('ZoneName',list.to_a))
+                              amazonize_list('ZoneName',list.to_a))
       request_cache_or_info :describe_availability_zones, link,  QEc2DescribeAvailabilityZonesParser, @@bench, list.blank?
     rescue Exception
       on_exception
@@ -989,7 +971,7 @@ module RightAws
     #
     def describe_regions(list=[])
       link = generate_request("DescribeRegions",
-                              hash_params('RegionName',list.to_a))
+                              amazonize_list('RegionName',list.to_a))
       request_cache_or_info :describe_regions, link,  QEc2DescribeRegionsParser, @@bench, list.blank?
     rescue Exception
       on_exception
@@ -1022,7 +1004,7 @@ module RightAws
     #
     def describe_volumes(list=[])
       link = generate_request("DescribeVolumes", 
-                              hash_params('VolumeId',list.to_a))
+                              amazonize_list('VolumeId',list.to_a))
       request_cache_or_info :describe_volumes, link,  QEc2DescribeVolumesParser, @@bench, list.blank?
     rescue Exception
       on_exception
@@ -1124,7 +1106,7 @@ module RightAws
      #
     def describe_snapshots(list=[])
       link = generate_request("DescribeSnapshots", 
-                              hash_params('SnapshotId',list.to_a))
+                              amazonize_list('SnapshotId',list.to_a))
       request_cache_or_info :describe_snapshots, link,  QEc2DescribeSnapshotsParser, @@bench, list.blank?
     rescue Exception
       on_exception
