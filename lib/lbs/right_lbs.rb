@@ -116,7 +116,7 @@ module RightAws
     #      :access_point_name  => "test"}]
     #
     def describe_access_points(*access_points)
-      access_points.flatten!
+      access_points = access_points.flatten.compact
       request_hash = amazonize_list("AccessPointNames.member", access_points)
       link = generate_request("DescribeAccessPoints", request_hash)
       request_cache_or_info(:describe_access_points, link,  DescribeAccessPointsParser, @@bench, access_points.blank?)
@@ -212,7 +212,7 @@ module RightAws
     #
     def describe_end_point_state(access_point_name, *end_points)
       end_points.flatten!
-      request_hash = amazonize_list("EndPoints.member", end_points)
+      request_hash = amazonize_list("EndPoints.member.?.InstanceId", end_points)
       request_hash.merge!( 'AccessPointName' => access_point_name )
       link = generate_request("DescribeEndPointState", request_hash)
       request_info(link, DescribeEndPointStateParser.new(:logger => @logger))
