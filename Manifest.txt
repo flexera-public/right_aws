@@ -10,6 +10,7 @@ lib/right_aws.rb
 lib/s3/right_s3.rb
 lib/ams/right_ams.rb
 lib/lbs/right_lbs.rb
+lib/aass/right_aass.rb
 lib/s3/right_s3_interface.rb
 lib/sdb/active_sdb.rb
 lib/sdb/right_sdb_interface.rb
