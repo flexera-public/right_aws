@@ -47,6 +47,19 @@ module RightAws
       @@bench.service
     end
 
+      # Params supported:
+      #  :no_subdomains => true # do not use bucket as a part of domain name but as a part of path
+    @@params = {}
+    def self.params
+      @@params
+    end
+
+      # get custom option
+    def param(name)
+      # - check explicitly defined param (@params)
+      # - otherwise check implicitly defined one (@@params)
+      @params.has_key?(name) ? @params[name] : @@params[name]
+    end
 
       # Creates new RightS3 instance.
       #
@@ -120,7 +133,7 @@ module RightAws
       headers[:url].to_s[%r{^([a-z0-9._-]*)(/[^?]*)?(\?.+)?}i]
       bucket_name, key_path, params_list = $1, $2, $3
       # select request model
-      if is_dns_bucket?(bucket_name)
+      if !param(:no_subdomains) && is_dns_bucket?(bucket_name)
         # fix a path
         server = "#{bucket_name}.#{server}"
         key_path ||= '/'
