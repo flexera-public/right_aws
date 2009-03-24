@@ -68,7 +68,7 @@ module RightAws
     include RightAwsBaseInterface
     
     # Amazon EC2 API version being used
-    API_VERSION       = "2008-12-01"
+    API_VERSION       = "2009-03-01"
     DEFAULT_HOST      = "ec2.amazonaws.com"
     DEFAULT_PATH      = '/'
     DEFAULT_PROTOCOL  = 'https'
@@ -383,7 +383,7 @@ module RightAws
     rescue Exception
       on_exception
     end
-    
+
       # Return the product code attached to instance or +nil+ otherwise.
       #
       #  ec2.confirm_product_instance('ami-e444444d','12345678') #=> nil
@@ -669,6 +669,73 @@ module RightAws
     def cancel_bundle_task(bundle_id)
       link = generate_request("CancelBundleTask", { 'BundleId' => bundle_id })
       request_info(link, QEc2BundleInstanceParser.new)
+    rescue Exception
+      on_exception
+    end
+
+  #-----------------------------------------------------------------
+  #      Reserved instances
+  #-----------------------------------------------------------------
+
+    # Retrieve reserved instances list.
+    # Returns a list of Reserved Instances.
+    #
+    # TODO: not tested with a real list of Reserved Instances.
+    def describe_reserved_instances(list=[])
+      link = generate_request("DescribeReservedInstances", amazonize_list('ReservedInstancesId',list.to_a))
+      request_cache_or_info(:describe_reserved_instances, link,  QEc2DescribeReservedInstancesParser, @@bench, list.blank?)
+    rescue Exception
+      on_exception
+    end
+
+    # Retrieve reserved instances offerings.
+    # Returns a set of available offerings.
+    #
+    # Optional params:
+    #  :aws_ids                 => String || Array
+    #  :aws_instance_type       => String
+    #  :aws_availability_zone   => String
+    #  :aws_product_description => String
+    #
+    #  ec2.describe_reserved_instances_offerings #=>
+    #    [{:aws_instance_type=>"c1.medium",
+    #      :aws_availability_zone=>"us-east-1c",
+    #      :aws_duration=>94608000,
+    #      :aws_product_description=>"Linux/UNIX",
+    #      :aws_id=>"e5a2ff3b-f6eb-4b4e-83f8-b879d7060257",
+    #      :aws_usage_price=>0.06,
+    #      :aws_fixed_price=>1000.0},
+    #      ...
+    #     {:aws_instance_type=>"m1.xlarge",
+    #      :aws_availability_zone=>"us-east-1a",
+    #      :aws_duration=>31536000,
+    #      :aws_product_description=>"Linux/UNIX",
+    #      :aws_id=>"c48ab04c-63ab-4cd6-b8f5-978a29eb9bcc",
+    #      :aws_usage_price=>0.24,
+    #      :aws_fixed_price=>2600.0}]
+    #
+    def describe_reserved_instances_offerings(params={})
+      rparams = {}
+      rparams.update(amazonize_list('ReservedInstancesOfferingId', params[:aws_ids].to_a)) if params[:aws_ids]
+      rparams['InstanceType']       = params[:aws_instance_type]       if params[:aws_instance_type]
+      rparams['AvailabilityZone']   = params[:aws_availability_zone]   if params[:aws_availability_zone]
+      rparams['ProductDescription'] = params[:aws_product_description] if params[:aws_product_description]
+      link = generate_request("DescribeReservedInstancesOfferings", rparams)
+      request_cache_or_info(:describe_reserved_instances_offerings, link,  QEc2DescribeReservedInstancesOfferingsParser, @@bench, params.blank?)
+    rescue Exception
+      on_exception
+    end
+
+    # Purchase a Reserved Instance.
+    # Returns ReservedInstancesId value.
+    #
+    #  ec2.purchase_reserved_instances_offering('e5a2ff3b-f6eb-4b4e-83f8-b879d7060257', 3) # => '4b2293b4-5813-4cc8-9ce3-1957fc1dcfc8'
+    #
+    # TODO: not tested yet
+    def purchase_reserved_instances_offering(reserved_instances_offering_id, instance_count=1)
+      link = generate_request("PurchaseReservedInstancesOffering", { 'ReservedInstancesOfferingId' => reserved_instances_offering_id,
+                                                                     'InstanceCount'               => instance_count  })
+      request_info(link, QEc2PurchaseReservedInstancesOfferingParser.new)
     rescue Exception
       on_exception
     end
@@ -1455,6 +1522,65 @@ module RightAws
       end
       def reset
         @result = []
+      end
+    end
+
+  #-----------------------------------------------------------------
+  #      PARSERS: ReservedInstances
+  #-----------------------------------------------------------------
+
+    class QEc2DescribeReservedInstancesParser < RightAWSParser #:nodoc:
+      def tagstart(name, attributes)
+        @item = {} if name == 'item'
+      end
+      def tagend(name)
+        case name
+          when 'reservedInstancesId' then @item[:aws_id]                  = @text
+          when 'instanceType'        then @item[:aws_instance_type]       = @text
+          when 'availabilityZone'    then @item[:aws_availability_zone]   = @text
+          when 'duration'            then @item[:aws_duration]            = @text.to_i
+          when 'usagePrice'          then @item[:aws_usage_price]         = @text.to_f
+          when 'fixedPrice'          then @item[:aws_fixed_price]         = @text.to_f
+          when 'instanceCount'       then @item[:aws_instance_count]      = @text.to_i
+          when 'productDescription'  then @item[:aws_product_description] = @text
+          when 'state'               then @item[:aws_state]               = @text
+          when 'item'                then @result << @item
+        end
+      end
+      def reset
+        @result = []
+      end
+    end
+
+    class QEc2DescribeReservedInstancesOfferingsParser < RightAWSParser #:nodoc:
+      def tagstart(name, attributes)
+        @item = {} if name == 'item'
+      end
+      def tagend(name)
+        case name
+          when 'reservedInstancesOfferingId' then @item[:aws_id]                  = @text
+          when 'instanceType'                then @item[:aws_instance_type]       = @text
+          when 'availabilityZone'            then @item[:aws_availability_zone]   = @text
+          when 'duration'                    then @item[:aws_duration]            = @text.to_i
+          when 'usagePrice'                  then @item[:aws_usage_price]         = @text.to_f
+          when 'fixedPrice'                  then @item[:aws_fixed_price]         = @text.to_f
+          when 'productDescription'          then @item[:aws_product_description] = @text
+          when 'item'                        then @result << @item
+        end
+      end
+      def reset
+        @result = []
+      end
+    end
+
+    class QEc2PurchaseReservedInstancesOfferingParser < RightAWSParser #:nodoc:
+      def tagend(name)
+        if name == 'reservedInstancesId'
+          @result = @text
+        end
+      end
+      def reset
+        @result = ''
       end
     end
 
