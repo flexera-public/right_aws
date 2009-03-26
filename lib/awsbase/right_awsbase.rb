@@ -204,6 +204,9 @@ module RightAws
 
     def init(service_info, aws_access_key_id, aws_secret_access_key, params={}) #:nodoc:
       @params = params
+      # If one defines EC2_URL he may forget to use a single slash as an "empty service" path.
+      # Amazon does not like this therefore add this bad boy if he is missing...
+      service_info[:default_service] = '/' if service_info[:default_service].blank?
       raise AwsError.new("AWS access keys are required to operate on #{service_info[:name]}") \
         if aws_access_key_id.blank? || aws_secret_access_key.blank?
       @aws_access_key_id     = aws_access_key_id
@@ -213,6 +216,8 @@ module RightAws
         @params[:server]   = URI.parse(@params[:endpoint_url]).host
         @params[:port]     = URI.parse(@params[:endpoint_url]).port
         @params[:service]  = URI.parse(@params[:endpoint_url]).path
+        # make sure the 'service' path is not empty
+        @params[:service]  = service_info[:default_service] if @params[:service].blank?
         @params[:protocol] = URI.parse(@params[:endpoint_url]).scheme
         @params[:region]   = nil
       else

@@ -255,7 +255,7 @@ module RightAws
       AwsUtils.allow_only([:bucket,:xmldoc, :headers], params)
       params[:headers] = {} unless params[:headers]
       req_hash = generate_rest_request('PUT', params[:headers].merge(:url=>"#{params[:bucket]}?logging", :data => params[:xmldoc]))
-      request_info(req_hash, S3TrueParser.new)
+      request_info(req_hash, RightHttp2xxParser.new)
     rescue
       on_exception
     end
