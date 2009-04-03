@@ -1089,10 +1089,11 @@ module RightAws
     #       :aws_size       => 94}
     #
     def create_volume(snapshot_id, size, zone)
-      link = generate_request("CreateVolume", 
-                              "SnapshotId"        => snapshot_id.to_s,
-                              "Size"              => size.to_s,
-                              "AvailabilityZone"  => zone.to_s )
+      hash = { "Size"              => size.to_s,
+               "AvailabilityZone"  => zone.to_s }
+      # Get rig of empty snapshot: e8s guys do not like it
+      hash["SnapshotId"] = snapshot_id.to_s unless snapshot_id.blank?
+      link = generate_request("CreateVolume", hash )
       request_info(link, QEc2CreateVolumeParser.new(:logger => @logger))
     rescue Exception
       on_exception
