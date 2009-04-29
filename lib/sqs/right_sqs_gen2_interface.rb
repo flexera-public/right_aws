@@ -38,7 +38,7 @@ module RightAws
   class SqsGen2Interface < RightAwsBase
     include RightAwsBaseInterface
     
-    API_VERSION       = "2008-01-01"
+    API_VERSION       = "2009-02-01"
     DEFAULT_HOST      = "queue.amazonaws.com"
     DEFAULT_PORT      = 443
     DEFAULT_PROTOCOL  = 'https'
@@ -143,10 +143,9 @@ module RightAws
       request_info_impl(:sqs_connection, @@bench, request, parser)
     end
 
-
       # Creates a new queue, returning its URI.
       #
-      #  sqs.create_queue('my_awesome_queue') #=> 'http://queue.amazonaws.com/ZZ7XXXYYYBINS/my_awesome_queue'
+      #  sqs.create_queue('my_awesome_queue') #=> 'https://queue.amazonaws.com/ZZ7XXXYYYBINS/my_awesome_queue'
       #
     def create_queue(queue_name, default_visibility_timeout=nil)
       req_hash = generate_request('CreateQueue', 'QueueName' => queue_name,
@@ -162,7 +161,7 @@ module RightAws
      #
      #  sqs.create_queue('my_awesome_queue')
      #  sqs.create_queue('my_awesome_queue_2')
-     #  sqs.list_queues('my_awesome') #=> ['http://queue.amazonaws.com/ZZ7XXXYYYBINS/my_awesome_queue','http://queue.amazonaws.com/ZZ7XXXYYYBINS/my_awesome_queue_2']
+     #  sqs.list_queues('my_awesome') #=> ['https://queue.amazonaws.com/ZZ7XXXYYYBINS/my_awesome_queue','https://queue.amazonaws.com/ZZ7XXXYYYBINS/my_awesome_queue_2']
      #
     def list_queues(queue_name_prefix=nil)
       req_hash = generate_request('ListQueues', 'QueueNamePrefix' => queue_name_prefix)
@@ -177,11 +176,10 @@ module RightAws
       # may still show the deleted queue.  It is not unusual within the 60 s window to see the deleted queue absent from 
       # one list_queues call but present in the subsequent one.  Deletion is eventual.
       #
-      #  sqs.delete_queue('http://queue.amazonaws.com/ZZ7XXXYYYBINS/my_awesome_queue_2') #=> true
-      # 
+      #  sqs.delete_queue('https://queue.amazonaws.com/ZZ7XXXYYYBINS/my_awesome_queue_2') #=> true
       # 
     def delete_queue(queue_url)
-      req_hash = generate_request('DeleteQueue', :queue_url      => queue_url)
+      req_hash = generate_request('DeleteQueue', :queue_url => queue_url)
       request_info(req_hash, SqsStatusParser.new(:logger => @logger))
     rescue
       on_exception
@@ -189,11 +187,24 @@ module RightAws
 
       # Retrieves the queue attribute(s). Returns a hash of attribute(s) or an exception.
       #
-      #  sqs.get_queue_attributes('http://queue.amazonaws.com/ZZ7XXXYYYBINS/my_awesome_queue') 
-      #  #=> {"ApproximateNumberOfMessages"=>"0", "VisibilityTimeout"=>"30"}
+      #  sqs.get_queue_attributes('https://queue.amazonaws.com/ZZ7XXXYYYBINS/my_awesome_queue') #=>
+      #    {"ApproximateNumberOfMessages" => "0",
+      #     "LastModifiedTimestamp"       => "1240946032",
+      #     "CreatedTimestamp"            => "1240816887",
+      #     "VisibilityTimeout"           => "30",
+      #     "Policy"                      => "{"Version":"2008-10-17","Id":...}"}
+      #     
+      #  queue.get_queue_attributes('https://queue.amazonaws.com/ZZ7XXXYYYBINS/my_awesome_queue', "LastModifiedTimestamp", "VisibilityTimeout") #=>
+      #    {"LastModifiedTimestamp" => "1240946032",
+      #     "VisibilityTimeout"     => "30"}
       #
-    def get_queue_attributes(queue_url, attribute='All')
-      req_hash = generate_request('GetQueueAttributes', 'AttributeName' => attribute, :queue_url  => queue_url)
+      # http://docs.amazonwebservices.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/index.html?Query_QueryGetQueueAttributes.html
+    def get_queue_attributes(queue_url, *attributes)
+      attributes.flatten!
+      attributes << 'All' if attributes.blank?
+      params = amazonize_list('AttributeName', attributes.to_a)
+      params.merge!(:queue_url  => queue_url)
+      req_hash = generate_request('GetQueueAttributes', params)
       request_info(req_hash, SqsGetQueueAttributesParser.new(:logger => @logger))
     rescue
       on_exception
@@ -201,19 +212,65 @@ module RightAws
 
       # Sets queue attribute. Returns +true+ or an exception.
       #
-      #  sqs.set_queue_attributes('http://queue.amazonaws.com/ZZ7XXXYYYBINS/my_awesome_queue', "VisibilityTimeout", 10) #=> true
+      #  sqs.set_queue_attributes('https://queue.amazonaws.com/ZZ7XXXYYYBINS/my_awesome_queue', "VisibilityTimeout", 10) #=> true
       #
       # From the SQS Dev Guide:
-      # "Currently, you can set only the 
-      # VisibilityTimeout attribute for a queue... 
-      # When you change a queue's attributes, the change can take up to 60 seconds to propagate 
+      # "When you change a queue's attributes, the change can take up to 60 seconds to propagate 
       # throughout the SQS system."
       #
       # NB: Attribute values may not be immediately available to other queries
       # for some time after an update. See the SQS documentation for
       # semantics, but in general propagation can take up to 60 s.
+      # 
+      #  see http://docs.amazonwebservices.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/index.html?Query_QuerySetQueueAttributes.html
     def set_queue_attributes(queue_url, attribute, value)
-      req_hash = generate_request('SetQueueAttributes', 'Attribute.Name'  => attribute, 'Attribute.Value' => value, :queue_url  => queue_url)
+      req_hash = generate_request('SetQueueAttributes', 
+                                  'Attribute.Name'  => attribute,
+                                  'Attribute.Value' => value,
+                                  :queue_url        => queue_url)
+      request_info(req_hash, SqsStatusParser.new(:logger => @logger))
+    rescue
+      on_exception
+    end
+
+    # Add permissions to a queue.
+    #
+    #  sqs.add_permissions('https://queue.amazonaws.com/ZZ7XXXYYYBINS/my_awesome_queue',
+    #                     'testLabel',
+    #                     '125074342641' => 'SendMessage',
+    #                     '125074342642' => ['SendMessage','ReceiveMessage']) #=> true
+    #
+    #  +permissions+ is a hash of: AccountId => ActionName
+    #  (valid ActionNames: * | SendMessage | ReceiveMessage | DeleteMessage | ChangeMessageVisibility | GetQueueAttributes )
+    #
+    #  see http://docs.amazonwebservices.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/index.html?Query_QueryAddPermission.html
+    #      http://docs.amazonwebservices.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/index.html?acp-overview.html
+    def add_permissions(queue_url, label, permissions)
+      perms = []
+      permissions.each do |id, actions|
+        actions.to_a.each do |action|
+          perms << [id, action]
+        end
+      end
+      params = amazonize_list(['AWSAccountId', 'ActionName'], perms)
+      params.merge!('Label'    => label,
+                    :queue_url => queue_url )
+      req_hash = generate_request('AddPermission', params)
+      request_info(req_hash, SqsStatusParser.new(:logger => @logger))
+    rescue
+      on_exception
+    end
+
+    # Revoke any permissions in the queue policy that matches the +label+ parameter.
+    #
+    #  sqs.remove_permissions('https://queue.amazonaws.com/ZZ7XXXYYYBINS/my_awesome_queue',
+    #                        'testLabel') # => true
+    #
+    #  see http://docs.amazonwebservices.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/index.html?Query_QueryRemovePermission.html
+    def remove_permissions(queue_url, label)
+      req_hash = generate_request('RemovePermission',
+                                  'Label'    => label,
+                                  :queue_url => queue_url )
       request_info(req_hash, SqsStatusParser.new(:logger => @logger))
     rescue
       on_exception
@@ -221,18 +278,36 @@ module RightAws
 
       # Retrieves a list of messages from queue. Returns an array of hashes in format: <tt>{:id=>'message_id', body=>'message_body'}</tt>
       #
-      #   sqs.receive_message('http://queue.amazonaws.com/ZZ7XXXYYYBINS/my_awesome_queue',10, 5) #=>
+      #   sqs.receive_message('https://queue.amazonaws.com/ZZ7XXXYYYBINS/my_awesome_queue',10, 5) #=>
       #    [{"ReceiptHandle"=>"Euvo62...kw==", "MD5OfBody"=>"16af2171b5b83cfa35ce254966ba81e3", 
       #      "Body"=>"Goodbyte World!", "MessageId"=>"MUM4WlAyR...pYOTA="}, ..., {}]
       #
       # Normally this call returns fewer messages than the maximum specified,
       # even if they are available.
       #
-    def receive_message(queue_url, max_number_of_messages=1, visibility_timeout=nil)
+    def receive_message(queue_url, max_number_of_messages=1, visibility_timeout=nil, attributes=nil)
       return [] if max_number_of_messages == 0
-      req_hash = generate_post_request('ReceiveMessage', 'MaxNumberOfMessages'  => max_number_of_messages, 'VisibilityTimeout' => visibility_timeout,
-                                       :queue_url          => queue_url )
+      params = amazonize_list('AttributeName', attributes.to_a)
+      params.merge!('MaxNumberOfMessages' => max_number_of_messages,
+                    'VisibilityTimeout'   => visibility_timeout,
+                    :queue_url            => queue_url )
+      req_hash = generate_post_request('ReceiveMessage', params)
       request_info(req_hash, SqsReceiveMessageParser.new(:logger => @logger))
+    rescue
+      on_exception
+    end
+
+    # Change the visibility timeout of a specified message in a queue.
+    #
+    #  sqs.change_message_visibility('https://queue.amazonaws.com/ZZ7XXXYYYBINS/my_awesome_queue', 'Euvo62...kw==', 33) #=> true
+    #
+    #  see http://docs.amazonwebservices.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/index.html?Query_QueryChangeMessageVisibility.html
+    def change_message_visibility(queue_url, receipt_handle, visibility_timeout)
+      req_hash = generate_request('ChangeMessageVisibility',
+                                  'ReceiptHandle'     => receipt_handle,
+                                  'VisibilityTimeout' => visibility_timeout,
+                                  :queue_url          => queue_url )
+      request_info(req_hash, SqsStatusParser.new(:logger => @logger))
     rescue
       on_exception
     end
@@ -241,8 +316,9 @@ module RightAws
       # If successful, this call returns a hash containing key/value pairs for
       # "MessageId" and "MD5OfMessageBody":
       #
-      #  sqs.send_message('http://queue.amazonaws.com/ZZ7XXXYYYBINS/my_awesome_queue', 'message_1') #=> "1234567890...0987654321"
-      #  => {"MessageId"=>"MEs4M0JKNlRCRTBBSENaMjROTk58QVFRNzNEREhDVFlFOVJDQ1JKNjF8UTdBRllCUlJUMjhKMUI1WDJSWDE=", "MD5OfMessageBody"=>"16af2171b5b83cfa35ce254966ba81e3"}
+      #  sqs.send_message('https://queue.amazonaws.com/ZZ7XXXYYYBINS/my_awesome_queue', 'message_1') #=> 
+      #    {"MessageId"=>"MEs4M0JKNlRCRTBBSENaMjROTk58QVFRNzNEREhDVFlFOVJDQ1JKNjF8UTdBRllCUlJUMjhKMUI1WDJSWDE=",
+      #     "MD5OfMessageBody"=>"16af2171b5b83cfa35ce254966ba81e3"}
       #
       # On failure, send_message raises an exception.
       #
@@ -269,7 +345,7 @@ module RightAws
       # you again on a subsequent receive request. You should create your system to be 
       # idempotent so that receiving a particular message more than once is not a problem. "
       #
-      #  sqs.delete_message('http://queue.amazonaws.com/ZZ7XXXYYYBINS/my_awesome_queue', 'Euvo62/1nlIet...ao03hd9Sa0w==') #=> true
+      #  sqs.delete_message('https://queue.amazonaws.com/ZZ7XXXYYYBINS/my_awesome_queue', 'Euvo62/1nlIet...ao03hd9Sa0w==') #=> true
       #
     def delete_message(queue_url, receipt_handle)
       req_hash = generate_request('DeleteMessage', 'ReceiptHandle' => receipt_handle, :queue_url  => queue_url)
@@ -279,7 +355,7 @@ module RightAws
     end
     
       # Given the queue's short name, this call returns the queue URL or +nil+ if queue is not found
-      #  sqs.queue_url_by_name('my_awesome_queue') #=> 'http://queue.amazonaws.com/ZZ7XXXYYYBINS/my_awesome_queue'
+      #  sqs.queue_url_by_name('my_awesome_queue') #=> 'https://queue.amazonaws.com/ZZ7XXXYYYBINS/my_awesome_queue'
       #
     def queue_url_by_name(queue_name)
       return queue_name if queue_name.include?('/')
@@ -294,7 +370,7 @@ module RightAws
 
       # Returns short queue name by url.
       #
-      #  RightSqs.queue_name_by_url('http://queue.amazonaws.com/ZZ7XXXYYYBINS/my_awesome_queue') #=> 'my_awesome_queue'
+      #  RightSqs.queue_name_by_url('https://queue.amazonaws.com/ZZ7XXXYYYBINS/my_awesome_queue') #=> 'my_awesome_queue'
       #
     def self.queue_name_by_url(queue_url)
       queue_url[/[^\/]*$/]
@@ -304,7 +380,7 @@ module RightAws
     
       # Returns short queue name by url.
       #
-      #  sqs.queue_name_by_url('http://queue.amazonaws.com/ZZ7XXXYYYBINS/my_awesome_queue') #=> 'my_awesome_queue'
+      #  sqs.queue_name_by_url('https://queue.amazonaws.com/ZZ7XXXYYYBINS/my_awesome_queue') #=> 'my_awesome_queue'
       #
     def queue_name_by_url(queue_url)
       self.class.queue_name_by_url(queue_url)
@@ -314,7 +390,7 @@ module RightAws
 
       # Returns approximate number of messages in queue.
       #
-      #  sqs.get_queue_length('http://queue.amazonaws.com/ZZ7XXXYYYBINS/my_awesome_queue') #=> 3
+      #  sqs.get_queue_length('https://queue.amazonaws.com/ZZ7XXXYYYBINS/my_awesome_queue') #=> 3
       #
     def get_queue_length(queue_url)
       get_queue_attributes(queue_url)['ApproximateNumberOfMessages'].to_i
@@ -324,7 +400,7 @@ module RightAws
 
       # Removes all visible messages from queue. Return +true+ or an exception.
       #
-      #  sqs.clear_queue('http://queue.amazonaws.com/ZZ7XXXYYYBINS/my_awesome_queue') #=> true
+      #  sqs.clear_queue('https://queue.amazonaws.com/ZZ7XXXYYYBINS/my_awesome_queue') #=> true
       #
     def clear_queue(queue_url)
       while (pop_messages(queue_url, 10).length > 0) ; end   # delete all messages in queue
@@ -335,12 +411,12 @@ module RightAws
 
       # Pops (retrieves and deletes) up to 'number_of_messages' from queue. Returns an array of retrieved messages in format: <tt>[{:id=>'message_id', :body=>'message_body'}]</tt>.
       #
-      #   sqs.pop_messages('http://queue.amazonaws.com/ZZ7XXXYYYBINS/my_awesome_queue', 3) #=>
+      #   sqs.pop_messages('https://queue.amazonaws.com/ZZ7XXXYYYBINS/my_awesome_queue', 3) #=>
       #   [{"ReceiptHandle"=>"Euvo62/...+Zw==", "MD5OfBody"=>"16af2...81e3", "Body"=>"Goodbyte World!", 
       #   "MessageId"=>"MEZI...JSWDE="}, {...}, ... , {...} ]
       #
-    def pop_messages(queue_url, number_of_messages=1)
-      messages = receive_message(queue_url, number_of_messages)
+    def pop_messages(queue_url, number_of_messages=1, attributes=nil)
+      messages = receive_message(queue_url, number_of_messages, nil, attributes)
       messages.each do |message|
         delete_message(queue_url, message['ReceiptHandle'])
       end
@@ -351,11 +427,11 @@ module RightAws
 
       # Pops (retrieves and  deletes) first accessible message from queue. Returns the message in format <tt>{:id=>'message_id', :body=>'message_body'}</tt> or +nil+.
       #
-      #  sqs.pop_message('http://queue.amazonaws.com/ZZ7XXXYYYBINS/my_awesome_queue') #=>
+      #  sqs.pop_message('https://queue.amazonaws.com/ZZ7XXXYYYBINS/my_awesome_queue') #=>
       #    {:id=>"12345678904GEZX9746N|0N9ED344VK5Z3SV1DTM0|1RVYH4X3TJ0987654321", :body=>"message_1"}
       #
-    def pop_message(queue_url)
-      messages = pop_messages(queue_url)
+    def pop_message(queue_url, attributes=nil)
+      messages = pop_messages(queue_url, 1, attributes)
       messages.blank? ? nil : messages[0]
     rescue
       on_exception
@@ -398,8 +474,8 @@ module RightAws
       end
       def tagend(name)
         case name 
-          when 'Name'      ; @current_attribute          = @text
-          when 'Value'     ; @result[@current_attribute] = @text
+          when 'Name'  then @current_attribute          = @text
+          when 'Value' then @result[@current_attribute] = @text
         end
       end
     end
@@ -413,14 +489,23 @@ module RightAws
         @result = []
       end
       def tagstart(name, attributes)
-        @current_message = {} if name == 'Message'
+        case name
+        when 'Message' then @current_message = { }
+        when 'Attribute' then
+          @current_message['Attributes'] ||= {}
+          @current_attribute_name  = ''
+          @current_attribute_value = ''
+        end
       end
       def tagend(name)
         case name
-          when 'MessageId'  ; @current_message['MessageId'] = @text
-          when 'ReceiptHandle' ; @current_message['ReceiptHandle'] = @text
-          when 'MD5OfBody' ; @current_message['MD5OfBody'] = @text
-          when 'Body'; @current_message['Body'] = @text; @result << @current_message
+        when 'MessageId'     then @current_message['MessageId']     = @text
+        when 'ReceiptHandle' then @current_message['ReceiptHandle'] = @text
+        when 'MD5OfBody'     then @current_message['MD5OfBody']     = @text
+        when 'Name'          then @current_attribute_name  = @text
+        when 'Value'         then @current_attribute_value = @text
+        when 'Attribute'     then @current_message['Attributes'][@current_attribute_name] = @current_attribute_value
+        when 'Body'          then @current_message['Body'] = @text; @result << @current_message
         end
       end
     end
@@ -431,8 +516,8 @@ module RightAws
       end
       def tagend(name)
         case name
-          when 'MessageId' ; @result['MessageId'] = @text
-          when 'MD5OfMessageBody' ; @result['MD5OfMessageBody'] = @text
+          when 'MessageId'        then @result['MessageId']        = @text
+          when 'MD5OfMessageBody' then @result['MD5OfMessageBody'] = @text
         end
       end
     end

@@ -167,11 +167,10 @@ module RightAws
         #
         #  queue.receive_messages(2,10) #=> array of messages
         #
-      def receive_messages(number_of_messages=1, visibility=nil)
-        list = @sqs.interface.receive_message(@url, number_of_messages, visibility)
+      def receive_messages(number_of_messages=1, visibility=nil, attributes=nil)
+        list = @sqs.interface.receive_message(@url, number_of_messages, visibility, attributes)
         list.map! do |entry|
-          msg = Message.new(self, entry['MessageId'], entry['ReceiptHandle'],
-                            entry['Body'], visibility)
+          msg = Message.new(self, entry['MessageId'], entry['ReceiptHandle'], entry['Body'], visibility, entry['Attributes'])
           msg.received_at = Time.now 
           msg.receive_checksum = entry['MD5OfBody']
           msg
@@ -183,8 +182,8 @@ module RightAws
         #
         #  queue.receive #=> #<RightAws::SqsGen2::Message:0xb7bf0884 ... >
         #
-      def receive(visibility=nil)
-        list = receive_messages(1, visibility)
+      def receive(visibility=nil, attributes=nil)
+        list = receive_messages(1, visibility, attributes)
         list.empty? ? nil : list[0]
       end
 
@@ -193,12 +192,15 @@ module RightAws
         #
         #  queue.pop #=> #<RightAws::SqsGen2::Message:0xb7bf0884 ... >
         #
-      def pop
-        list = @sqs.interface.pop_messages(@url, 1)
+        #  # pop a message with custom attributes
+        #  m = queue.pop(['SenderId', 'SentTimestamp']) #=> #<RightAws::SqsGen2::Message:0xb7bf1884 ... >
+        #  m.attributes #=> {"SentTimestamp"=>"1240991906937", "SenderId"=>"800000000005"}
+        #
+      def pop(attributes=nil)
+        list = @sqs.interface.pop_messages(@url, 1, attributes)
         return nil if list.empty?
         entry = list[0]
-        msg = Message.new(self, entry['MessageId'], entry['ReceiptHandle'],
-                            entry['Body'], visibility)
+        msg = Message.new(self, entry['MessageId'], entry['ReceiptHandle'], entry['Body'], visibility, entry['Attributes'])
         msg.received_at = Time.now 
         msg.receive_checksum = entry['MD5OfBody']
         msg
@@ -241,27 +243,78 @@ module RightAws
       end
         
         # Retrieves queue attributes. 
-        # At this moment Amazon supports +VisibilityTimeout+ and +ApproximateNumberOfMessages+ only. 
         # If the name of attribute is set, returns its value. Otherwise, returns a hash of attributes.
         #
         # queue.get_attribute('VisibilityTimeout')  #=> {"VisibilityTimeout"=>"45"} 
         #
+        # P.S. This guy is deprecated. Use +get_attributes+ instead.
       def get_attribute(attribute='All')
-        attributes = @sqs.interface.get_queue_attributes(@url, attribute)
+        attributes = get_attributes(attribute)
         attribute=='All' ? attributes : attributes[attribute]
       end
+
+      # Retrieves queue attributes.
+      #
+      #  queue.get_attributes #=>
+      #    {"ApproximateNumberOfMessages" => "0",
+      #     "LastModifiedTimestamp"       => "1240946032",
+      #     "CreatedTimestamp"            => "1240816887",
+      #     "VisibilityTimeout"           => "30",
+      #     "Policy"                      => "{"Version":"2008-10-17","Id":...}"}
+      #
+      #  queue.get_attributes("LastModifiedTimestamp", "VisibilityTimeout") #=>
+      #    {"LastModifiedTimestamp" => "1240946032",
+      #     "VisibilityTimeout"     => "30"}
+      #
+      def get_attributes(*attributes)
+        @sqs.interface.get_queue_attributes(@url, attributes)
+      end
+
+      # Add permission to the queue.
+      #
+      #  queue.add_permissions('testLabel',
+      #                        '125074342641' => 'SendMessage',
+      #                        '125074342642' => ['SendMessage','ReceiveMessage']) #=> true
+      #
+      def add_permissions(label, permissions)
+        @sqs.interface.add_permissions(@url, label, permissions)
+      end
+
+      # Revoke any permissions in the queue policy that matches the +label+ parameter.
+      #
+      #  sqs.remove_permissions('testLabel') # => true
+      #
+      def remove_permissions(label)
+        @sqs.interface.remove_permissions(@url, label)
+      end
+
+      # Get current permissions set. The set is JSON packed.
+      # 
+      #  sqs.get_permissions #=>
+      #    '{"Version":"2008-10-17","Id":"/826693181925/kd-test-gen-2_5/SQSDefaultPolicy",
+      #      "Statement":[{"Sid":"kd-perm-04","Effect":"Allow","Principal":{"AWS":"100000000001",
+      #      "AWS":"100000000001","AWS":"100000000002"},"Action":["SQS:SendMessage","SQS:DeleteMessage",
+      #      "SQS:ReceiveMessage"],"Resource":"/826693181925/kd-test-gen-2_5"},{"Sid":"kd-perm-03",
+      #      "Effect":"Allow","Principal":{"AWS":"648772224137"},"Action":"SQS:SendMessage",
+      #      "Resource":"/826693181925/kd-test-gen-2_5"}]}'
+      #
+      def get_permissions
+        get_attributes('Policy')['Policy']
+      end
+      
     end
         
     class Message
-      attr_reader   :queue, :id, :body, :visibility, :receipt_handle
+      attr_reader   :queue, :id, :body, :visibility, :receipt_handle, :attributes
       attr_accessor :sent_at, :received_at, :send_checksum, :receive_checksum
       
-      def initialize(queue, id=nil, rh = nil, body=nil, visibility=nil)
+      def initialize(queue, id=nil, rh = nil, body=nil, visibility=nil, attributes=nil)
         @queue       = queue
         @id          = id
         @receipt_handle = rh 
         @body        = body
         @visibility  = visibility
+        @attributes  = attributes
         @sent_at     = nil
         @received_at = nil
         @send_checksum = nil
@@ -273,6 +326,12 @@ module RightAws
         @body
       end
 
+      # Set message visibility timeout.
+      def visibility=(visibility_timeout)
+        @queue.sqs.interface.change_message_visibility(@queue.url, @receipt_handle, visibility_timeout)
+        @visibility = visibility_timeout
+      end
+
         # Removes message from queue. 
         # Returns +true+.
       def delete
@@ -280,7 +339,6 @@ module RightAws
       end
 
     end
-
 
   end
 end
