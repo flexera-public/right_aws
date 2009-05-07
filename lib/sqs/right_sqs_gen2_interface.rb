@@ -236,23 +236,17 @@ module RightAws
     # Add permissions to a queue.
     #
     #  sqs.add_permissions('https://queue.amazonaws.com/ZZ7XXXYYYBINS/my_awesome_queue',
-    #                     'testLabel',
-    #                     '125074342641' => 'SendMessage',
-    #                     '125074342642' => ['SendMessage','ReceiveMessage']) #=> true
+    #                     'testLabel', ['125074342641','125074342642'],
+    #                     ['SendMessage','SendMessage','ReceiveMessage']) #=> true
     #
     #  +permissions+ is a hash of: AccountId => ActionName
     #  (valid ActionNames: * | SendMessage | ReceiveMessage | DeleteMessage | ChangeMessageVisibility | GetQueueAttributes )
     #
     #  see http://docs.amazonwebservices.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/index.html?Query_QueryAddPermission.html
     #      http://docs.amazonwebservices.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/index.html?acp-overview.html
-    def add_permissions(queue_url, label, permissions)
-      perms = []
-      permissions.each do |id, actions|
-        actions.to_a.each do |action|
-          perms << [id, action]
-        end
-      end
-      params = amazonize_list(['AWSAccountId', 'ActionName'], perms)
+    def add_permissions(queue_url, label, grantees, actions)
+      params      = amazonize_list('AWSAccountId', grantees.to_a)
+      params.merge!(amazonize_list('ActionName', actions.to_a))
       params.merge!('Label'    => label,
                     :queue_url => queue_url )
       req_hash = generate_request('AddPermission', params)
@@ -276,7 +270,7 @@ module RightAws
       on_exception
     end
 
-      # Retrieves a list of messages from queue. Returns an array of hashes in format: <tt>{:id=>'message_id', body=>'message_body'}</tt>
+      # Retrieves a list of messages from queue. Returns an array of hashes in format: <tt>{:id=>'message_id', :body=>'message_body'}</tt>
       #
       #   sqs.receive_message('https://queue.amazonaws.com/ZZ7XXXYYYBINS/my_awesome_queue',10, 5) #=>
       #    [{"ReceiptHandle"=>"Euvo62...kw==", "MD5OfBody"=>"16af2171b5b83cfa35ce254966ba81e3", 

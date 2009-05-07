@@ -136,7 +136,7 @@ module RightAws
         #  queue.clear() #=> true
         #
       def clear()
-          @sqs.interface.clear_queue(@url)
+        @sqs.interface.clear_queue(@url)
       end
       
         # Deletes queue.  Any messages in the queue will be permanently lost. 
@@ -272,12 +272,11 @@ module RightAws
 
       # Add permission to the queue.
       #
-      #  queue.add_permissions('testLabel',
-      #                        '125074342641' => 'SendMessage',
-      #                        '125074342642' => ['SendMessage','ReceiveMessage']) #=> true
+      #  queue.add_permissions('testLabel',['125074342641', '125074342642'],
+      #                        ['SendMessage','SendMessage','ReceiveMessage']) #=> true
       #
-      def add_permissions(label, permissions)
-        @sqs.interface.add_permissions(@url, label, permissions)
+      def add_permissions(label, grantees, actions)
+        @sqs.interface.add_permissions(@url, label, grantees, actions)
       end
 
       # Revoke any permissions in the queue policy that matches the +label+ parameter.
