@@ -182,7 +182,7 @@ module RightAws
       end
       # logging
       logging = ''
-      unless config[:logging].blank?
+      unless config[:logging].blank? || config[:logging][:bucket].blank?
         logging = "  <Logging>\n" +
                   "    <Bucket>#{config[:logging][:bucket]}</Bucket>\n" +
                   "    <Prefix>#{config[:logging][:prefix]}</Prefix>\n" +
@@ -217,7 +217,7 @@ module RightAws
     #      :last_modified_time => Wed Sep 10 17:00:04 UTC 2008 }, ..., {...} ]
     #
     def list_distributions(params={})
-      list_distributions_with_marks(params)[:distributions]
+      incrementally_list_distributions(params)[:distributions]
     end
 
     # Incrementally list distributions.
