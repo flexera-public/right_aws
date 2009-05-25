@@ -145,15 +145,16 @@ module RightAws
     # Text, if found in an error message returned by AWS, indicates that this may be a transient
     # error. Transient errors are automatically retried with exponential back-off.
     AMAZON_PROBLEMS = [ 'internal service error', 
-                      'is currently unavailable', 
-                      'no response from', 
-                      'Please try again',
-                      'InternalError',
-                      'ServiceUnavailable', #from SQS docs
-                      'Unavailable',
-                      'This application is not currently available',
-                      'InsufficientInstanceCapacity'
-                    ]
+                        'is currently unavailable',
+                        'no response from',
+                        'Please try again',
+                        'InternalError',
+                        'Internal Server Error',
+                        'ServiceUnavailable', #from SQS docs
+                        'Unavailable',
+                        'This application is not currently available',
+                        'InsufficientInstanceCapacity'
+                      ]
     @@amazon_problems = AMAZON_PROBLEMS
       # Returns a list of Amazon service responses which are known to be transient problems. 
       # We have to re-request if we get any of them, because the problem will probably disappear. 
@@ -227,12 +228,15 @@ module RightAws
         @params[:service]  ||= service_info[:default_service]
         @params[:protocol] ||= service_info[:default_protocol]
       end
-      @params[:multi_thread] ||= defined?(AWS_DAEMON)
+#      @params[:multi_thread] ||= defined?(AWS_DAEMON)
+      @params[:connections] ||= :shared # || :dedicated
+      @params[:max_connections] ||= 10
+      @params[:connection_lifetime] ||= 20*60
       @params[:api_version]  ||= service_info[:default_api_version]
       @logger = @params[:logger]
       @logger = RAILS_DEFAULT_LOGGER if !@logger && defined?(RAILS_DEFAULT_LOGGER)
       @logger = Logger.new(STDOUT)   if !@logger
-      @logger.info "New #{self.class.name} using #{@params[:multi_thread] ? 'multi' : 'single'}-threaded mode"
+      @logger.info "New #{self.class.name} using #{@params[:connections]} connections mode"
       @error_handler = nil
       @cache = {}
       @signature_version = (params[:signature_version] || DEFAULT_SIGNATURE_VERSION).to_s
@@ -296,10 +300,10 @@ module RightAws
       AwsError::on_aws_exception(self, options)
     end
     
-      # Return +true+ if this instance works in multi_thread mode and +false+ otherwise.
-    def multi_thread
-      @params[:multi_thread]
-    end
+#      # Return +true+ if this instance works in multi_thread mode and +false+ otherwise.
+#    def multi_thread
+#      @params[:multi_thread]
+#    end
 
     # ACF, AMS, EC2, LBS and SDB uses this guy
     # SQS and S3 use their own methods
@@ -341,14 +345,40 @@ module RightAws
         :protocol => @params[:protocol] }
     end
 
+    def get_connection(aws_service, request) #:nodoc
+      server_url = "#{request[:protocol]}://#{request[:server]}:#{request[:port]}}"
+      #
+      case @params[:connections].to_s
+      when 'dedicated'
+        @connections_storage ||= {}
+      else # 'dedicated'
+        @connections_storage = (Thread.current[aws_service] ||= {})
+      end
+      #
+      @connections_storage[server_url] ||= {}
+      @connections_storage[server_url][:last_used_at] = Time.now
+      @connections_storage[server_url][:connection] ||= Rightscale::HttpConnection.new(:exception => RightAws::AwsError, :logger => @logger)
+      # keep X most recent connections (but were used not far than Y minutes ago)
+      connections = 0
+      @connections_storage.to_a.sort{|i1, i2| i2[1][:last_used_at] <=> i1[1][:last_used_at]}.to_a.each do |i|
+        if i[0] != server_url && (@params[:max_connections] <= connections  || i[1][:last_used_at] < Time.now - @params[:connection_lifetime])
+          # delete the connection from the list
+          @connections_storage.delete(i[0])
+          # then finish it
+          i[1][:connection].finish((@params[:max_connections] <= connections) ? "out-of-limit" : "out-of-date") rescue nil
+        else
+          connections += 1
+        end
+      end
+      @connections_storage[server_url][:connection]
+    end
+
     # All services uses this guy.
     def request_info_impl(aws_service, benchblock, request, parser, &block) #:nodoc:
-      thread = @params[:multi_thread] ? Thread.current : Thread.main
-      thread[aws_service] ||= Rightscale::HttpConnection.new(:exception => RightAws::AwsError, :logger => @logger)
-      @connection    = thread[aws_service]
+      @connection    = get_connection(aws_service, request)
       @last_request  = request[:request]
       @last_response = nil
-      response=nil
+      response = nil
       blockexception = nil
 
       if(block != nil)

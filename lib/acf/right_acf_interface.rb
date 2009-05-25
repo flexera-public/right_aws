@@ -76,7 +76,7 @@ module RightAws
     
     include RightAwsBaseInterface
 
-    API_VERSION      = "2008-06-30"
+    API_VERSION      = "2009-04-02"
     DEFAULT_HOST     = 'cloudfront.amazonaws.com'
     DEFAULT_PORT     = 443
     DEFAULT_PROTOCOL = 'https'
@@ -101,7 +101,7 @@ module RightAws
     # * <tt>:cache</tt>: true/false: caching for list_distributions method, default: false.
     #
     #  acf = RightAws::AcfInterface.new('1E3GDYEOGFJPIT7XXXXXX','hgTHt68JY07JKUY08ftHYtERkjgtfERn57XXXXXX',
-    #    {:multi_thread => true, :logger => Logger.new('/tmp/x.log')}) #=>  #<RightAws::AcfInterface::0xb7b3c30c>
+    #    {:logger => Logger.new('/tmp/x.log')}) #=>  #<RightAws::AcfInterface::0xb7b3c30c>
     #
     def initialize(aws_access_key_id=nil, aws_secret_access_key=nil, params={})
       init({ :name                => 'ACF',
@@ -120,7 +120,13 @@ module RightAws
     #-----------------------------------------------------------------
 
     # Generates request hash for REST API.
-    def generate_request(method, path, body=nil, headers={})  # :nodoc:
+    def generate_request(method, path, params={}, body=nil, headers={})  # :nodoc:
+      # Params
+      params.delete_if{ |key, val| val.blank? }
+      unless params.blank?
+        path += "?" + params.to_a.collect{ |key,val| "#{AwsUtils::amz_escape(key)}=#{AwsUtils::amz_escape(val.to_s)}" }.join("&")
+      end
+      # Headers
       headers['content-type'] ||= 'text/xml' if body
       headers['date'] = Time.now.httpdate
       # Auth
@@ -157,10 +163,6 @@ module RightAws
       REXML::Text::unnormalize(text)
     end
 
-    def xmlns # :nodoc:
-      %Q{"http://#{@params[:server]}/doc/#{API_VERSION}/"}
-    end
-
     def generate_call_reference # :nodoc:
       result = Time.now.strftime('%Y%m%d%H%M%S')
       10.times{ result << rand(10).to_s }
@@ -171,6 +173,31 @@ module RightAws
       hash[:location] = @last_response['Location'] if @last_response['Location']
       hash[:e_tag]    = @last_response['ETag']     if @last_response['ETag']
       hash
+    end
+
+    def config_to_xml(config) # :nodoc:
+      cnames = ''
+      unless config[:cnames].blank?
+        config[:cnames].to_a.each { |cname| cnames += "  <CNAME>#{cname}</CNAME>\n" }
+      end
+      # logging
+      logging = ''
+      unless config[:logging].blank?
+        logging = "  <Logging>\n" +
+                  "    <Bucket>#{config[:logging][:bucket]}</Bucket>\n" +
+                  "    <Prefix>#{config[:logging][:prefix]}</Prefix>\n" +
+                  "  </Logging>\n"
+      end
+      # xml
+      "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
+      "<DistributionConfig xmlns=\"http://#{@params[:server]}/doc/#{API_VERSION}/\">\n" +
+      "  <Origin>#{config[:origin]}</Origin>\n" +
+      "  <CallerReference>#{config[:caller_reference]}</CallerReference>\n" +
+      "  <Comment>#{AcfInterface::escape(config[:comment].to_s)}</Comment>\n" +
+      "  <Enabled>#{config[:enabled]}</Enabled>\n" +
+      cnames  +
+      logging +
+      "</DistributionConfig>"
     end
 
     #-----------------------------------------------------------------
@@ -189,15 +216,58 @@ module RightAws
     #      :comment            => "My comments",
     #      :last_modified_time => Wed Sep 10 17:00:04 UTC 2008 }, ..., {...} ]
     #
-    def list_distributions
-      request_hash = generate_request('GET', 'distribution')
-      request_cache_or_info :list_distributions, request_hash,  AcfDistributionListParser, @@bench
+    def list_distributions(params={})
+      list_distributions_with_marks(params)[:distributions]
+    end
+
+    # Incrementally list distributions.
+    # Optional params: +:marker+ and +:max_items+.
+    #
+    #   # get first distributions
+    #   incrementally_list_distributions(:max_items => 1) #=>
+    #      {:distributions=>
+    #        [{:status=>"Deployed",
+    #          :aws_id=>"E2Q0AOOMFNPSYL",
+    #          :logging=>{},
+    #          :origin=>"my-bucket.s3.amazonaws.com",
+    #          :domain_name=>"d1s5gmdtmafnre.6hops.net",
+    #          :comment=>"ONE LINE OF COMMENT",
+    #          :last_modified_time=>Wed Oct 22 19:31:23 UTC 2008,
+    #          :enabled=>true,
+    #          :cnames=>[]}],
+    #       :is_truncated=>true,
+    #       :max_items=>1,
+    #       :marker=>"",
+    #       :next_marker=>"E2Q0AOOMFNPSYL"}
+    #
+    #   # get all distributions (the list may be restricted by a default MaxItems value (==100) )
+    #   incrementally_list_distributions
+    #
+    #   # list distributions by 10
+    #   incrementally_list_distributions(:max_items => 10) do |response|
+    #     puts response.inspect # a list of 10 distributions
+    #     false # return false if the listing should be broken otherwise use true
+    #   end
+    #
+    def incrementally_list_distributions(params={}, &block)
+      opts = {}
+      opts['MaxItems'] = params[:max_items] if params[:max_items]
+      opts['Marker']   = params[:marker]    if params[:marker]
+      last_response = nil
+      loop do
+        request_hash  = generate_request('GET', 'distribution', opts)
+        last_response = request_cache_or_info( :list_distributions, request_hash,  AcfDistributionListParser, @@bench, params.blank?)
+        opts['Marker'] = last_response[:next_marker]
+        break unless block && block.call(last_response) && !last_response[:next_marker].blank?
+      end 
+      last_response 
     end
 
     # Create a new distribution.
     # Returns the just created distribution or RightAws::AwsError exception.
     #
-    #  acf.create_distribution('bucket-for-k-dzreyev.s3.amazonaws.com', 'Woo-Hoo!', true, ['web1.my-awesome-site.net'] ) #=>
+    #  acf.create_distribution('my-bucket.s3.amazonaws.com', 'Woo-Hoo!', true, ['web1.my-awesome-site.net'],
+    #                          { :prefix=>"log/", :bucket=>"my-logs.s3.amazonaws.com" } ) #=>
     #    {:comment            => "Woo-Hoo!",
     #     :enabled            => true,
     #     :location           => "https://cloudfront.amazonaws.com/2008-06-30/distribution/E2REJM3VUN5RSI",
@@ -205,30 +275,26 @@ module RightAws
     #     :aws_id             => "E2REJM3VUN5RSI",
     #     :domain_name        => "d3dxv71tbbt6cd.6hops.net",
     #     :origin             => "my-bucket.s3.amazonaws.com",
-    #     :cnames             => ["web1.my-awesome-site.net"]
+    #     :cnames             => ["web1.my-awesome-site.net"],
+    #     :logging            => { :prefix => "log/",
+    #                              :bucket => "my-logs.s3.amazonaws.com"},
     #     :last_modified_time => Wed Sep 10 17:00:54 UTC 2008,
     #     :caller_reference   => "200809102100536497863003"}
     #
-    def create_distribution(origin, comment='', enabled=true, cnames=[], caller_reference=nil)
-      # join CNAMES
-      cnames_str = ''
-      unless cnames.blank?
-        cnames.to_a.each { |cname| cnames_str += "\n           <CNAME>#{cname}</CNAME>" }
-      end
-      # reference
-      caller_reference ||= generate_call_reference
-      body = <<-EOXML
-        <?xml version="1.0" encoding="UTF-8"?>
-        <DistributionConfig xmlns=#{xmlns}>
-           <Origin>#{origin}</Origin>
-           <CallerReference>#{caller_reference}</CallerReference>
-           #{cnames_str.lstrip}
-           <Comment>#{AcfInterface::escape(comment.to_s)}</Comment>
-           <Enabled>#{enabled}</Enabled>
-        </DistributionConfig>
-      EOXML
-      request_hash = generate_request('POST', 'distribution', body.strip)
-      merge_headers(request_info(request_hash, AcfDistributionParser.new))
+    def create_distribution(origin, comment='', enabled=true, cnames=[], caller_reference=nil, logging={})
+      config = { :origin  => origin,
+                 :comment => comment,
+                 :enabled => enabled,
+                 :cnames  => cnames.to_a,
+                 :caller_reference => caller_reference }
+      config[:logging] = logging unless logging.blank?
+      create_distribution_by_config(config)
+    end
+
+    def create_distribution_by_config(config)
+      config[:caller_reference] ||= generate_call_reference
+      request_hash = generate_request('POST', 'distribution', {}, config_to_xml(config))
+      merge_headers(request_info(request_hash, AcfDistributionListParser.new)[:distributions].first)
     end
 
     # Get a distribution's information.
@@ -248,7 +314,7 @@ module RightAws
     #
     def get_distribution(aws_id)
       request_hash = generate_request('GET', "distribution/#{aws_id}")
-      merge_headers(request_info(request_hash, AcfDistributionParser.new))
+      merge_headers(request_info(request_hash, AcfDistributionListParser.new)[:distributions].first)
     end
 
     # Get a distribution's configuration.
@@ -264,7 +330,7 @@ module RightAws
     #
     def get_distribution_config(aws_id)
       request_hash = generate_request('GET', "distribution/#{aws_id}/config")
-      merge_headers(request_info(request_hash, AcfDistributionConfigParser.new))
+      merge_headers(request_info(request_hash, AcfDistributionListParser.new)[:distributions].first)
     end
 
     # Set a distribution's configuration 
@@ -283,24 +349,9 @@ module RightAws
     #  acf.set_distribution_config('E2REJM3VUN5RSI', config) #=> true
     #
     def set_distribution_config(aws_id, config)
-      # join CNAMES
-      cnames_str = ''
-      unless config[:cnames].blank?
-        config[:cnames].to_a.each { |cname| cnames_str += "\n           <CNAME>#{cname}</CNAME>" }
-      end
-      # format request's XML body
-      body = <<-EOXML
-        <?xml version="1.0" encoding="UTF-8"?>
-        <DistributionConfig xmlns=#{xmlns}>
-           <Origin>#{config[:origin]}</Origin>
-           <CallerReference>#{config[:caller_reference]}</CallerReference>
-           #{cnames_str.lstrip}
-           <Comment>#{AcfInterface::escape(config[:comment].to_s)}</Comment>
-           <Enabled>#{config[:enabled]}</Enabled>
-        </DistributionConfig>
-      EOXML
-      request_hash = generate_request('PUT', "distribution/#{aws_id}/config", body.strip,
-                                      'If-Match' => config[:e_tag])
+      request_hash = generate_request('PUT', "distribution/#{aws_id}/config", {},
+                                             config_to_xml(config),
+                                             'If-Match' => config[:e_tag])
       request_info(request_hash, RightHttp2xxParser.new)
     end
 
@@ -310,7 +361,8 @@ module RightAws
     #  acf.delete_distribution('E2REJM3VUN5RSI', 'E39OHHU1ON65SI') #=> true
     #
     def delete_distribution(aws_id, e_tag)
-      request_hash = generate_request('DELETE', "distribution/#{aws_id}", nil,
+      request_hash = generate_request('DELETE', "distribution/#{aws_id}", {},
+                                      nil,
                                       'If-Match' => e_tag)
       request_info(request_hash, RightHttp2xxParser.new)
     end
@@ -321,58 +373,37 @@ module RightAws
 
     class AcfDistributionListParser < RightAWSParser # :nodoc:
       def reset
-        @result = []
+        @result = { :distributions => [] }
       end
       def tagstart(name, attributes)
-        @distribution = { :cnames => [] } if name == 'DistributionSummary'
+        if name == 'DistributionSummary' || name == 'Distribution' ||
+          (name == 'DistributionConfig' && @xmlpath.blank?)
+          @distribution = { :cnames  => [], :logging => {} }
+        end
       end
       def tagend(name)
         case name
-          when 'Id'                  then @distribution[:aws_id]             = @text
-          when 'Status'              then @distribution[:status]             = @text
-          when 'LastModifiedTime'    then @distribution[:last_modified_time] = Time.parse(@text)
-          when 'DomainName'          then @distribution[:domain_name]        = @text
-          when 'Origin'              then @distribution[:origin]             = @text
-          when 'Comment'             then @distribution[:comment]            = AcfInterface::unescape(@text)
-          when 'CNAME'               then @distribution[:cnames]            << @text
-          when 'DistributionSummary' then @result << @distribution
+          when 'Marker'      then @result[:marker]       = @text
+          when 'NextMarker'  then @result[:next_marker]  = @text
+          when 'MaxItems'    then @result[:max_items]    = @text.to_i
+          when 'IsTruncated' then @result[:is_truncated] = @text == 'true' ? true : false
+          when 'Id'               then @distribution[:aws_id]             = @text
+          when 'Status'           then @distribution[:status]             = @text
+          when 'LastModifiedTime' then @distribution[:last_modified_time] = Time.parse(@text)
+          when 'DomainName'       then @distribution[:domain_name]        = @text
+          when 'Origin'           then @distribution[:origin]             = @text
+          when 'Comment'          then @distribution[:comment]            = AcfInterface::unescape(@text)
+          when 'CallerReference'  then @distribution[:caller_reference]   = @text
+          when 'CNAME'            then @distribution[:cnames]            << @text
+          when 'Enabled'          then @distribution[:enabled]            = @text == 'true' ? true : false
+          when 'Bucket'           then @distribution[:logging][:bucket]   = @text
+          when 'Prefix'           then @distribution[:logging][:prefix]   = @text
+        end
+        if name == 'DistributionSummary' || name == 'Distribution' ||
+          (name == 'DistributionConfig' && @xmlpath.blank?)
+          @result[:distributions] << @distribution
         end
       end
     end
-
-    class AcfDistributionParser < RightAWSParser # :nodoc:
-      def reset
-        @result = { :cnames => [] }
-      end
-      def tagend(name)
-        case name
-          when 'Id'               then @result[:aws_id]             = @text
-          when 'Status'           then @result[:status]             = @text
-          when 'LastModifiedTime' then @result[:last_modified_time] = Time.parse(@text)
-          when 'DomainName'       then @result[:domain_name]        = @text
-          when 'Origin'           then @result[:origin]             = @text
-          when 'CallerReference'  then @result[:caller_reference]   = @text
-          when 'Comment'          then @result[:comment]            = AcfInterface::unescape(@text)
-          when 'Enabled'          then @result[:enabled]            = @text == 'true' ? true : false
-          when 'CNAME'            then @result[:cnames]            << @text
-        end
-      end
-    end
-
-    class AcfDistributionConfigParser < RightAWSParser # :nodoc:
-      def reset
-        @result = { :cnames => [] }
-      end
-      def tagend(name)
-        case name
-          when 'Origin'           then @result[:origin]           = @text
-          when 'CallerReference'  then @result[:caller_reference] = @text
-          when 'Comment'          then @result[:comment]          = AcfInterface::unescape(@text)
-          when 'Enabled'          then @result[:enabled]          = @text == 'true' ? true : false
-          when 'CNAME'            then @result[:cnames]          << @text
-        end
-      end
-    end
-
   end
 end

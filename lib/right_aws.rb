@@ -33,6 +33,7 @@ require "digest/sha1"
 
 require 'rubygems'
 require 'right_http_connection'
+#require "/home/rightscale/right_gems/right_http_connection/lib/right_http_connection"
 
 $:.unshift(File.dirname(__FILE__))
 require 'awsbase/benchmark_fix'
@@ -56,7 +57,7 @@ module RightAws #:nodoc:
   module VERSION #:nodoc:
     MAJOR = 1
     MINOR = 10
-    TINY  = 0
+    TINY  = 99 #0
 
     STRING = [MAJOR, MINOR, TINY].join('.')
   end
