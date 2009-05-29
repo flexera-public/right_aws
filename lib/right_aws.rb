@@ -33,16 +33,15 @@ require "digest/sha1"
 
 require 'rubygems'
 require 'right_http_connection'
-#require "/home/rightscale/right_gems/right_http_connection/lib/right_http_connection"
 
 $:.unshift(File.dirname(__FILE__))
 require 'awsbase/benchmark_fix'
 require 'awsbase/support'
 require 'awsbase/right_awsbase'
 require 'ec2/right_ec2'
-require 'lbs/right_lbs'
-require 'ams/right_ams'
-require 'aass/right_aass'
+require 'elb/right_elb_interface'
+require 'acw/right_acw_interface'
+require 'as/right_as_interface'
 require 's3/right_s3_interface'
 require 's3/right_s3'
 require 'sqs/right_sqs_interface'

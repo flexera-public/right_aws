@@ -182,7 +182,7 @@ module RightAws
       end
       # logging
       logging = ''
-      unless config[:logging].blank? || config[:logging][:bucket].blank?
+      unless config[:logging].blank?
         logging = "  <Logging>\n" +
                   "    <Bucket>#{config[:logging][:bucket]}</Bucket>\n" +
                   "    <Prefix>#{config[:logging][:prefix]}</Prefix>\n" +
@@ -255,8 +255,8 @@ module RightAws
       opts['Marker']   = params[:marker]    if params[:marker]
       last_response = nil
       loop do
-        request_hash  = generate_request('GET', 'distribution', opts)
-        last_response = request_cache_or_info( :list_distributions, request_hash,  AcfDistributionListParser, @@bench, params.blank?)
+        link = generate_request('GET', 'distribution', opts)
+        last_response  = request_cache_or_info( :list_distributions, link,  AcfDistributionListParser, @@bench, params.blank?)
         opts['Marker'] = last_response[:next_marker]
         break unless block && block.call(last_response) && !last_response[:next_marker].blank?
       end 
@@ -293,8 +293,8 @@ module RightAws
 
     def create_distribution_by_config(config)
       config[:caller_reference] ||= generate_call_reference
-      request_hash = generate_request('POST', 'distribution', {}, config_to_xml(config))
-      merge_headers(request_info(request_hash, AcfDistributionListParser.new)[:distributions].first)
+      link = generate_request('POST', 'distribution', {}, config_to_xml(config))
+      merge_headers(request_info(link, AcfDistributionListParser.new)[:distributions].first)
     end
 
     # Get a distribution's information.
@@ -313,8 +313,8 @@ module RightAws
     #     :last_modified_time => Wed Sep 10 17:00:54 UTC 2008 }
     #
     def get_distribution(aws_id)
-      request_hash = generate_request('GET', "distribution/#{aws_id}")
-      merge_headers(request_info(request_hash, AcfDistributionListParser.new)[:distributions].first)
+      link = generate_request('GET', "distribution/#{aws_id}")
+      merge_headers(request_info(link, AcfDistributionListParser.new)[:distributions].first)
     end
 
     # Get a distribution's configuration.
@@ -329,8 +329,8 @@ module RightAws
     #     :origin           => "my-bucket.s3.amazonaws.com"}
     #
     def get_distribution_config(aws_id)
-      request_hash = generate_request('GET', "distribution/#{aws_id}/config")
-      merge_headers(request_info(request_hash, AcfDistributionListParser.new)[:distributions].first)
+      link = generate_request('GET', "distribution/#{aws_id}/config")
+      merge_headers(request_info(link, AcfDistributionListParser.new)[:distributions].first)
     end
 
     # Set a distribution's configuration 
@@ -349,10 +349,9 @@ module RightAws
     #  acf.set_distribution_config('E2REJM3VUN5RSI', config) #=> true
     #
     def set_distribution_config(aws_id, config)
-      request_hash = generate_request('PUT', "distribution/#{aws_id}/config", {},
-                                             config_to_xml(config),
-                                             'If-Match' => config[:e_tag])
-      request_info(request_hash, RightHttp2xxParser.new)
+      link = generate_request('PUT', "distribution/#{aws_id}/config", {}, config_to_xml(config),
+                                     'If-Match' => config[:e_tag])
+      request_info(link, RightHttp2xxParser.new)
     end
 
     # Delete a distribution. The enabled distribution cannot be deleted.
@@ -361,10 +360,9 @@ module RightAws
     #  acf.delete_distribution('E2REJM3VUN5RSI', 'E39OHHU1ON65SI') #=> true
     #
     def delete_distribution(aws_id, e_tag)
-      request_hash = generate_request('DELETE', "distribution/#{aws_id}", {},
-                                      nil,
-                                      'If-Match' => e_tag)
-      request_info(request_hash, RightHttp2xxParser.new)
+      link = generate_request('DELETE', "distribution/#{aws_id}", {}, nil,
+                                        'If-Match' => e_tag)
+      request_info(link, RightHttp2xxParser.new)
     end
 
     #-----------------------------------------------------------------

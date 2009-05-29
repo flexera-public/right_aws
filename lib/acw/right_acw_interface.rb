@@ -23,17 +23,16 @@
 
 module RightAws
 
-  # Amazon Monitoring Service
-  class Ams < RightAwsBase
+  # Amazon Cloud Watch
+  class AcwInterface < RightAwsBase
     include RightAwsBaseInterface
 
-    # Amazon AMS API version being used
-    API_VERSION       = "2009-01-22"
+    # Amazon ACW API version being used
+    API_VERSION       = "2009-05-15"
     DEFAULT_HOST      = "monitoring.amazonaws.com"
     DEFAULT_PATH      = '/'
-    # KD: FIXME later to https and 443
-    DEFAULT_PROTOCOL  = 'http'
-    DEFAULT_PORT      = 80
+    DEFAULT_PROTOCOL  = 'https'
+    DEFAULT_PORT      = 443
 
     @@bench = AwsBenchmarkingBlock.new
     def self.bench_xml
@@ -43,26 +42,26 @@ module RightAws
       @@bench.service
     end
 
-    # Create a new handle to an AMS account. All handles share the same per process or per thread
-    # HTTP connection to Amazon AMS. Each handle is for a specific account. The params have the
+    # Create a new handle to an ACW account. All handles share the same per process or per thread
+    # HTTP connection to Amazon ACW. Each handle is for a specific account. The params have the
     # following options:
-    # * <tt>:endpoint_url</tt> a fully qualified url to Amazon API endpoint (this overwrites: :server, :port, :service, :protocol and :region). Example: 'https://eu-west-1.AMS.amazonaws.com/'
-    # * <tt>:server</tt>: AMS service host, default: DEFAULT_HOST
-    # * <tt>:region</tt>: AMS region (North America by default)
-    # * <tt>:port</tt>: AMS service port, default: DEFAULT_PORT
+    # * <tt>:endpoint_url</tt> a fully qualified url to Amazon API endpoint (this overwrites: :server,
+    #  :port, :service, :protocol). Example: 'https://monitoring.amazonaws.com/'
+    # * <tt>:server</tt>: ACW service host, default: DEFAULT_HOST
+    # * <tt>:port</tt>: ACW service port, default: DEFAULT_PORT
     # * <tt>:protocol</tt>: 'http' or 'https', default: DEFAULT_PROTOCOL
     # * <tt>:multi_thread</tt>: true=HTTP connection per thread, false=per process
     # * <tt>:logger</tt>: for log messages, default: RAILS_DEFAULT_LOGGER else STDOUT
     # * <tt>:signature_version</tt>:  The signature version : '0','1' or '2'(default)
-    # * <tt>:cache</tt>: true/false(default): <not supported now>
+    # * <tt>:cache</tt>: true/false(default): list_metrics
     #
     def initialize(aws_access_key_id=nil, aws_secret_access_key=nil, params={})
-      init({ :name                => 'AMS',
-             :default_host        => ENV['AMS_URL'] ? URI.parse(ENV['AMS_URL']).host   : DEFAULT_HOST,
-             :default_port        => ENV['AMS_URL'] ? URI.parse(ENV['AMS_URL']).port   : DEFAULT_PORT,
-             :default_service     => ENV['AMS_URL'] ? URI.parse(ENV['AMS_URL']).path   : DEFAULT_PATH,
-             :default_protocol    => ENV['AMS_URL'] ? URI.parse(ENV['AMS_URL']).scheme : DEFAULT_PROTOCOL,
-             :default_api_version => ENV['AMS_API_VERSION'] || API_VERSION },
+      init({ :name                => 'ACW',
+             :default_host        => ENV['ACW_URL'] ? URI.parse(ENV['ACW_URL']).host   : DEFAULT_HOST,
+             :default_port        => ENV['ACW_URL'] ? URI.parse(ENV['ACW_URL']).port   : DEFAULT_PORT,
+             :default_service     => ENV['ACW_URL'] ? URI.parse(ENV['ACW_URL']).path   : DEFAULT_PATH,
+             :default_protocol    => ENV['ACW_URL'] ? URI.parse(ENV['ACW_URL']).scheme : DEFAULT_PROTOCOL,
+             :default_api_version => ENV['ACW_API_VERSION'] || API_VERSION },
            aws_access_key_id    || ENV['AWS_ACCESS_KEY_ID'] ,
            aws_secret_access_key|| ENV['AWS_SECRET_ACCESS_KEY'],
            params)
@@ -91,8 +90,9 @@ module RightAws
     #    :statistics   - Average, Minimum. Maximum, Sum, Samples
     #    :start_time   - The timestamp of the first datapoint to return, inclusive.
     #    :end_time     - The timestamp to use for determining the last datapoint to return. This is the last datapoint to fetch, exclusive.
+    #    :namespace    - The namespace corresponding to the service of interest. For example, AWS/EC2 represents Amazon EC2.
     #    :unit         - Seconds, Percent, Bytes, Bits, Count, Bytes/Second, Bits/Second, Count/Second, and None
-    #    :custom_unit  - (not supported yet)
+    #    :custom_unit  - The user-defined CustomUnit applied to a Measure. Please see the key term Unit.
     #    
     #    :dimentions
     #      Dimensions for EC2 Metrics:
@@ -158,6 +158,7 @@ module RightAws
                        'MeasureName' => measure_name }
       request_hash['Unit']       = options[:unit]        if options[:unit]
       request_hash['CustomUnit'] = options[:custom_unit] if options[:custom_unit]
+      request_hash['Namespace']  = options[:namespace]   if options[:namespace]
       request_hash.merge!(amazonize_list('Statistics.member', statistics))
       # dimentions
       dim = []
@@ -168,6 +169,20 @@ module RightAws
       #
       link = generate_request("GetMetricStatistics", request_hash)
       request_info(link, GetMetricStatisticsParser.new(:logger => @logger))
+    end
+
+    # This call returns a list of the valid metrics for which there is recorded data available to a you.
+    #
+    #  acw.list_metrics #=>
+    #      [ { :namespace    => "AWS/ELB",
+    #          :measure_name => "HealthyHostCount",
+    #          :dimentions   => { "LoadBalancerName"=>"test-kd1" } },
+    #        { :namespace    => "AWS/ELB",
+    #          :measure_name => "UnHealthyHostCount",
+    #          :dimentions   => { "LoadBalancerName"=>"test-kd1" } } ]
+    def list_metrics
+      link = generate_request("ListMetrics")
+      request_cache_or_info :list_metrics, link,  ListMetricsParser, @@bench, true
     end
 
     #-----------------------------------------------------------------
@@ -189,11 +204,39 @@ module RightAws
         when 'Maximum'    then @item[:maximum]     = @text.to_f
         when 'Sum'        then @item[:sum]         = @text.to_f
         when 'member'     then @result[:datapoints] << @item
-        when 'label'      then @result[:label]     = @text
+        when 'Label'      then @result[:label]     = @text
         end
       end
       def reset
         @result = { :datapoints => [] }
+      end
+    end
+
+    class ListMetricsParser < RightAWSParser #:nodoc:
+      def tagstart(name, attributes)
+        case name
+        when 'member'
+          case @xmlpath
+            when @p then @item = { :dimentions => {} }
+          end
+        end
+      end
+      def tagend(name)
+        case name
+        when 'MeasureName' then @item[:measure_name] = @text
+        when 'Namespace'   then @item[:namespace] = @text
+        when 'Name'        then @dname  = @text
+        when 'Value'       then @dvalue = @text
+        when 'member'
+          case @xmlpath
+          when "#@p/member/Dimensions" then @item[:dimentions][@dname] = @dvalue
+          when @p then @result << @item
+          end
+        end
+      end
+      def reset
+        @p      = 'ListMetricsResponse/ListMetricsResult/Metrics'
+        @result = []
       end
     end
 
