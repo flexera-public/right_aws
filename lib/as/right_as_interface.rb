@@ -23,7 +23,53 @@
 
 module RightAws
 
-  # Auto Scaling
+  # = RightAWS::AsInterface -- RightScale Amazon Auto Scaling interface
+  # The RightAws::AsInterface class provides a complete interface to Amazon Auto Scaling service.
+  #
+  # For explanations of the semantics of each call, please refer to Amazon's documentation at
+  # http://docs.amazonwebservices.com/AutoScaling/latest/DeveloperGuide/
+  #
+  # Create an interface handle:
+  #
+  #  as = RightAws::AsInterface.new(aws_access_key_id, aws_security_access_key)
+  #
+  # Create a launch configuration:
+  #
+  #  as.create_launch_configuration('CentOS.5.1-c', 'ami-08f41161', 'm1.small',
+  #                                 :key_name        => 'kd-moo-test',
+  #                                 :security_groups => ['default'],
+  #                                 :user_data       => "Woohoo: CentOS.5.1-c" )
+  #
+  # Create an AutoScaling group:
+  #
+  #  as.create_auto_scaling_group('CentOS.5.1-c-array', 'CentOS.5.1-c', 'us-east-1c',
+  #                               :min_size => 2,
+  #                               :max_size => 5)
+  #
+  # Create a new trigger:
+  # 
+  #  as.create_or_update_scaling_trigger('kd.tr.1', 'CentOS.5.1-c-array',
+  #                                      :measure_name => 'CPUUtilization',
+  #                                      :statistic => :average,
+  #                                      :dimentions => {
+  #                                         'AutoScalingGroupName' => 'CentOS.5.1-c-array',
+  #                                         'Namespace' => 'AWS',
+  #                                         'Service' => 'EC2' },
+  #                                      :period => 60,
+  #                                      :lower_threshold => 5,
+  #                                      :lower_breach_scale_increment => -1,
+  #                                      :upper_threshold => 60,
+  #                                      :upper_breach_scale_increment => 1,
+  #                                      :breach_duration => 300 )
+  #
+  # Describe scaling activity:
+  #
+  #  as.incrementally_describe_scaling_activities('CentOS.5.1-c-array') #=> List of activities
+  #
+  # Describe the Auto Scaling group status:
+  #
+  #  as.describe_auto_scaling_groups('CentOS.5.1-c-array') #=> Current group status
+  #
   class AsInterface < RightAwsBase
     include RightAwsBaseInterface
 
@@ -45,14 +91,14 @@ module RightAws
     # Create a new handle to an CSLS account. All handles share the same per process or per thread
     # HTTP connection to Amazon CSLS. Each handle is for a specific account. The params have the
     # following options:
-    # * <tt>:endpoint_url</tt> a fully qualified url to Amazon API endpoint (this overwrites: :server, :port,
-    # :service, :protocol). Example: 'https://autoscaling.amazonaws.com/'
+    # * <tt>:endpoint_url</tt> a fully qualified url to Amazon API endpoint (this overwrites: :server, :port, :service, :protocol). Example: 'https://autoscaling.amazonaws.com/'
     # * <tt>:server</tt>: AS service host, default: DEFAULT_HOST
     # * <tt>:port</tt>: AS service port, default: DEFAULT_PORT
     # * <tt>:protocol</tt>: 'http' or 'https', default: DEFAULT_PROTOCOL
     # * <tt>:multi_thread</tt>: true=HTTP connection per thread, false=per process
     # * <tt>:logger</tt>: for log messages, default: RAILS_DEFAULT_LOGGER else STDOUT
     # * <tt>:signature_version</tt>:  The signature version : '0','1' or '2'(default)
+    # * <tt>:cache</tt>: true/false(default): describe_auto_scaling_groups
     #
     def initialize(aws_access_key_id=nil, aws_secret_access_key=nil, params={})
       init({ :name                => 'AS',
@@ -172,12 +218,49 @@ module RightAws
     #      Scaling Activities
     #-----------------------------------------------------------------
 
-    # Describe Scaling Activities.
+    # Describe all Scaling Activities.
+    #
+    #  describe_scaling_activities('CentOS.5.1-c-array') #=>
+    #        [{:cause=>
+    #            "At 2009-05-28 10:11:35Z trigger kd.tr.1 breached high threshold value for
+    #             CPUUtilization, 10.0, adjusting the desired capacity from 1 to 2.  At 2009-05-28 10:11:35Z
+    #             a breaching trigger explicitly set group desired capacity changing the desired capacity
+    #             from 1 to 2.  At 2009-05-28 10:11:40Z an instance was started in response to a difference
+    #             between desired and actual capacity, increasing the capacity from 1 to 2.",
+    #          :activity_id=>"067c9abb-f8a7-4cf8-8f3c-dc6f280457c4",
+    #          :progress=>0,
+    #          :description=>"Launching a new EC2 instance",
+    #          :status_code=>"InProgress",
+    #          :start_time=>Thu May 28 10:11:40 UTC 2009},
+    #         {:end_time=>Thu May 28 09:35:23 UTC 2009,
+    #          :cause=>
+    #            "At 2009-05-28 09:31:21Z a user request created an AutoScalingGroup changing the desired
+    #             capacity from 0 to 1.  At 2009-05-28 09:32:35Z an instance was started in response to a
+    #             difference between desired and actual capacity, increasing the capacity from 0 to 1.",
+    #          :activity_id=>"90d506ba-1b75-4d29-8739-0a75b1ba8030",
+    #          :progress=>100,
+    #          :description=>"Launching a new EC2 instance",
+    #          :status_code=>"Successful",
+    #          :start_time=>Thu May 28 09:32:35 UTC 2009}]}
+    #
+    def describe_scaling_activities(auto_scaling_group_name, *activity_ids)
+      result = []
+      incrementally_describe_scaling_activities(auto_scaling_group_name, *activity_ids) do |response|
+        result += response[:scaling_activities]
+        true
+      end
+      result
+    end
+
+    # Incrementally describe Scaling Activities.
     # Returns the scaling activities specified for the given group. If the input list is empty, all the
     # activities from the past six weeks will be returned. Activities will be sorted by completion time.
     # Activities that have no completion time will be considered as using the most recent possible time.
     #
-    #  as.describe_scaling_activities('CentOS.5.1-c-array') #=>
+    # Optional params: +:max_records+, +:next_token+.
+    #
+    #  # get max 100 first activities
+    #  as.incrementally_describe_scaling_activities('CentOS.5.1-c-array') #=>
     #      {:scaling_activities=>
     #        [{:cause=>
     #            "At 2009-05-28 10:11:35Z trigger kd.tr.1 breached high threshold value for
@@ -201,6 +284,12 @@ module RightAws
     #          :status_code=>"Successful",
     #          :start_time=>Thu May 28 09:32:35 UTC 2009}]}
     #
+    #  # list by 5 records
+    #  incrementally_describe_scaling_activities('CentOS.5.1-c-array', :max_records => 5) do |response|
+    #    puts response.inspect
+    #    true
+    #  end
+    #
     def incrementally_describe_scaling_activities(auto_scaling_group_name, *activity_ids, &block)
       activity_ids = activity_ids.flatten.compact
       params = activity_ids.last.kind_of?(Hash) ? activity_ids.pop : {}
@@ -211,7 +300,7 @@ module RightAws
       last_response = nil
       loop do
         link = generate_request("DescribeScalingActivities", request_hash)
-        last_response = request_cache_or_info( :incrementally_describe_scaling_activities, link,  DescribeScalingActivitiesParser, @@bench, params.blank?)
+        last_response = request_info( link,  DescribeScalingActivitiesParser.new(:logger => @logger))
         request_hash['NextToken'] = last_response[:next_token]
         break unless block && block.call(last_response) && !last_response[:next_token].blank?
       end
@@ -271,9 +360,38 @@ module RightAws
       request_info(link, RightHttp2xxParser.new(:logger => @logger))
     end
 
+
+    # Describe all Launch Configurations.
+    # Returns an array of configurations.
+    #
+    #  as.describe_launch_configurations #=>
+    #    [{:created_time=>Thu May 28 09:31:20 UTC 2009,
+    #      :kernel_id=>"",
+    #      :launch_configuration_name=>"CentOS.5.1-c",
+    #      :ramdisk_id=>"",
+    #      :security_groups=>["default"],
+    #      :key_name=>"kd-moo-test",
+    #      :user_data=>"Woohoo: CentOS.5.1-c-array",
+    #      :image_id=>"ami-08f41161",
+    #      :block_device_mappings=>[],
+    #      :instance_type=>"m1.small"}, ... ]
+    #
+    def describe_launch_configurations(*launch_configuration_names)
+      result = []
+      incrementally_describe_launch_configurations(*launch_configuration_names) do |response|
+        result += response[:launch_configurations]
+        true
+      end
+      result
+    end
+
+    # Incrementally describe Launch Configurations.
     # Returns a full description of the launch configurations given the specified names. If no names
     # are specified, then the full details of all launch configurations are returned.
+    # 
+    # Optional params: +:max_records+, +:next_token+.
     #
+    #  # get max 100 first configurations
     #  as.incrementally_describe_launch_configurations #=>
     #      {:launch_configurations=>
     #        [{:created_time=>Thu May 28 09:31:20 UTC 2009,
@@ -287,6 +405,12 @@ module RightAws
     #          :block_device_mappings=>[],
     #          :instance_type=>"m1.small"}, ... ]}
     #
+    #  # list by 5 records
+    #  incrementally_describe_launch_configurations(:max_records => 5) do |response|
+    #    puts response.inspect
+    #    true
+    #  end
+    #
     def incrementally_describe_launch_configurations(*launch_configuration_names, &block)
       launch_configuration_names = launch_configuration_names.flatten.compact
       params = launch_configuration_names.last.kind_of?(Hash) ? launch_configuration_names.pop : {}
@@ -296,7 +420,7 @@ module RightAws
       last_response = nil
       loop do
         link = generate_request("DescribeLaunchConfigurations", request_hash)
-        last_response = request_cache_or_info( :incrementally_describe_launch_configurations, link,  DescribeLaunchConfigurationsParser, @@bench, params.blank?)
+        last_response = request_info( link, DescribeLaunchConfigurationsParser.new(:logger => @logger) )
         request_hash['NextToken'] = last_response[:next_token]
         break unless block && block.call(last_response) && !last_response[:next_token].blank?
       end

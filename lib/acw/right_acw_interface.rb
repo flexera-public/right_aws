@@ -23,7 +23,12 @@
 
 module RightAws
 
-  # Amazon Cloud Watch
+  # = RightAWS::AcwInterface -- RightScale Amazon Cloud Watch interface
+  # The RightAws::AcwInterface class provides a complete interface to Amazon Cloud Watch service.
+  #
+  # For explanations of the semantics of each call, please refer to Amazon's documentation at
+  # http://docs.amazonwebservices.com/AmazonCloudWatch/latest/DeveloperGuide/
+  #
   class AcwInterface < RightAwsBase
     include RightAwsBaseInterface
 
@@ -45,8 +50,7 @@ module RightAws
     # Create a new handle to an ACW account. All handles share the same per process or per thread
     # HTTP connection to Amazon ACW. Each handle is for a specific account. The params have the
     # following options:
-    # * <tt>:endpoint_url</tt> a fully qualified url to Amazon API endpoint (this overwrites: :server,
-    #  :port, :service, :protocol). Example: 'https://monitoring.amazonaws.com/'
+    # * <tt>:endpoint_url</tt> a fully qualified url to Amazon API endpoint (this overwrites: :server, :port, :service, :protocol). Example: 'https://monitoring.amazonaws.com/'
     # * <tt>:server</tt>: ACW service host, default: DEFAULT_HOST
     # * <tt>:port</tt>: ACW service port, default: DEFAULT_PORT
     # * <tt>:protocol</tt>: 'http' or 'https', default: DEFAULT_PROTOCOL

@@ -23,7 +23,41 @@
 
 module RightAws
 
-  # Elastic Load Balancing Service
+  # = RightAWS::ElbInterface -- RightScale Amazon Elastic Load Balancer interface
+  # The RightAws::ElbInterface class provides a complete interface to Amazon's
+  # Elastic Load Balancer service.
+  # 
+  # For explanations of the semantics of each call, please refer to Amazon's documentation at
+  # http://docs.amazonwebservices.com/ElasticLoadBalancing/latest/DeveloperGuide/
+  # 
+  # Create an interface handle:
+  #
+  #  elb = RightAws::ElbInterface.new(aws_access_key_id, aws_security_access_key)
+  #
+  # Create an new load balancer:
+  #
+  #  elb.create_load_balancer( 'test-kd1',
+  #                           ['us-east-1a', 'us-east-1b'],
+  #                           [ { :protocol => :http, :load_balancer_port => 80,  :instance_port => 80 },
+  #		                          { :protocol => :tcp,  :load_balancer_port => 443, :instance_port => 443 } ])
+  #
+  # Configure its health checking:
+  #
+  #  elb.configure_health_check( 'test-kd1',
+  #                              { :healthy_threshold => 9,
+  #                                :unhealthy_threshold => 3,
+  #                                :target => "TCP:433",
+  #                                :timeout => 6,
+  #                                :interval => 31}
+  #
+  # Register instances with the balancer:
+  #
+  #  elb.register_instances_with_load_balancer('test-kd1', 'i-8b8bcbe2', 'i-bf8bcbd6') #=> ["i-8b8bcbe2", "i-bf8bcbd6"]
+  #
+  # Add new availability zones:
+  #
+  #  elb.enable_availability_zones_for_load_balancer("test-kd1", "us-east-1c")
+  #
   class ElbInterface < RightAwsBase
     include RightAwsBaseInterface
 
@@ -45,15 +79,14 @@ module RightAws
     # Create a new handle to an ELB account. All handles share the same per process or per thread
     # HTTP connection to Amazon ELB. Each handle is for a specific account. The params have the
     # following options:
-    # * <tt>:endpoint_url</tt> a fully qualified url to Amazon API endpoint (this overwrites: :server,
-    #  :port, :service, :protocol). Example: 'https://elasticloadbalancing.amazonaws.com'
+    # * <tt>:endpoint_url</tt> a fully qualified url to Amazon API endpoint (this overwrites: :server, :port, :service, :protocol). Example: 'https://elasticloadbalancing.amazonaws.com'
     # * <tt>:server</tt>: ELB service host, default: DEFAULT_HOST
     # * <tt>:port</tt>: ELB service port, default: DEFAULT_PORT
     # * <tt>:protocol</tt>: 'http' or 'https', default: DEFAULT_PROTOCOL
     # * <tt>:multi_thread</tt>: true=HTTP connection per thread, false=per process
     # * <tt>:logger</tt>: for log messages, default: RAILS_DEFAULT_LOGGER else STDOUT
     # * <tt>:signature_version</tt>:  The signature version : '0','1' or '2'(default)
-    # * <tt>:cache</tt>: true/false(default): caching works for: describe_access_points
+    # * <tt>:cache</tt>: true/false(default): caching works for: describe_load_balancers
     #
     def initialize(aws_access_key_id=nil, aws_secret_access_key=nil, params={})
       init({ :name                => 'ELB',
@@ -221,7 +254,6 @@ module RightAws
     # Add new instance(s) to the load balancer.
     # Returns an updated list of instances for the load balancer.
     #
-    #  elb = RightAws::ElbInterface.new(aws_access_key_id, aws_security_access_key)
     #  elb.register_instances_with_load_balancer('test-kd1', 'i-8b8bcbe2', 'i-bf8bcbd6') #=> ["i-8b8bcbe2", "i-bf8bcbd6"]
     #
     def register_instances_with_load_balancer(load_balancer_name, *instances)
@@ -235,7 +267,6 @@ module RightAws
     # Remove instance(s) from the load balancer.
     # Returns an updated list of instances for the load balancer.
     #
-    #  elb = RightAws::ElbInterface.new(aws_access_key_id, aws_security_access_key)
     #  elb.deregister_instances_with_load_balancer('test-kd1', 'i-8b8bcbe2') #=> ["i-bf8bcbd6"]
     #
     def deregister_instances_with_load_balancer(load_balancer_name, *instances)

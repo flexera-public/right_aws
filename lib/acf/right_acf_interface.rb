@@ -93,12 +93,12 @@ module RightAws
     # Create a new handle to a CloudFront account. All handles share the same per process or per thread
     # HTTP connection to CloudFront. Each handle is for a specific account. The params have the
     # following options:
+    # * <tt>:endpoint_url</tt> a fully qualified url to Amazon API endpoint (this overwrites: :server, :port, :service, :protocol). Example: 'https://cloudfront.amazonaws.com'
     # * <tt>:server</tt>: CloudFront service host, default: DEFAULT_HOST
     # * <tt>:port</tt>: CloudFront service port, default: DEFAULT_PORT
     # * <tt>:protocol</tt>: 'http' or 'https', default: DEFAULT_PROTOCOL
     # * <tt>:multi_thread</tt>: true=HTTP connection per thread, false=per process
     # * <tt>:logger</tt>: for log messages, default: RAILS_DEFAULT_LOGGER else STDOUT
-    # * <tt>:cache</tt>: true/false: caching for list_distributions method, default: false.
     #
     #  acf = RightAws::AcfInterface.new('1E3GDYEOGFJPIT7XXXXXX','hgTHt68JY07JKUY08ftHYtERkjgtfERn57XXXXXX',
     #    {:logger => Logger.new('/tmp/x.log')}) #=>  #<RightAws::AcfInterface::0xb7b3c30c>
@@ -204,7 +204,7 @@ module RightAws
     #      API Calls:
     #-----------------------------------------------------------------
 
-    # List distributions.
+    # List all distributions.
     # Returns an array of distributions or RightAws::AwsError exception.
     #
     #  acf.list_distributions #=>
@@ -216,14 +216,20 @@ module RightAws
     #      :comment            => "My comments",
     #      :last_modified_time => Wed Sep 10 17:00:04 UTC 2008 }, ..., {...} ]
     #
-    def list_distributions(params={})
-      incrementally_list_distributions(params)[:distributions]
+    def list_distributions
+      result = []
+      incrementally_list_distributions do |response|
+        result += response[:distributions]
+        true
+      end
+      result
     end
 
     # Incrementally list distributions.
+    # 
     # Optional params: +:marker+ and +:max_items+.
     #
-    #   # get first distributions
+    #   # get first distribution
     #   incrementally_list_distributions(:max_items => 1) #=>
     #      {:distributions=>
     #        [{:status=>"Deployed",
@@ -240,7 +246,7 @@ module RightAws
     #       :marker=>"",
     #       :next_marker=>"E2Q0AOOMFNPSYL"}
     #
-    #   # get all distributions (the list may be restricted by a default MaxItems value (==100) )
+    #   # get max 100 distributions (the list will be restricted by a default MaxItems value ==100 )
     #   incrementally_list_distributions
     #
     #   # list distributions by 10
@@ -256,7 +262,7 @@ module RightAws
       last_response = nil
       loop do
         link = generate_request('GET', 'distribution', opts)
-        last_response  = request_cache_or_info( :list_distributions, link,  AcfDistributionListParser, @@bench, params.blank?)
+        last_response = request_info(link,  AcfDistributionListParser.new(:logger => @logger))
         opts['Marker'] = last_response[:next_marker]
         break unless block && block.call(last_response) && !last_response[:next_marker].blank?
       end 
@@ -294,7 +300,7 @@ module RightAws
     def create_distribution_by_config(config)
       config[:caller_reference] ||= generate_call_reference
       link = generate_request('POST', 'distribution', {}, config_to_xml(config))
-      merge_headers(request_info(link, AcfDistributionListParser.new)[:distributions].first)
+      merge_headers(request_info(link, AcfDistributionListParser.new(:logger => @logger))[:distributions].first)
     end
 
     # Get a distribution's information.
@@ -314,7 +320,7 @@ module RightAws
     #
     def get_distribution(aws_id)
       link = generate_request('GET', "distribution/#{aws_id}")
-      merge_headers(request_info(link, AcfDistributionListParser.new)[:distributions].first)
+      merge_headers(request_info(link, AcfDistributionListParser.new(:logger => @logger))[:distributions].first)
     end
 
     # Get a distribution's configuration.
@@ -330,7 +336,7 @@ module RightAws
     #
     def get_distribution_config(aws_id)
       link = generate_request('GET', "distribution/#{aws_id}/config")
-      merge_headers(request_info(link, AcfDistributionListParser.new)[:distributions].first)
+      merge_headers(request_info(link, AcfDistributionListParser.new(:logger => @logger))[:distributions].first)
     end
 
     # Set a distribution's configuration 
@@ -351,7 +357,7 @@ module RightAws
     def set_distribution_config(aws_id, config)
       link = generate_request('PUT', "distribution/#{aws_id}/config", {}, config_to_xml(config),
                                      'If-Match' => config[:e_tag])
-      request_info(link, RightHttp2xxParser.new)
+      request_info(link, RightHttp2xxParser.new(:logger => @logger))
     end
 
     # Delete a distribution. The enabled distribution cannot be deleted.
@@ -362,7 +368,7 @@ module RightAws
     def delete_distribution(aws_id, e_tag)
       link = generate_request('DELETE', "distribution/#{aws_id}", {}, nil,
                                         'If-Match' => e_tag)
-      request_info(link, RightHttp2xxParser.new)
+      request_info(link, RightHttp2xxParser.new(:logger => @logger))
     end
 
     #-----------------------------------------------------------------
