@@ -680,7 +680,17 @@ module RightAws
     # Retrieve reserved instances list.
     # Returns a list of Reserved Instances.
     #
-    # TODO: not tested with a real list of Reserved Instances.
+    # ec2.describe_reserved_instances #=>
+    #    [{:aws_id=>"1ba8e2e3-1c40-434c-a741-5ff16a4c542e",
+    #      :aws_duration=>31536000,
+    #      :aws_instance_type=>"m1.small",
+    #      :aws_usage_price=>0.03,
+    #      :aws_availability_zone=>"us-east-1b",
+    #      :aws_state=>"payment-pending",
+    #      :aws_product_description=>"Test",
+    #      :aws_fixed_price=>325.0,
+    #      :aws_instance_count=>1}]
+    #
     def describe_reserved_instances(list=[])
       link = generate_request("DescribeReservedInstances", amazonize_list('ReservedInstancesId',list.to_a))
       request_cache_or_info(:describe_reserved_instances, link,  QEc2DescribeReservedInstancesParser, @@bench, list.blank?)
@@ -731,7 +741,6 @@ module RightAws
     #
     #  ec2.purchase_reserved_instances_offering('e5a2ff3b-f6eb-4b4e-83f8-b879d7060257', 3) # => '4b2293b4-5813-4cc8-9ce3-1957fc1dcfc8'
     #
-    # TODO: not tested yet
     def purchase_reserved_instances_offering(reserved_instances_offering_id, instance_count=1)
       link = generate_request("PurchaseReservedInstancesOffering", { 'ReservedInstancesOfferingId' => reserved_instances_offering_id,
                                                                      'InstanceCount'               => instance_count  })
