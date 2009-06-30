@@ -123,6 +123,11 @@ module RightAws
       $1
     end
 
+    def self.split_items_and_params(array)
+      items  = array.to_a.flatten.compact
+      params = items.last.kind_of?(Hash) ? items.pop : {}
+      [items, params]
+    end
   end
 
   class AwsBenchmarkingBlock #:nodoc:
