@@ -91,7 +91,7 @@ module RightAws
         link = generate_request(action, params)
         last_response = request_info( link,  parser_class.new(:logger => @logger))
         params['Marker'] = last_response[:marker]
-        break unless block && block.call(last_response) && !last_response[:next_token].blank?
+        break unless block && block.call(last_response) && !last_response[:marker].blank?
       end
       last_response
     end
