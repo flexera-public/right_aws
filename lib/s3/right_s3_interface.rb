@@ -988,11 +988,11 @@ module RightAws
       end
       def tagend(name)
         case name
-          when 'ID'          ; @owner[:owner_id]               = @text
-          when 'DisplayName' ; @owner[:owner_display_name]     = @text
-          when 'Name'        ; @current_bucket[:name]          = @text
-          when 'CreationDate'; @current_bucket[:creation_date] = @text
-          when 'Bucket'      ; @result << @current_bucket.merge(@owner)
+          when 'ID'          then @owner[:owner_id]               = @text
+          when 'DisplayName' then @owner[:owner_display_name]     = @text
+          when 'Name'        then @current_bucket[:name]          = @text
+          when 'CreationDate'then @current_bucket[:creation_date] = @text
+          when 'Bucket'      then @result << @current_bucket.merge(@owner)
         end
       end
     end
@@ -1009,21 +1009,23 @@ module RightAws
       def tagend(name)
         case name
             # service info
-          when 'Name'        ; @service['name']         = @text
-          when 'Prefix'      ; @service['prefix']       = @text
-          when 'Marker'      ; @service['marker']       = @text
-          when 'MaxKeys'     ; @service['max-keys']     = @text
-          when 'Delimiter'   ; @service['delimiter']    = @text
-          when 'IsTruncated' ; @service['is_truncated'] = (@text =~ /false/ ? false : true)
+          when 'Name'        then @service['name']         = @text
+          when 'Prefix'      then @service['prefix']       = @text
+          when 'Marker'      then @service['marker']       = @text
+          when 'MaxKeys'     then @service['max-keys']     = @text
+          when 'Delimiter'   then @service['delimiter']    = @text
+          when 'IsTruncated' then @service['is_truncated'] = (@text =~ /false/ ? false : true)
             # key data
-          when 'Key'         ; @current_key[:key]                = @text
-          when 'LastModified'; @current_key[:last_modified]      = @text
-          when 'ETag'        ; @current_key[:e_tag]              = @text
-          when 'Size'        ; @current_key[:size]               = @text.to_i
-          when 'StorageClass'; @current_key[:storage_class]      = @text
-          when 'ID'          ; @current_key[:owner_id]           = @text
-          when 'DisplayName' ; @current_key[:owner_display_name] = @text
-          when 'Contents'    ; @current_key[:service]            = @service;  @result << @current_key
+          when 'Key'         then @current_key[:key]                = @text
+          when 'LastModified'then @current_key[:last_modified]      = @text
+          when 'ETag'        then @current_key[:e_tag]              = @text
+          when 'Size'        then @current_key[:size]               = @text.to_i
+          when 'StorageClass'then @current_key[:storage_class]      = @text
+          when 'ID'          then @current_key[:owner_id]           = @text
+          when 'DisplayName' then @current_key[:owner_display_name] = @text
+          when 'Contents'
+            @current_key[:service] = @service
+            @result << @current_key
         end
       end
     end
@@ -1045,27 +1047,29 @@ module RightAws
       def tagend(name)
         case name
             # service info
-          when 'Name'        ; @result[:name]         = @text
+          when 'Name'        then @result[:name]         = @text
           # Amazon uses the same tag for the search prefix and for the entries
             # in common prefix...so use our simple flag to see which element
             # we are parsing
-          when 'Prefix'      ; @in_common_prefixes ? @common_prefixes << @text : @result[:prefix] = @text
-          when 'Marker'      ; @result[:marker]       = @text
-          when 'MaxKeys'     ; @result[:max_keys]     = @text
-          when 'Delimiter'   ; @result[:delimiter]    = @text
-          when 'IsTruncated' ; @result[:is_truncated] = (@text =~ /false/ ? false : true)
-          when 'NextMarker'  ; @result[:next_marker]  = @text
+          when 'Prefix'      then @in_common_prefixes ? @common_prefixes << @text : @result[:prefix] = @text
+          when 'Marker'      then @result[:marker]       = @text
+          when 'MaxKeys'     then @result[:max_keys]     = @text
+          when 'Delimiter'   then @result[:delimiter]    = @text
+          when 'IsTruncated' then @result[:is_truncated] = (@text =~ /false/ ? false : true)
+          when 'NextMarker'  then @result[:next_marker]  = @text
             # key data
-          when 'Key'         ; @current_key[:key]                = @text
-          when 'LastModified'; @current_key[:last_modified]      = @text
-          when 'ETag'        ; @current_key[:e_tag]              = @text
-          when 'Size'        ; @current_key[:size]               = @text.to_i
-          when 'StorageClass'; @current_key[:storage_class]      = @text
-          when 'ID'          ; @current_key[:owner_id]           = @text
-          when 'DisplayName' ; @current_key[:owner_display_name] = @text
-          when 'Contents'    ; @result[:contents] << @current_key
+          when 'Key'         then @current_key[:key]                = @text
+          when 'LastModified'then @current_key[:last_modified]      = @text
+          when 'ETag'        then @current_key[:e_tag]              = @text
+          when 'Size'        then @current_key[:size]               = @text.to_i
+          when 'StorageClass'then @current_key[:storage_class]      = @text
+          when 'ID'          then @current_key[:owner_id]           = @text
+          when 'DisplayName' then @current_key[:owner_display_name] = @text
+          when 'Contents'    then @result[:contents] << @current_key
             # Common Prefix stuff
-          when 'CommonPrefixes' ; @result[:common_prefixes] = @common_prefixes; @in_common_prefixes = false
+          when 'CommonPrefixes' 
+            @result[:common_prefixes] = @common_prefixes
+            @in_common_prefixes = false
         end
       end
     end
@@ -1140,8 +1144,8 @@ module RightAws
       end
       def tagend(name)
         case name
-        when 'LastModified' : @result[:last_modified] = @text
-        when 'ETag'         : @result[:e_tag]         = @text
+        when 'LastModified' then @result[:last_modified] = @text
+        when 'ETag'         then @result[:e_tag]         = @text
         end
       end
     end

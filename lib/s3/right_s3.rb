@@ -761,9 +761,9 @@ module RightAws
         @name  = name
         @perms = perms.to_a
         case action
-          when :apply:             apply
-          when :refresh:           refresh
-          when :apply_and_refresh: apply; refresh
+          when :apply             then apply
+          when :refresh           then refresh
+          when :apply_and_refresh then apply; refresh
         end
       end
       
@@ -775,9 +775,13 @@ module RightAws
         false
       end
       
-        # Return Grantee type (+String+): "Group" or "CanonicalUser".
+        # Return Grantee type (+String+): "Group", "AmazonCustomerByEmail" or "CanonicalUser".
       def type
-        @id[/^http:/] ? "Group" : "CanonicalUser"
+        case @id
+        when /^http:/ then "Group"
+        when /@/      then "AmazonCustomerByEmail"
+        else               "CanonicalUser"
+        end
       end
  
         # Return a name or an id.
@@ -872,7 +876,11 @@ module RightAws
       end
 
       def to_xml   # :nodoc:
-        id_str = @id[/^http/] ? "<URI>#{@id}</URI>" : "<ID>#{@id}</ID>"
+        id_str = case @id
+                 when /^http/ then "<URI>#{@id}</URI>"
+                 when /@/     then "<EmailAddress>#{@id}</EmailAddress>"
+                 else              "<ID>#{@id}</ID>"
+                 end
         grants = ''
         @perms.each do |perm|
           grants << "<Grant>"    +
