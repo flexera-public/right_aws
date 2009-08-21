@@ -100,4 +100,11 @@ task :testacf do
   require 'test/acf/test_right_acf.rb'
 end
 
+desc "Test RDS interface"
+task :testrds do
+  require 'test/test_credentials'
+  TestCredentials.get_credentials
+  require 'test/rds/test_right_rds.rb'
+end
+
 # vim: syntax=Ruby
