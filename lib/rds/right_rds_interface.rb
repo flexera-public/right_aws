@@ -127,7 +127,7 @@ module RightAws
     #
     #  # Retrieve a custom DB instance.
     #  # The response is an +Array+ with a single instance record.
-    #  rds.describe_db_instances(:aws_id=>"kd-test-n3")
+    #  rds.describe_db_instances("kd-test-n3")
     #
     #  # Incrementally a list DB instances. Every response part is a +Hash+.
     #  rds.describe_db_instances(:max_records => 30) do |x|
@@ -151,8 +151,9 @@ module RightAws
     #  end
     #
     def describe_db_instances(params={}, &block)
+      item, params = AwsUtils::split_items_and_params(params)
       params = params.dup
-      params['DBInstanceIdentifier'] = params.delete(:aws_id) unless params[:aws_id].blank?
+      params['DBInstanceIdentifier'] = item if item
       result = []
       incrementally_list_items('DescribeDBInstances', DescribeDbInstancesParser, params) do |response|
         result += response[:db_instances]
@@ -190,8 +191,8 @@ module RightAws
       request_hash['MasterUsername']       = master_username
       request_hash['MasterUserPassword']   = master_user_password
       # Mandatory with default values
-      request_hash['DBInstanceClass']  = params[:instance_class].blank? ? 'Medium'   : params[:db_instance_class].to_s.capitalize
-      request_hash['AllocatedStorage'] = params[:instance_class].blank? ? 25         : params[:allocated_storage]
+      request_hash['DBInstanceClass']  = params[:instance_class].blank?    ? 'Medium'   : params[:instance_class].to_s.capitalize
+      request_hash['AllocatedStorage'] = params[:allocated_storage].blank? ? 25         : params[:allocated_storage]
       request_hash['Engine']           = params[:engine].blank?            ? 'MySQL5.1' : params[:engine]
       # Optional
       request_hash['EndpointPort']               = params[:endpoint_port]                unless params[:endpoint_port].blank?
@@ -208,7 +209,7 @@ module RightAws
     # 
     # Mandatory arguments: +aws_id+. 
     # Optional params: +:master_user_password+, +:instance_class+, +:db_security_groups+,
-    # +:preferred_maintenance_window+, +:allocated_storage+
+    # +:db_parameter_groups+, +:preferred_maintenance_window+, +:allocated_storage+, +:apply_immediately+
     #
     def modify_db_instance(aws_id, params={})
       request_hash = {}
@@ -219,24 +220,33 @@ module RightAws
       request_hash['DBInstanceClass']            = params[:instance_class].to_s.capitalize    unless params[:instance_class].blank?
       request_hash['PreferredMaintenanceWindow'] = params[:preferred_maintenance_window]      unless params[:preferred_maintenance_window].blank?
       request_hash['AllocatedStorage']           = params[:allocated_storage]                 unless params[:allocated_storage].blank?
-      request_hash['ApplyImmediately']           = params[:force].to_s                        unless params[:force].blank?
-      request_hash.merge!(amazonize_list('DBSecurityGroups.member', params[:db_security_groups]))
+      request_hash['ApplyImmediately']           = params[:apply_immediately].to_s            unless params[:apply_immediately].blank?
+      request_hash.merge!(amazonize_list('DBSecurityGroups.member',  params[:db_security_groups]))
+      request_hash.merge!(amazonize_list('DBParameterGroups.member', params[:db_parameter_groups]))
       link = generate_request('ModifyDBInstance', request_hash)
+      request_info(link, DescribeDbInstancesParser.new(:logger => @logger))[:db_instances].first
+    end
+
+    def reboot_db_instance(aws_id, params={})
+      params = params.dup
+      params['DBInstanceIdentifier'] = aws_id
+      link = generate_request('RebootDBInstance', params)
       request_info(link, DescribeDbInstancesParser.new(:logger => @logger))[:db_instances].first
     end
 
     # Delete a DB instance
     #
     # Mandatory arguments: aws_id
-    # Optional params: :force ('false' by def), :snapshot_aws_id ('{instance_aws_id}-final-snapshot-YYYYMMDDHHMMSS')
+    # Optional params: :skip_final_snapshot ('false' by def),
+    #                  :snapshot_aws_id ('{instance_aws_id}-final-snapshot-YYYYMMDDHHMMSS')
     #
     #  rds.delete_db_instance('my-awesome-db-g2') #=> true
     #
     def delete_db_instance(aws_id, params={})
       request_hash = {}
       request_hash['DBInstanceIdentifier'] = aws_id
-      request_hash['ForceDataDeletion']    = params.has_key?(:force) ? params[:force].to_s : 'false'
-      if request_hash['ForceDataDeletion'] == 'false' && params[:snapshot_aws_id].blank?
+      request_hash['SkipFinalSnapshot']    = params.has_key?(:skip_final_snapshot) ? params[:skip_final_snapshot].to_s : 'false'
+      if request_hash['SkipFinalSnapshot'] == 'false' && params[:snapshot_aws_id].blank?
         params = params.dup
         params[:snapshot_aws_id] = "#{aws_id}-final-snapshot-#{Time.now.utc.strftime('%Y%m%d%H%M%S')}"
       end
@@ -484,7 +494,7 @@ module RightAws
     #
     def describe_db_parameters(*db_parameter_group_name, &block)
       item, params = AwsUtils::split_items_and_params(db_parameter_group_name)
-      params['DBParameterGroupName'] = item if item
+      params['DBParameterGroupName'] = item
       result = []
       incrementally_list_items('DescribeDBParameters', DescribeDbParametersParser, params) do |response|
         result += response[:parameters]
@@ -540,7 +550,7 @@ module RightAws
     # --------------------------------------------
 
     # Get DBSecurityGroup details for a particular customer or for a particular DBSecurityGroup if a name is specified.
-    # Optional params:  +:aws_id+, +:instance_aws_id+
+    # Optional params: +:instance_aws_id+
     #
     #  # all snapshots
     #  rds.describe_db_snapshots #=>
@@ -551,7 +561,7 @@ module RightAws
     #      :aws_id=>"kd-test-n1-final-snapshot-at-20090630131215",
     #      :engine=>"MySQL5.1",
     #      :endpoint_port=>3306,
-    #      :instance_creation_date=>"2009-06-30T12:48:15.590Z",
+    #      :instance_create_time=>"2009-06-30T12:48:15.590Z",
     #      :master_username=>"payless",
     #      :snapshot_time=>"2009-06-30T13:16:48.496Z"}, ...]
     #
@@ -564,26 +574,26 @@ module RightAws
     #      :aws_id=>"kd-test-n3-final-snapshot-20090713074916",
     #      :engine=>"MySQL5.1",
     #      :endpoint_port=>3306,
-    #      :instance_creation_date=>"2009-06-30T12:51:32.540Z",
+    #      :instance_create_time=>"2009-06-30T12:51:32.540Z",
     #      :master_username=>"payless",
     #      :snapshot_time=>"2009-07-13T07:52:35.542Z"}]
     #
     #  # a snapshot by id
-    #  rds.describe_db_snapshots(:aws_id => 'my-awesome-db-final-snapshot-20090713075554') #=>
+    #  rds.describe_db_snapshots('my-awesome-db-final-snapshot-20090713075554') #=>
     #    [{:status=>"Available",
     #      :allocated_storage=>25,
     #      :engine=>"MySQL5.1",
     #      :instance_aws_id=>"my-awesome-db",
     #      :availability_zone=>"us-east-1a",
-    #      :instance_creation_date=>"2009-07-13T07:53:08.912Z",
+    #      :instance_create_time=>"2009-07-13T07:53:08.912Z",
     #      :endpoint_port=>3306,
     #      :master_username=>"medium",
     #      :aws_id=>"my-awesome-db-final-snapshot-20090713075554",
     #      :snapshot_time=>"2009-07-13T07:59:17.537Z"}]
     #
     def describe_db_snapshots(params={}, &block)
-      params = params.dup
-      params['DBSnapshotIdentifier'] = params.delete(:aws_id) unless params[:aws_id].blank?
+      item, params = AwsUtils::split_items_and_params(params)
+      params['DBSnapshotIdentifier'] = item if item
       params['DBInstanceIdentifier'] = params.delete(:instance_aws_id) unless params[:instance_aws_id].blank?
       result = []
       incrementally_list_items('DescribeDBSnapshots', DescribeDbSnapshotsParser, params) do |response|
@@ -601,14 +611,14 @@ module RightAws
     #     :availability_zone=>"us-east-1b",
     #     :engine=>"MySQL5.1",
     #     :aws_id=>"remove-me-tomorrow-2",
-    #     :instance_creation_date=>"2009-07-13T09:35:39.243Z",
+    #     :instance_create_time=>"2009-07-13T09:35:39.243Z",
     #     :endpoint_port=>3306,
     #     :instance_aws_id=>"my-awesome-db-g7",
     #     :db_master_username=>"username"}
     #
     def create_db_snapshot(aws_id, instance_aws_id)
-      link = generate_request('CreateDBSnapshot', 'TargetDBSnapshotIdentifier' => aws_id,
-                                                  'SourceDBInstanceIdentifier' => instance_aws_id)
+      link = generate_request('CreateDBSnapshot', 'DBSnapshotIdentifier' => aws_id,
+                                                  'DBInstanceIdentifier' => instance_aws_id)
       request_info(link, DescribeDbSnapshotsParser.new(:logger => @logger))[:db_snapshots].first
     end
 
@@ -623,7 +633,7 @@ module RightAws
       request_hash['DBInstanceClass']  = params[:instance_class]    unless params[:instance_class].blank?
       request_hash['EndpointPort']     = params[:endpoint_port]     unless params[:endpoint_port].blank?
       request_hash['AvailabilityZone'] = params[:availability_zone] unless params[:availability_zone].blank?
-      link = generate_request('DeleteDBSnapshot', request_hash)
+      link = generate_request('RestoreDBInstanceFromDBSnapshot', request_hash)
       request_info(link, DescribeDbInstancesParser.new(:logger => @logger))[:db_instances].first
     end
 
@@ -632,7 +642,7 @@ module RightAws
     #  rds.delete_db_snapshot('remove-me-tomorrow-1') #=>
     #    {:status=>"Deleted",
     #     :allocated_storage=>50,
-    #     :instance_creation_date=>"2009-07-13T09:27:01.053Z",
+    #     :instance_create_time=>"2009-07-13T09:27:01.053Z",
     #     :availability_zone=>"us-east-1a",
     #     :db_master_username=>"username",
     #     :aws_id=>"remove-me-tomorrow-1",
@@ -709,6 +719,7 @@ module RightAws
                'CreateDBInstanceResult',
                'DeleteDBInstanceResult',
                'ModifyDBInstanceResult',
+               'RebootDBInstanceResult',
                'RestoreDBInstanceFromDBSnapshotResult' ]
         @result = { :db_instances => [] }
       end
@@ -727,7 +738,7 @@ module RightAws
         when 'MaxRecords'                 then @result[:max_records]  = @text.to_i
         when 'DBInstanceIdentifier'       then @db_instance[:aws_id]               = @text
         when 'DBName'                     then @db_instance[:name]                 = @text  # ? is this one used?
-        when 'CreationDate'               then @db_instance[:creation_date]        = @text  # ? is in docs but is absent in response
+        when 'InstanceCreateTime'         then @db_instance[:create_time]          = @text
         when 'Engine'                     then @db_instance[:engine]               = @text
         when 'DBInstanceStatus'           then @db_instance[:status]               = @text
         when 'AllocatedStorage'           then @db_instance[:allocated_storage]    = @text.to_i
@@ -785,7 +796,7 @@ module RightAws
           when /IPRange$/          then @ip_range[:status] = @text
           when /EC2SecurityGroup$/ then @ec2_security_group[:status] = @text
           end
-        when 'EC2SecurityGroupName'    then @ec2_security_group[:aws_id]   = @text
+        when 'EC2SecurityGroupName'    then @ec2_security_group[:name]     = @text
         when 'EC2SecurityGroupOwnerId' then @ec2_security_group[:owner_id] = @text
         when 'CIDRIP'                  then @ip_range[:cidrip]             = @text
         when 'IPRange'                 then @item[:ip_ranges]           << @ip_range
