@@ -435,13 +435,13 @@ module RightAws
     #
     #  rds.modify_db_parameter_group('kd1', 'max_allowed_packet' => 2048) #=> true
     #  
-    #  rds.modify_db_parameter_group('kd1', 'max_allowed_packet' => {:value => 2048, :method => 'pending-reboot')  #=> true
+    #  rds.modify_db_parameter_group('kd1', 'max_allowed_packet' => {:value => 2048, :method => 'immediate')  #=> true
     #
     def modify_db_parameter_group(db_parameter_group_name, params={}) # :nodoc:
       request_hash = { 'DBParameterGroupName' => db_parameter_group_name}
       parameters = []
       params.each do |key, value|
-        method = 'immediate'
+        method = 'pending-reboot'
         if value.is_a?(Hash)
           method = value[:method] unless value[:method].blank?
           value  = value[:value]
@@ -464,9 +464,35 @@ module RightAws
       request_info(link, RightHttp2xxParser.new(:logger => @logger))
     end
 
-    # --------------------------------------------
-    #  Parameters
-    # --------------------------------------------
+    # Modify the parameters of a DBParameterGroup to the engine/system default value.
+    # 
+    #  # Reset all parameters
+    #  rds.reset_db_parameter_group('kd2', :all ) #=> true
+    #
+    #  # Reset custom parameters
+    #  rds.reset_db_parameter_group('kd2', 'max_allowed_packet', 'auto_increment_increment' ) #=> true
+    #  rds.reset_db_parameter_group('kd2', 'max_allowed_packet', 'auto_increment_increment' => 'immediate' ) #=> true
+    #
+    def reset_db_parameter_group(db_parameter_group_name, *params)
+      params = params.flatten
+      request_hash = { 'DBParameterGroupName' => db_parameter_group_name }
+      if params.first.to_s == 'all'
+        request_hash['ResetAllParameters'] = true
+      else
+        tmp = []
+        params.each{ |item| tmp |= item.to_a }
+        params = []
+        tmp.each do |key, method|
+          method = 'pending-reboot' unless method
+          params << [key, method]
+        end
+        request_hash.merge!( amazonize_list(['Parameters.member.?.ParameterName',
+                                             'Parameters.member.?.ApplyMethod'],
+                                             params ))
+      end
+      link = generate_request('ResetDBParameterGroup', request_hash)
+      request_info(link, RightHttp2xxParser.new(:logger => @logger))
+    end
 
     # Get the detailed parameters list for a particular DBParameterGroup.
     #
@@ -503,36 +529,24 @@ module RightAws
       result
     end
 
-    # Modify the parameters of a DBParameterGroup to the engine/system default value.
-    # 
-    #  # Reset all parameters
-    #  rds.reset_db_parameter_group('kd2', :all ) #=> true
+    # Describe a default parameters for the engine.
     #
-    #  # Reset custom parameters
-    #  rds.reset_db_parameter_group('kd2', 'max_allowed_packet', 'auto_increment_increment' ) #=> true
-    #  rds.reset_db_parameter_group('kd2', 'max_allowed_packet', 'auto_increment_increment' => 'pending-reboot' ) #=> true
+    #  rds.describe_engine_default_parameters('MySQL5.1') #=>
+    #    [{:is_modifiable=>true,
+    #      :apply_type=>"static",
+    #      :source=>"engine-default",
+    #      :allowed_values=>"ON,OFF",
+    #      :description=>"Controls whether user-defined functions that have only an xxx symbol for the main function can be loaded",
+    #      :name=>"allow-suspicious-udfs",
+    #      :data_type=>"boolean"},
+    #     {:is_modifiable=>true,
+    #      :apply_type=>"dynamic",
+    #      :source=>"engine-default",
+    #      :allowed_values=>"1-65535",
+    #      :description=>"Intended for use with master-to-master replication, and can be used to control the operation of AUTO_INCREMENT columns",
+    #      :name=>"auto_increment_increment",
+    #      :data_type=>"integer"}, ... ]
     #
-    def reset_db_parameter_group(db_parameter_group_name, *params)
-      request_hash = { 'DBParameterGroupName' => db_parameter_group_name }
-      if params == [:all]
-        request_hash['ResetAllParameters'] = true
-      else
-        tmp = []
-        params.each{ |item| tmp |= item.to_a }
-        params = []
-        tmp.each do |key, method|
-          method = 'immediate' unless method
-          params << [key, method]
-        end
-        request_hash.merge!( amazonize_list(['Parameters.member.?.ParameterName',
-                                             'Parameters.member.?.ApplyMethod'],
-                                             params ))
-      end
-      link = generate_request('ResetDBParameterGroup', request_hash)
-      request_info(link, RightHttp2xxParser.new(:logger => @logger))
-    end
-
-    # TODO make sure this API works (false as for now)
     def describe_engine_default_parameters(*engine, &block)
       engine = ['MySQL5.1'] if engine.blank?
       item, params = AwsUtils::split_items_and_params(engine)
@@ -627,8 +641,8 @@ module RightAws
     #
     # Optional params: +:instance_class+, +:endpoint_port+, +:availability_zone+
     #
-    def restore_db_instance_from_db_snapshot(aws_id, instance_aws_id, params={})
-      request_hash = { 'DBSnapshotIdentifier' => aws_id,
+    def restore_db_instance_from_db_snapshot(snapshot_aws_id, instance_aws_id, params={})
+      request_hash = { 'DBSnapshotIdentifier' => snapshot_aws_id,
                        'DBInstanceIdentifier' => instance_aws_id }
       request_hash['DBInstanceClass']  = params[:instance_class]    unless params[:instance_class].blank?
       request_hash['EndpointPort']     = params[:endpoint_port]     unless params[:endpoint_port].blank?
@@ -858,6 +872,7 @@ module RightAws
         when 'ApplyType'     then @item[:apply_type]     = @text
         when 'AllowedValues' then @item[:allowed_values] = @text
         when 'ParameterName' then @item[:name]           = @text
+        when 'ParameterValue' then @item[:value]         = @text
         when 'Parameter'     then @result[:parameters] << @item
         end
       end
