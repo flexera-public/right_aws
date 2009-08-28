@@ -481,13 +481,26 @@ module RightAws
     #    { 'Item.1.Name' => 'A', 'Item.1.Value' => 'a',
     #      'Item.2.Name' => 'B', 'Item.2.Value' => 'b'  }
     #
+    #  amazonize_list(['Filter.?.Key', 'Filter.?.Value.?'], {'A' => ['aa','ab'], 'B' => ['ba','bb']}) #=>
+    #  amazonize_list(['Filter.?.Key', 'Filter.?.Value.?'], [['A',['aa','ab']], ['B',['ba','bb']]])   #=>
+    #    {"Filter.1.Key"=>"A",
+    #     "Filter.1.Value.1"=>"aa",
+    #     "Filter.1.Value.2"=>"ab",
+    #     "Filter.2.Key"=>"B",
+    #     "Filter.2.Value.1"=>"ba",
+    #     "Filter.2.Value.2"=>"bb"}
     def amazonize_list(masks, list) #:nodoc:
       groups = {}
       list.to_a.each_with_index do |list_item, i|
         masks.to_a.each_with_index do |mask, mask_idx|
           key = mask[/\?/] ? mask.dup : mask.dup + '.?'
-          key.gsub!('?', (i+1).to_s)
-          groups[key] = list_item.to_a[mask_idx]
+          key.sub!('?', (i+1).to_s)
+          value = list_item.to_a[mask_idx]
+          if value.is_a?(Array)
+            groups.merge!(amazonize_list(key, value))
+          else
+            groups[key] = value
+          end
         end
       end
       groups
@@ -734,7 +747,7 @@ module RightAws
       @right_aws_parser.tag_start(name, attr_hash) 
     end   
     def on_characters(chars) 
-      @right_aws_parser.text(chars) 
+      @right_aws_parser.tag_text(chars)
     end 
     def on_end_element(name) 
       @right_aws_parser.tag_end(name) 
@@ -763,26 +776,33 @@ module RightAws
     attr_accessor :result
     attr_reader   :xmlpath
     attr_accessor :xml_lib
+    attr_reader   :full_tag_name
+    attr_reader   :text
+    attr_reader   :tag
     
     def initialize(params={})
       @xmlpath = ''
+      @full_tag_name = ''
       @result  = false
       @text    = ''
+      @tag     = ''
       @xml_lib = params[:xml_lib] || @@xml_lib
       @logger  = params[:logger]
       reset
     end
     def tag_start(name, attributes)
       @text = ''
+      @tag  = name
+      @full_tag_name += @full_tag_name.empty? ? name : "/#{name}"
       tagstart(name, attributes)
-      @xmlpath += @xmlpath.empty? ? name : "/#{name}"
+      @xmlpath = @full_tag_name
     end
     def tag_end(name)
-      @xmlpath[/^(.*?)\/?#{name}$/]
-      @xmlpath = $1
+      @xmlpath = @full_tag_name[/^(.*?)\/?#{name}$/] && $1
       tagend(name)
+      @full_tag_name = @xmlpath
     end
-    def text(text)
+    def tag_text(text)
       @text += text
       tagtext(text)
     end
@@ -824,7 +844,7 @@ module RightAws
           xml.callbacks = RightSaxParserCallback.new(self) 
         else 
           xml.on_start_element{|name, attr_hash| self.tag_start(name, attr_hash)} 
-          xml.on_characters{   |text|            self.text(text)} 
+          xml.on_characters{   |text|            self.tag_text(text)}
           xml.on_end_element{  |name|            self.tag_end(name)} 
         end 
         xml.parse
