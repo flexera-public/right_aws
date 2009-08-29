@@ -782,7 +782,6 @@ module RightAws
     attr_reader   :xmlpath
     attr_accessor :xml_lib
     attr_reader   :full_tag_name
-    attr_reader   :text
     attr_reader   :tag
     
     def initialize(params={})
