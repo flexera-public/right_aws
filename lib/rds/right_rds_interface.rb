@@ -227,6 +227,22 @@ module RightAws
       request_info(link, DescribeDbInstancesParser.new(:logger => @logger))[:db_instances].first
     end
 
+    # Reboot Db instance.
+    #
+    #  rds.reboot_db_instance('kd-my-awesome-db') #=>
+    #    {:status=>"rebooting",
+    #     :pending_modified_values=>{},
+    #     :allocated_storage=>42,
+    #     :db_parameter_groups=>[],
+    #     :master_username=>"kd",
+    #     :db_security_groups=>[],
+    #     :instance_class=>"Medium",
+    #     :availability_zone=>"us-east-1a",
+    #     :aws_id=>"kd-my-awesome-db",
+    #     :create_time=>"2009-08-28T08:34:21.858Z",
+    #     :engine=>"MySQL5.1",
+    #     :preferred_maintenance_window=>"Sun:05:00-Sun:09:00"}
+    #
     def reboot_db_instance(aws_id, params={})
       params = params.dup
       params['DBInstanceIdentifier'] = aws_id
@@ -420,7 +436,9 @@ module RightAws
 
     # Creates a database parameter group so that configuration of an RDS Instance can be controlled.
     #
-    #  TODO make sure the call returns valid params (this is not true as for now, the problem is posted at AWS forum )
+    #  rds.create_db_parameter_group('my-new-group-1','My new group') #=> {}
+    #
+    #  TODO: this call returns an empty hash, but should be a parameter group data - ask Amazon guys.
     #
     def create_db_parameter_group(db_parameter_group_name, db_parameter_group_description, engine='MySQL5.1', params={})
       params['DBParameterGroupName'] = db_parameter_group_name
@@ -453,11 +471,12 @@ module RightAws
                                            'Parameters.member.?.ApplyMethod'],
                                            parameters ))
       link = generate_request('ModifyDBParameterGroup', request_hash)
-#      request_info(link, DescribeDbParameterGroupsParser.new(:logger => @logger))[:db_parameter_groups].first
       request_info(link, RightHttp2xxParser.new(:logger => @logger))
     end
 
+    # Delete DBParameter Group.
     #
+    # rds.delete_db_parameter_group('kd1') #=> true
     #
     def delete_db_parameter_group(db_parameter_group_name)
       link = generate_request('DeleteDBParameterGroup', 'DBParameterGroupName' => db_parameter_group_name)
@@ -640,6 +659,20 @@ module RightAws
     # in the "Available" state. The new RDS instance is created with the Default security group.
     #
     # Optional params: +:instance_class+, +:endpoint_port+, +:availability_zone+
+    #
+    #  rds.restore_db_instance_from_db_snapshot('ahahahaha-final-snapshot-20090828081159', 'q1') #=>
+    #    {:status=>"creating",
+    #     :pending_modified_values=>{},
+    #     :allocated_storage=>42,
+    #     :db_security_groups=>[],
+    #     :db_parameter_groups=>[],
+    #     :master_username=>"kd",
+    #     :availability_zone=>"us-east-1a",
+    #     :aws_id=>"q1",
+    #     :create_time=>"2009-08-29T18:07:01.510Z",
+    #     :instance_class=>"Medium",
+    #     :preferred_maintenance_window=>"Sun:05:00-Sun:09:00",
+    #     :engine=>"MySQL5.1"}
     #
     def restore_db_instance_from_db_snapshot(snapshot_aws_id, instance_aws_id, params={})
       request_hash = { 'DBSnapshotIdentifier' => snapshot_aws_id,
