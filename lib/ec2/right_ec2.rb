@@ -68,7 +68,7 @@ module RightAws
     include RightAwsBaseInterface
     
     # Amazon EC2 API version being used
-    API_VERSION       = "2009-03-01"
+    API_VERSION       = "2009-07-15"
     DEFAULT_HOST      = "ec2.amazonaws.com"
     DEFAULT_PATH      = '/'
     DEFAULT_PROTOCOL  = 'https'
@@ -419,8 +419,8 @@ module RightAws
       #
     def run_instances(image_id, min_count, max_count, group_ids, key_name, user_data='',  
                       addressing_type = nil, instance_type = nil,
-                      kernel_id = nil, ramdisk_id = nil, availability_zone = nil, 
-                      block_device_mappings = nil) 
+                      kernel_id = nil, ramdisk_id = nil, availability_zone = nil,
+                      monitoring_enabled = nil, subnet_id = nil)
  	    launch_instances(image_id, { :min_count       => min_count, 
  	                                 :max_count       => max_count, 
  	                                 :user_data       => user_data, 
@@ -430,8 +430,9 @@ module RightAws
                                    :addressing_type => addressing_type,
                                    :kernel_id       => kernel_id,
                                    :ramdisk_id      => ramdisk_id,
-                                   :availability_zone     => availability_zone,
-                                   :block_device_mappings => block_device_mappings
+                                   :availability_zone  => availability_zone,
+                                   :monitoring_enabled => monitoring_enabled,
+                                   :subnet_id          => subnet_id
                                  }) 
     end
     
@@ -448,8 +449,9 @@ module RightAws
       #  :kernel_id              string
       #  :ramdisk_id             string 
       #  :availability_zone      string
-      #  :block_device_mappings  string
       #  :user_data              string
+      #  :monitoring_enabled 
+      #  :subnet_id
       # 
       #  ec2.launch_instances('ami-e444444d', :group_ids => 'my_awesome_group', 
       #                                       :user_data => "Woohoo!!!", 
@@ -489,8 +491,10 @@ module RightAws
       params['KeyName']                    = lparams[:key_name]              unless lparams[:key_name].blank? 
       params['KernelId']                   = lparams[:kernel_id]             unless lparams[:kernel_id].blank? 
       params['RamdiskId']                  = lparams[:ramdisk_id]            unless lparams[:ramdisk_id].blank? 
-      params['Placement.AvailabilityZone'] = lparams[:availability_zone]     unless lparams[:availability_zone].blank? 
-      params['BlockDeviceMappings']        = lparams[:block_device_mappings] unless lparams[:block_device_mappings].blank?
+      params['Placement.AvailabilityZone'] = lparams[:availability_zone]     unless lparams[:availability_zone].blank?
+      params['Monitoring.Enabled']  = lparams[:monitoring_enabled].to_s if     lparams[:monitoring_enabled]
+      params['SubnetId']            = lparams[:subnet_id]               unless lparams[:subnet_id].blank?
+
       unless lparams[:user_data].blank? 
         lparams[:user_data].strip! 
           # Do not use CGI::escape(encode64(...)) as it is done in Amazons EC2 library.
@@ -1432,7 +1436,6 @@ module RightAws
           when 'productCode'        then @result[:aws_product_codes] << @text
           when 'kernel'             then @result[:aws_kernel]  = @text
           when 'ramdisk'            then @result[:aws_ramdisk] = @text
-          when 'blockDeviceMapping' then @result[:block_device_mapping] = @text
         end
       end
       def reset
@@ -1447,25 +1450,21 @@ module RightAws
     class QEc2DescribeInstancesParser < RightAWSParser #:nodoc:
       def tagstart(name, attributes)
            # DescribeInstances property
-        if (name == 'item' && @xmlpath == 'DescribeInstancesResponse/reservationSet') || 
-           # RunInstances property
-           (name == 'RunInstancesResponse')  
-            @reservation = { :aws_groups    => [],
-                             :instances_set => [] }
-              
-        elsif (name == 'item') && 
-                # DescribeInstances property
-              ( @xmlpath=='DescribeInstancesResponse/reservationSet/item/instancesSet' ||
-               # RunInstances property
-                @xmlpath=='RunInstancesResponse/instancesSet' )
-              # the optional params (sometimes are missing and we dont want them to be nil) 
-            @instance = { :aws_reason       => '',
-                          :dns_name         => '',
-                          :private_dns_name => '',
-                          :ami_launch_index => '',
-                          :ssh_key_name     => '',
-                          :aws_state        => '',
-                          :aws_product_codes => [] }
+        case full_tag_name
+        when 'DescribeInstancesResponse/reservationSet/item',
+             'RunInstancesResponse'
+          @reservation = { :aws_groups    => [],
+                           :instances_set => [] }
+        when 'DescribeInstancesResponse/reservationSet/item/instancesSet/item',
+             'RunInstancesResponse/instancesSet/item'
+            # the optional params (sometimes are missing and we dont want them to be nil) 
+          @instance = { :aws_reason       => '',
+                        :dns_name         => '',
+                        :private_dns_name => '',
+                        :ami_launch_index => '',
+                        :ssh_key_name     => '',
+                        :aws_state        => '',
+                        :aws_product_codes => [] }
         end
       end
       def tagend(name)
@@ -1491,14 +1490,19 @@ module RightAws
           when 'ramdiskId'        then @instance[:aws_ramdisk_id]     = @text
           when 'platform'         then @instance[:aws_platform]       = @text
           when 'availabilityZone' then @instance[:aws_availability_zone] = @text
-          when 'item'
-            if @xmlpath == 'DescribeInstancesResponse/reservationSet/item/instancesSet' || # DescribeInstances property
-               @xmlpath == 'RunInstancesResponse/instancesSet'            # RunInstances property
-              @reservation[:instances_set] << @instance
-            elsif @xmlpath=='DescribeInstancesResponse/reservationSet'    # DescribeInstances property
-              @result << @reservation
-            end
-          when 'RunInstancesResponse' then @result << @reservation            # RunInstances property
+          when 'state'            then @instance[:monitoring_state] = @text if @xmlpath[/monitoring$/]
+          when 'subnetId'         then @instance[:subnet_id] = @text
+          when 'vpcId'            then @instance[:vpc_id] = @text
+          when 'privateIpAddress' then @instance[:private_ip_address] = @text
+          when 'ipAddress'        then @instance[:ip_address] = @text
+        end
+        case full_tag_name
+        when 'DescribeInstancesResponse/reservationSet/item/instancesSet/item',
+             'RunInstancesResponse/instancesSet'
+          @reservation[:instances_set] << @instance
+        when 'DescribeInstancesResponse/reservationSet/item',
+             'RunInstancesResponse'
+          @result << @reservation
         end
       end
       def reset
