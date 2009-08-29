@@ -747,7 +747,7 @@ module RightAws
       @right_aws_parser.tag_start(name, attr_hash) 
     end   
     def on_characters(chars) 
-      @right_aws_parser.tag_text(chars)
+      @right_aws_parser.text(chars)
     end 
     def on_end_element(name) 
       @right_aws_parser.tag_end(name) 
@@ -801,7 +801,7 @@ module RightAws
       tagend(name)
       @full_tag_name = @xmlpath
     end
-    def tag_text(text)
+    def text(text)
       @text += text
       tagtext(text)
     end
@@ -843,7 +843,7 @@ module RightAws
           xml.callbacks = RightSaxParserCallback.new(self) 
         else 
           xml.on_start_element{|name, attr_hash| self.tag_start(name, attr_hash)} 
-          xml.on_characters{   |text|            self.tag_text(text)}
+          xml.on_characters{   |text|            self.text(text)}
           xml.on_end_element{  |name|            self.tag_end(name)} 
         end 
         xml.parse
