@@ -6,6 +6,7 @@ lib/awsbase/benchmark_fix.rb
 lib/awsbase/right_awsbase.rb
 lib/awsbase/support.rb
 lib/ec2/right_ec2.rb
+lib/ec2/right_ec2_reserved_instances.rb
 lib/ec2/right_ec2_vpc.rb
 lib/ec2/right_ec2_monitoring.rb
 lib/right_aws.rb
