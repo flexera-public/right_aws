@@ -51,8 +51,6 @@ module RightAws
     #
     #  ec2.describe_vpcs("vpc-890ce2e0")
     #
-    #
-    #
     def describe_vpcs(*list_and_filters)
       list, filters = vpc__split_list_and_filters(list_and_filters)
       cache_for = (list.empty? && filters.empty?) ? :describe_vpcs : nil
@@ -186,6 +184,15 @@ module RightAws
       on_exception
     end
 
+    # Associate DHCP options
+    #
+    # ec2.associate_dhcp_options("dopt-cb0de3a2", "vpc-890ce2e0" ) #=> true
+    # ec2.describe_vpcs #=>
+    #    [{:vpc_id=>"vpc-890ce2e0",
+    #      :dhcp_options_id=>"dopt-cb0de3a2",
+    #      :cidr_block=>"10.0.0.0/23",
+    #      :state=>"available"}]
+    #
     def associate_dhcp_options(dhcp_options_id, vpc_id)
       link = generate_request("AssociateDhcpOptions", 'DhcpOptionsId' => dhcp_options_id,
                                                       'VpcId'         => vpc_id)
@@ -314,6 +321,10 @@ module RightAws
       on_exception
     end
 
+    # Detach VPN gateway.
+    #
+    #  ec2.detach_vpn_gateway('vgw-dfa144b6','vpc-890ce2e0') #=> true
+    #
     def detach_vpn_gateway(vpn_gateway_id, vpc_id)
       link = generate_request("DetachVpnGateway", 'VpnGatewayId' => vpn_gateway_id,
                                                   'VpcId'        => vpc_id )
@@ -337,6 +348,17 @@ module RightAws
     # VPN Connections
     #-----------------
 
+    # Describe VPN connections.
+    #
+    #  ec2.describe_vpn_connections #=>
+    #    [{:type=>"ipsec.1",
+    #      :vpn_connection_id=>"vpn-a9a643c0",
+    #      :customer_gateway_configuration=>
+    #       "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<vpn_connection id=\"vpn-a9a643c0\">\n...</vpn_connection>\n",
+    #      :state=>"available",
+    #      :vpn_gateway_id=>"vgw-dfa144b6",
+    #      :customer_gateway_id=>"cgw-81a643e8"}]
+    #
     def describe_vpn_connections(*list_and_filters)
       list, filters = vpc__split_list_and_filters(list_and_filters)
       cache_for = (list.empty? && filters.empty?) ? :describe_vpn_connections : nil
@@ -349,6 +371,16 @@ module RightAws
       on_exception
     end
 
+    # Create VPN connection.
+    #
+    #  ec2.create_vpn_connection('ipsec.1', 'cgw-81a643e8' ,'vgw-dfa144b6')
+    #    {:customer_gateway_id=>"cgw-81a643e8",
+    #     :vpn_connection_id=>"vpn-a9a643c0",
+    #     :customer_gateway_configuration=>
+    #      "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<vpn_connection id=\"vpn-a9a643c0\">\n...</vpn_connection>\n",
+    #     :state=>"pending",
+    #     :vpn_gateway_id=>"vgw-dfa144b6"}
+    #
     def create_vpn_connection(type, customer_gateway_id, vpn_gateway_id)
       link = generate_request("CreateVpnConnection", 'Type'              => type,
                                                      'CustomerGatewayId' => customer_gateway_id,
@@ -358,6 +390,10 @@ module RightAws
       on_exception
     end
 
+    # Delete VPN connection.
+    #
+    #  ec2.delete_vpn_connection("vpn-a9a643c0") #=> true
+    #
     def delete_vpn_connection(vpn_connection_id)
       link = generate_request("DeleteVpnConnection", 'VpnConnectionId' => vpn_connection_id )
       request_info(link, RightHttp2xxParser.new(:logger => @logger))
