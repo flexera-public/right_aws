@@ -167,7 +167,7 @@ module RightAws
       on_exception
     end
 
-    # Create DHSP options.
+    # Create DHCP options.
     #
     #  ec2.create_dhcp_options('domain-name' => 'my.awesomesite.ru',
     #                          'netbios-node-type' => 1) #=>
