@@ -145,7 +145,7 @@ module RightAws
     #      :aws_description=>"Wikipedia XML Backups (Linux)",
     #      :aws_progress=>"100%",
     #      :aws_started_at=>Mon Sep 28 23:49:50 UTC 2009,
-    #      :aws_owner_id=>"amazon",
+    #      :aws_owner=>"amazon",
     #      :aws_id=>"snap-8041f2e9",
     #      :aws_volume_size=>500,
     #      :aws_status=>"completed"},
@@ -153,7 +153,7 @@ module RightAws
     #      :aws_description=>"Sloan Digital Sky Survey DR6 Subset (Linux)",
     #      :aws_progress=>"100%",
     #      :aws_started_at=>Mon Sep 28 23:56:10 UTC 2009,
-    #      :aws_owner_id=>"amazon",
+    #      :aws_owner=>"amazon",
     #      :aws_id=>"snap-3740f35e",
     #      :aws_volume_size=>180,
     #      :aws_status=>"completed"}, ...]
@@ -172,7 +172,7 @@ module RightAws
     #    {:aws_volume_id=>"vol-e429db8d",
     #     :aws_started_at=>Thu Oct 01 09:23:38 UTC 2009,
     #     :aws_description=>"KD: WooHoo!!",
-    #     :aws_owner_id=>"648770000000",
+    #     :aws_owner=>"648770000000",
     #     :aws_progress=>"",
     #     :aws_status=>"pending",
     #     :aws_volume_size=>1,
@@ -196,7 +196,7 @@ module RightAws
     #    {:aws_volume_id=>"vol-e429db8d",
     #     :aws_started_at=>Thu Oct 01 09:23:38 UTC 2009,
     #     :aws_description=>"KD: WooHoo!!",
-    #     :aws_owner_id=>"648770000000",
+    #     :aws_owner=>"648770000000",
     #     :aws_progress=>"",
     #     :aws_status=>"pending",
     #     :aws_volume_size=>1,
@@ -417,7 +417,7 @@ module RightAws
         when 'startTime'   then @snapshot[:aws_started_at]  = Time.parse(@text)
         when 'progress'    then @snapshot[:aws_progress]    = @text
         when 'description' then @snapshot[:aws_description] = @text
-        when 'ownerId'     then @snapshot[:aws_owner_id]    = @text
+        when 'ownerId'     then @snapshot[:aws_owner]       = @text
         when 'volumeSize'  then @snapshot[:aws_volume_size] = @text.to_i
         when *@each        then @result << @snapshot
         end
