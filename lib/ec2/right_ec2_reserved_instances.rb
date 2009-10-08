@@ -85,7 +85,7 @@ module RightAws
       rparams['AvailabilityZone']   = params[:aws_availability_zone]   if params[:aws_availability_zone]
       rparams['ProductDescription'] = params[:aws_product_description] if params[:aws_product_description]
       link = generate_request("DescribeReservedInstancesOfferings", rparams)
-      request_cache_or_info(:describe_reserved_instances_offerings, link,  QEc2DescribeReservedInstancesOfferingsParser, @@bench, params.blank?)
+      request_cache_or_info(:describe_reserved_instances_offerings, link,  QEc2DescribeReservedInstancesOfferingsParser, @@bench, list.blank?)
     rescue Exception
       on_exception
     end
