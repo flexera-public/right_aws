@@ -167,6 +167,7 @@ module RightAws
     # Mandatory arguments: +aws_id+, +master_username+, +master_user_password+
     # Optional params: +:allocated_storage+ (25 by def), +:instance_class+ (:medium by def), +:engine+ ('MySQL5.1' by def),
     # +:endpoint_port+, +:db_name+, +:db_security_groups+, +:db_parameter_groups+,  +:availability_zone+, +:preferred_maintenance_window+
+    # +:backup_retention_period+, +:preferred_backup_window+
     #
     #  ds.create_db_instance('my-awesome-db', 'username', 'password') #=>
     #    {:instance_class=>"Medium",
@@ -199,6 +200,8 @@ module RightAws
       request_hash['DBName']                     = params[:db_name]                      unless params[:db_name].blank?
       request_hash['AvailabilityZone']           = params[:availability_zone]            unless params[:availability_zone].blank?
       request_hash['PreferredMaintenanceWindow'] = params[:preferred_maintenance_window] unless params[:preferred_maintenance_window].blank?
+      request_hash['BackupRetentionPeriod']      = params[:backup_retention_period]      unless params[:backup_retention_period].blank?
+      request_hash['PreferredBackupWindow']      = params[:preferred_backup_window]      unless params[:preferred_backup_window].blank?
       request_hash.merge!(amazonize_list('DBSecurityGroups.member',  params[:db_security_groups]))
       request_hash.merge!(amazonize_list('DBParameterGroups.member', params[:db_parameter_groups]))
       link = generate_request('CreateDBInstance', request_hash)
@@ -209,18 +212,21 @@ module RightAws
     # 
     # Mandatory arguments: +aws_id+. 
     # Optional params: +:master_user_password+, +:instance_class+, +:db_security_groups+,
-    # +:db_parameter_groups+, +:preferred_maintenance_window+, +:allocated_storage+, +:apply_immediately+
+    # +:db_parameter_groups+, +:preferred_maintenance_window+, +:allocated_storage+, +:apply_immediately+,
+    # +:backup_retention_period+, +:preferred_backup_window+
     #
     def modify_db_instance(aws_id, params={})
       request_hash = {}
       # Mandatory
       request_hash['DBInstanceIdentifier'] = aws_id
       # Optional
-      request_hash['MasterUserPassword']         = params[:master_user_password]              unless params[:master_user_password].blank?
-      request_hash['DBInstanceClass']            = params[:instance_class].to_s.capitalize    unless params[:instance_class].blank?
-      request_hash['PreferredMaintenanceWindow'] = params[:preferred_maintenance_window]      unless params[:preferred_maintenance_window].blank?
-      request_hash['AllocatedStorage']           = params[:allocated_storage]                 unless params[:allocated_storage].blank?
-      request_hash['ApplyImmediately']           = params[:apply_immediately].to_s            unless params[:apply_immediately].blank?
+      request_hash['MasterUserPassword']         = params[:master_user_password]           unless params[:master_user_password].blank?
+      request_hash['DBInstanceClass']            = params[:instance_class].to_s.capitalize unless params[:instance_class].blank?
+      request_hash['PreferredMaintenanceWindow'] = params[:preferred_maintenance_window]   unless params[:preferred_maintenance_window].blank?
+      request_hash['BackupRetentionPeriod']      = params[:backup_retention_period]        unless params[:backup_retention_period].blank?
+      request_hash['PreferredBackupWindow']      = params[:preferred_backup_window]        unless params[:preferred_backup_window].blank?
+      request_hash['AllocatedStorage']           = params[:allocated_storage]              unless params[:allocated_storage].blank?
+      request_hash['ApplyImmediately']           = params[:apply_immediately].to_s         unless params[:apply_immediately].blank?
       request_hash.merge!(amazonize_list('DBSecurityGroups.member',  params[:db_security_groups]))
       request_hash.merge!(amazonize_list('DBParameterGroups.member', params[:db_parameter_groups]))
       link = generate_request('ModifyDBInstance', request_hash)
@@ -684,6 +690,18 @@ module RightAws
       request_info(link, DescribeDbInstancesParser.new(:logger => @logger))[:db_instances].first
     end
 
+    # Create a new RDS instance from a point-in-time system snapshot. The target
+    # database is created from the source database restore point with the same configuration as
+    # the original source database, except that the new RDS instance is created with the default
+    # security group.
+    def restore_db_instance_to_point_in_time(snapshot_aws_id, instance_aws_id, restore_time)
+      request_hash = { 'SourceDBInstanceIdentifier' => snapshot_aws_id,
+                       'TargetDBInstanceIdentifier' => instance_aws_id,
+                       'RestoreTime' => restore_time}
+      link = generate_request('RestoreDBInstanceToPointInTime', request_hash)
+      request_info(link, DescribeDbInstancesParser.new(:logger => @logger))[:db_instances].first
+    end
+
     # Delete a DBSnapshot. The DBSnapshot must be in the Available state to be deleted.
     #
     #  rds.delete_db_snapshot('remove-me-tomorrow-1') #=>
@@ -794,6 +812,8 @@ module RightAws
         when 'MasterUsername'             then @db_instance[:master_username]      = @text
         when 'AvailabilityZone'           then @db_instance[:availability_zone]    = @text
         when 'PreferredMaintenanceWindow' then @db_instance[:preferred_maintenance_window] = @text
+        when 'BackupRetentionPeriod'      then @db_instance[:backup_retention_period] = @text
+        when 'PreferredBackupWindow'      then @db_instance[:preferred_backup_window] = @text
         when 'DBInstanceClass'
           case @xmlpath
           when /PendingModifiedValues$/ then @db_instance[:pending_modified_values][:instance_class] = @text
