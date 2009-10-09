@@ -115,7 +115,7 @@ module RightAws
     #      :engine=>"MySQL5.1",
     #      :allocated_storage=>50,
     #      :pending_modified_values=>{},
-    #      :db_parameter_groups=>[{:status=>"in-sync", :name=>"default.MySQL5.1"}],
+    #      :db_parameter_group=>{:status=>"in-sync", :name=>"default.MySQL5.1"},
     #      :db_security_groups=>
     #       [{:status=>"active", :name=>"kd-2-test"},
     #        {:status=>"active", :name=>"default"},
@@ -138,7 +138,7 @@ module RightAws
     #          :engine=>"MySQL5.1",
     #          :allocated_storage=>50,
     #          :pending_modified_values=>{},
-    #          :db_parameter_groups=>[{:status=>"in-sync", :name=>"default.MySQL5.1"}],
+    #          :db_parameter_group=>{:status=>"in-sync", :name=>"default.MySQL5.1"},
     #          :db_security_groups=>
     #           [{:status=>"active", :name=>"kd-2-test"},
     #            {:status=>"active", :name=>"default"},
@@ -166,7 +166,7 @@ module RightAws
     #
     # Mandatory arguments: +aws_id+, +master_username+, +master_user_password+
     # Optional params: +:allocated_storage+ (25 by def), +:instance_class+ (:medium by def), +:engine+ ('MySQL5.1' by def),
-    # +:endpoint_port+, +:db_name+, +:db_security_groups+, +:db_parameter_groups+,  +:availability_zone+, +:preferred_maintenance_window+
+    # +:endpoint_port+, +:db_name+, +:db_security_groups+, +:db_parameter_group+,  +:availability_zone+, +:preferred_maintenance_window+
     # +:backup_retention_period+, +:preferred_backup_window+
     #
     #  ds.create_db_instance('my-awesome-db', 'username', 'password') #=>
@@ -175,7 +175,6 @@ module RightAws
     #     :engine=>"MySQL5.1",
     #     :allocated_storage=>50,
     #     :pending_modified_values=>{},
-    #     :db_parameter_groups=>[],
     #     :db_security_groups=>
     #      [{:status=>"active", :name=>"kd-2-test"},
     #       {:status=>"active", :name=>"default"},
@@ -203,7 +202,8 @@ module RightAws
       request_hash['BackupRetentionPeriod']      = params[:backup_retention_period]      unless params[:backup_retention_period].blank?
       request_hash['PreferredBackupWindow']      = params[:preferred_backup_window]      unless params[:preferred_backup_window].blank?
       request_hash.merge!(amazonize_list('DBSecurityGroups.member',  params[:db_security_groups]))
-      request_hash.merge!(amazonize_list('DBParameterGroups.member', params[:db_parameter_groups]))
+#      request_hash.merge!(amazonize_list('DBParameterGroups.member', params[:db_parameter_groups]))
+      request_hash['DBParameterGroup']           = params[:db_parameter_group]           unless params[:db_parameter_group].blank?
       link = generate_request('CreateDBInstance', request_hash)
       request_info(link, DescribeDbInstancesParser.new(:logger => @logger))[:db_instances].first
     end
@@ -212,7 +212,7 @@ module RightAws
     # 
     # Mandatory arguments: +aws_id+. 
     # Optional params: +:master_user_password+, +:instance_class+, +:db_security_groups+,
-    # +:db_parameter_groups+, +:preferred_maintenance_window+, +:allocated_storage+, +:apply_immediately+,
+    # +:db_parameter_group+, +:preferred_maintenance_window+, +:allocated_storage+, +:apply_immediately+,
     # +:backup_retention_period+, +:preferred_backup_window+
     #
     def modify_db_instance(aws_id, params={})
@@ -228,7 +228,8 @@ module RightAws
       request_hash['AllocatedStorage']           = params[:allocated_storage]              unless params[:allocated_storage].blank?
       request_hash['ApplyImmediately']           = params[:apply_immediately].to_s         unless params[:apply_immediately].blank?
       request_hash.merge!(amazonize_list('DBSecurityGroups.member',  params[:db_security_groups]))
-      request_hash.merge!(amazonize_list('DBParameterGroups.member', params[:db_parameter_groups]))
+#      request_hash.merge!(amazonize_list('DBParameterGroups.member', params[:db_parameter_groups]))
+      request_hash['DBParameterGroupName']       = params[:db_parameter_group]             unless params[:db_parameter_group].blank?
       link = generate_request('ModifyDBInstance', request_hash)
       request_info(link, DescribeDbInstancesParser.new(:logger => @logger))[:db_instances].first
     end
@@ -239,7 +240,6 @@ module RightAws
     #    {:status=>"rebooting",
     #     :pending_modified_values=>{},
     #     :allocated_storage=>42,
-    #     :db_parameter_groups=>[],
     #     :master_username=>"kd",
     #     :db_security_groups=>[],
     #     :instance_class=>"Medium",
@@ -671,7 +671,6 @@ module RightAws
     #     :pending_modified_values=>{},
     #     :allocated_storage=>42,
     #     :db_security_groups=>[],
-    #     :db_parameter_groups=>[],
     #     :master_username=>"kd",
     #     :availability_zone=>"us-east-1a",
     #     :aws_id=>"q1",
@@ -785,13 +784,13 @@ module RightAws
                'DeleteDBInstanceResult',
                'ModifyDBInstanceResult',
                'RebootDBInstanceResult',
+               'RestoreDBInstanceToPointInTimeResponse',
                'RestoreDBInstanceFromDBSnapshotResult' ]
         @result = { :db_instances => [] }
       end
       def tagstart(name, attributes)
         case name
           when *@m               then @db_instance = { :db_security_groups => [], 
-                                                       :db_parameter_groups => [],
                                                        :pending_modified_values => {} }
           when 'DBSecurityGroup' then @db_security_group = {}
           when 'DBParameterGroup', 'DBParameterGroupStatus' then @db_parameter_group = {}
@@ -826,7 +825,7 @@ module RightAws
         when 'ParameterApplyStatus'       then @db_parameter_group[:status] = @text
         when 'DBSecurityGroup'            then @db_instance[:db_security_groups] << @db_security_group
         when 'DBParameterGroup','DBParameterGroupStatus'
-          @db_instance[:db_parameter_groups] << @db_parameter_group
+          @db_instance[:db_parameter_group] = @db_parameter_group
         when *@m                          then @result[:db_instances]            << @db_instance
         end
       end
