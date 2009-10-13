@@ -693,9 +693,9 @@ module RightAws
     # database is created from the source database restore point with the same configuration as
     # the original source database, except that the new RDS instance is created with the default
     # security group.
-    def restore_db_instance_to_point_in_time(snapshot_aws_id, instance_aws_id, restore_time)
-      request_hash = { 'SourceDBInstanceIdentifier' => snapshot_aws_id,
-                       'TargetDBInstanceIdentifier' => instance_aws_id,
+    def restore_db_instance_to_point_in_time(instance_aws_id, new_instance_aws_id, restore_time)
+      request_hash = { 'SourceDBInstanceIdentifier' => instance_aws_id,
+                       'TargetDBInstanceIdentifier' => new_instance_aws_id,
                        'RestoreTime' => restore_time}
       link = generate_request('RestoreDBInstanceToPointInTime', request_hash)
       request_info(link, DescribeDbInstancesParser.new(:logger => @logger))[:db_instances].first
