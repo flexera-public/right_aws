@@ -165,7 +165,7 @@ module RightAws
     # Create a new RDS instance of the type and size specified by you. The default storage engine for RDS Instances is InnoDB.
     #
     # Mandatory arguments: +aws_id+, +master_username+, +master_user_password+
-    # Optional params: +:allocated_storage+ (25 by def), +:instance_class+ (:medium by def), +:engine+ ('MySQL5.1' by def),
+    # Optional params: +:allocated_storage+ (25 by def), +:instance_class+ ('db.m1.large' by def), +:engine+ ('MySQL5.1' by def),
     # +:endpoint_port+, +:db_name+, +:db_security_groups+, +:db_parameter_group+,  +:availability_zone+, +:preferred_maintenance_window+
     # +:backup_retention_period+, +:preferred_backup_window+
     #
@@ -191,9 +191,9 @@ module RightAws
       request_hash['MasterUsername']       = master_username
       request_hash['MasterUserPassword']   = master_user_password
       # Mandatory with default values
-      request_hash['DBInstanceClass']  = params[:instance_class].blank?    ? 'Medium'   : params[:instance_class].to_s.capitalize
-      request_hash['AllocatedStorage'] = params[:allocated_storage].blank? ? 25         : params[:allocated_storage]
-      request_hash['Engine']           = params[:engine].blank?            ? 'MySQL5.1' : params[:engine]
+      request_hash['DBInstanceClass']  = params[:instance_class].blank?    ? 'db.m1.large' : params[:instance_class].to_s
+      request_hash['AllocatedStorage'] = params[:allocated_storage].blank? ? 25            : params[:allocated_storage]
+      request_hash['Engine']           = params[:engine].blank?            ? 'MySQL5.1'    : params[:engine]
       # Optional
       request_hash['EndpointPort']               = params[:endpoint_port]                unless params[:endpoint_port].blank?
       request_hash['DBName']                     = params[:db_name]                      unless params[:db_name].blank?
