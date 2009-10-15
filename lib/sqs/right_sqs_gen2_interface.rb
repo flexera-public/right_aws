@@ -387,7 +387,9 @@ module RightAws
       #  sqs.get_queue_length('https://queue.amazonaws.com/ZZ7XXXYYYBINS/my_awesome_queue') #=> 3
       #
     def get_queue_length(queue_url)
-      get_queue_attributes(queue_url)['ApproximateNumberOfMessages'].to_i
+      attrs = get_queue_attributes(queue_url)
+      attrs['ApproximateNumberOfMessages'].to_i +
+      attrs['ApproximateNumberOfMessagesNotVisible'].to_i
     rescue
       on_exception
     end
