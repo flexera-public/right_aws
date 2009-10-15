@@ -725,19 +725,20 @@ module RightAws
     # --------------------------------------------
 
     # Get events related to RDS instances and DBSecurityGroups for the past 14 days.
-    # Optional params: +:duration+, +:start_time+, +:end_time+, +:source_type+ ('DBInstance' | 'DBSecurityGroup')
+    # Optional params: +:duration+, +:start_time+, +:end_time+, +:aws_id+, 
+    #                  +:source_type+('db-instance', 'db-security-group', 'db-snapshot', 'db-parameter-group')
     #
     #  # get all enevts
     #  rds.describe_events #=>
-    #    [{:source_aws_id=>"my-awesome-db-g4",
+    #    [{:aws_id=>"my-awesome-db-g4",
     #      :source_type=>"DBInstance",
     #      :message=>"Started user snapshot for database instance:my-awesome-db-g4",
     #      :date=>"2009-07-13T10:54:13.661Z"},
-    #     {:source_aws_id=>"my-awesome-db-g5",
+    #     {:aws_id=>"my-awesome-db-g5",
     #      :source_type=>"DBInstance",
     #      :message=>"Started user snapshot for database instance:my-awesome-db-g5",
     #      :date=>"2009-07-13T10:55:13.674Z"},
-    #     {:source_aws_id=>"my-awesome-db-g7",
+    #     {:aws_id=>"my-awesome-db-g7",
     #      :source_type=>"DBInstance",
     #      :message=>"Started user snapshot for database instance:my-awesome-db-g7",
     #      :date=>"2009-07-13T10:56:34.226Z"}]
@@ -750,11 +751,11 @@ module RightAws
     #
     def describe_events(params={}, &block)
       params = params.dup
-      params['Duration']   = params.delete(:duration)              unless params[:duration].blank?
-      params['SourceType'] = params.delete(:source_type)           unless params[:source_type].blank?
-      params['StartDate']  = fix_date(params.delete(:start_date))  unless params[:start_date].blank?
-      params['EndDate']    = fix_date(params.delete(:end_date))    unless params[:end_date].blank?
-
+      params['SourceIdentifier'] = params.delete(:aws_id)                unless params[:aws_id].blank?
+      params['SourceType']       = params.delete(:source_type)           unless params[:source_type].blank?
+      params['Duration']         = params.delete(:duration)              unless params[:duration].blank?
+      params['StartDate']        = fix_date(params.delete(:start_date))  unless params[:start_date].blank?
+      params['EndDate']          = fix_date(params.delete(:end_date))    unless params[:end_date].blank?
       result = []
       incrementally_list_items('DescribeEvents', DescribeEventsParser, params) do |response|
         result += response[:events]
@@ -982,7 +983,7 @@ module RightAws
         when 'Marker'           then @result[:marker]       = @text
         when 'MaxRecords'       then @result[:max_records]  = @text.to_i  # ?
         when 'Date'             then @event[:date]          = @text
-        when 'SourceIdentifier' then @event[:source_aws_id] = @text
+        when 'SourceIdentifier' then @event[:aws_id]        = @text
         when 'SourceType'       then @event[:source_type]   = @text
         when 'Message'          then @event[:message]       = @text
         when 'Event'            then @result[:events]      << @event
