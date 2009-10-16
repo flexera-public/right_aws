@@ -500,7 +500,7 @@ module RightAws
         when @p1, @p2
           @item = { :attachments => [] }
         when "#{@p1}/attachments/item",
-             "#{@p1}/attachments/item"
+             "#{@p2}/attachments/item"
           @attachment = {}
         end
       end
@@ -512,11 +512,14 @@ module RightAws
         when 'vpcId'            then @attachment[:vpc_id] = @text
         end
         case full_tag_name
+        when "#{@p1}/state",
+             "#{@p2}/state"
+          @item[:state] = @text
         when "#{@p1}/attachments/item/state",
              "#{@p2}/attachments/item/state"
           @attachment[:state] = @text
-        when "#{@p1}/attachments",
-             "#{@p2}/attachments"
+        when "#{@p1}/attachments/item",
+             "#{@p2}/attachments/item"
           @item[:attachments] << @attachment unless @attachment.blank?
         when @p1, @p2
           @result << @item
