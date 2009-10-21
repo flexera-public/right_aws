@@ -27,7 +27,7 @@ module RightAws
     
     include RightAwsBaseInterface
 
-    API_VERSION      = "2009-08-31"
+    API_VERSION      = "2009-10-16"
     DEFAULT_HOST     = 'rds.amazonaws.com'
     DEFAULT_PORT     = 443
     DEFAULT_PROTOCOL = 'https'
