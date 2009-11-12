@@ -1218,7 +1218,7 @@ module RightAws
         end
         case full_tag_name
         when 'DescribeInstancesResponse/reservationSet/item/instancesSet/item',
-             'RunInstancesResponse/instancesSet'
+             'RunInstancesResponse/instancesSet/item'
           @reservation[:instances_set] << @instance
         when 'DescribeInstancesResponse/reservationSet/item',
              'RunInstancesResponse'
