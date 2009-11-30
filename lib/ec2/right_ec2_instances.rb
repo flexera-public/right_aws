@@ -320,8 +320,19 @@ module RightAws
       on_exception
     end
 
+    INSTANCE_ATTRIBUTE_MAPPING = {
+      "instance_type"                        => "instanceType",
+      "kernel"                               => "kernel",
+      "ramdisk"                              => "ramdisk",
+      "user_data"                            => "userData",
+      "disable_api_termination"              => "disableApiTermination",
+      "instance_initiated_shutdown_behavior" => "instanceInitiatedShutdownBehavior",
+      "root_device_name"                     => "rootDeviceName",
+      "block_device_mapping"                 => "blockDeviceMapping"
+    }
+
     # Describe instance attribute.
-    # Attributes: 'InstanceType', 'Kernel', 'Ramdisk', 'UserData', 'DisableApiTermination', 'InstanceInitiatedShutdownBehavior', 'RootDeviceName', 'BlockDeviceMapping'
+    # Attributes: :instance_type, :kernel, :ramdisk, :user_data, :disable_api_termination, :instance_initiated_shutdown_behavior, :root_device_name, :block_device_mapping
     #
     #  ec2.describe_instance_attribute(instance, "BlockDeviceMapping") #=>
     #     [{:ebs_delete_on_termination=>true,
@@ -333,37 +344,52 @@ module RightAws
     #  ec2.describe_instance_attribute(instance, "InstanceInitiatedShutdownBehavior") #=> "stop"
     #
     def describe_instance_attribute(instance_id, attribute)
+      attribute = INSTANCE_ATTRIBUTE_MAPPING[attribute.to_s] || attribute.to_s
       link = generate_request('DescribeInstanceAttribute',
                               'InstanceId' => instance_id,
-                              attribute    => '')
-      request_info(link, QEc2DescribeInstanceAttributeParser.new(:logger => @logger))
+                              'Attribute'  => attribute)
+      value = request_info(link, QEc2DescribeInstanceAttributeParser.new(:logger => @logger))
+      case attribute
+      when "userData"
+        Base64.decode64(value)
+      else
+        value
+      end
     rescue Exception
       on_exception
     end
 
     # Describe instance attribute.
-    # Attributes: 'InstanceType', 'Kernel', 'Ramdisk', 'UserData', 'DisableApiTermination', 'InstanceInitiatedShutdownBehavior', 'RootDeviceName', 'BlockDeviceMapping'
+    # Attributes: :kernel, :ramdisk
     #
-    # TODO: cannot test due to Amazon issue: InvalidInstanceID.Malformed: Invalid id: "21432926" (expecting "i-...")
+    #  ec2.reset_instance_attribute(instance, :kernel) #=> true
+    #
     def reset_instance_attribute(instance_id, attribute)
+      attribute = INSTANCE_ATTRIBUTE_MAPPING[attribute.to_s] || attribute.to_s
       link = generate_request('ResetInstanceAttribute',
                               'InstanceId' => instance_id,
-                              attribute    => '')
+                              'Attribute'  => attribute )
       request_info(link, RightBoolResponseParser.new(:logger => @logger))
     rescue Exception
       on_exception
     end
 
     # Modify instance attribute.
-    # Attributes: 'InstanceType', 'Kernel', 'Ramdisk', 'UserData', 'DisableApiTermination', 'InstanceInitiatedShutdownBehavior', 'BlockDeviceMapping'
+    # Attributes: :instance_type, :kernel, :ramdisk, :user_data, :disable_api_termination, :instance_initiated_shutdown_behavior, :root_device_name, :block_device_mapping
     #
-    # TODO: issue: The request received was invalid.
+    #  ec2.modify_instance_attribute(instance, :instance_initiated_shutdown_behavior, "stop") #=> true
+    #
     def modify_instance_attribute(instance_id, attribute, value)
-      params = { 'InstanceId' => instance_id }
-      if attribute == "BlockDeviceMapping"
-        params.merge!(amazonize_block_device_mappings(options[:block_device_mappings]))
+      attribute = INSTANCE_ATTRIBUTE_MAPPING[attribute.to_s] || attribute.to_s
+      params = { 'InstanceId' => instance_id,
+                 'Attribute'  => attribute }
+      case attribute
+      when "blockDeviceMapping"
+        params.merge!(amazonize_block_device_mappings(value))
+      when "userData"
+        params['Value'] = Base64.encode64(value).delete("\n")
       else
-        params[attribute] = value
+        params['Value'] = value
       end
       link = generate_request('ModifyInstanceAttribute', params)
       request_info(link, RightBoolResponseParser.new(:logger => @logger))
@@ -566,7 +592,7 @@ module RightAws
         when 'privateIpAddress' then @item[:private_ip_address]    = @text
         when 'ipAddress'        then @item[:ip_address]            = @text
         when 'architecture'     then @item[:architecture]          = @text
-#       when 'rootDeviceType'   then @item[:root_device_type]      = @text
+        when 'rootDeviceType'   then @item[:root_device_type]      = @text
         when 'rootDeviceName'   then @item[:root_device_name]      = @text
         when 'instanceClass'    then @item[:instance_class]        = @text
         else
@@ -578,7 +604,7 @@ module RightAws
           when %r{/monitoring/state$}    then @item[:monitoring_state]     = @text
           when %r{/blockDeviceMapping/item} # no trailing $
             case name
-            when 'device'              then @block_device_mapping[:device_name]                = @text
+            when 'deviceName'          then @block_device_mapping[:device_name]                = @text
             when 'virtualName'         then @block_device_mapping[:virtual_name]               = @text
             when 'volumeId'            then @block_device_mapping[:ebs_volume_id]              = @text
             when 'status'              then @block_device_mapping[:ebs_status]                 = @text
