@@ -204,8 +204,14 @@ module RightAws
       #
     def create_bucket(bucket, headers={})
       data = nil
-      unless headers[:location].blank?
-        data = "<CreateBucketConfiguration><LocationConstraint>#{headers[:location].to_s.upcase}</LocationConstraint></CreateBucketConfiguration>"
+      location = case headers[:location].to_s
+                 when 'us','US' then ''
+                 when 'eu'      then 'EU'
+                 else                headers[:location].to_s
+                 end
+      
+      unless location.blank?
+        data = "<CreateBucketConfiguration><LocationConstraint>#{location}</LocationConstraint></CreateBucketConfiguration>"
       end
       req_hash = generate_rest_request('PUT', headers.merge(:url=>bucket, :data => data))
       request_info(req_hash, RightHttp2xxParser.new)
