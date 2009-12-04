@@ -643,7 +643,7 @@ module RightAws
       last_errors_text = ''
       response         = @aws.last_response
       # log error
-      request_text_data = "#{request[:server]}:#{request[:port]}#{request[:request].path}"
+      request_text_data = "#{request[:protocol]}://#{request[:server]}:#{request[:port]}#{request[:request].path}"
       # is this a redirect?
       # yes!
       if response.is_a?(Net::HTTPRedirection)
@@ -653,33 +653,36 @@ module RightAws
         @aws.logger.warn("##### #{@aws.class.name} returned an error: #{response.code} #{response.message}\n#{response.body} #####")
         @aws.logger.warn("##### #{@aws.class.name} request: #{request_text_data} ####")
       end
-        # Check response body: if it is an Amazon XML document or not:
-      if redirect_detected || (response.body && response.body[/^(<\?xml|<ErrorResponse)/])   # ... it is a xml document
+
+      # Extract error/redirection message from the response body
+      # Amazon claims that a redirection must have a body but somethimes it is nil....
+      if response.body && response.body[/^(<\?xml|<ErrorResponse)/]
+        error_parser = RightErrorResponseParser.new
         @aws.class.bench_xml.add! do
-          error_parser = RightErrorResponseParser.new
-          error_parser.parse(response)
-          @aws.last_errors     = error_parser.errors
-          @aws.last_request_id = error_parser.requestID
-          last_errors_text     = @aws.last_errors.flatten.join("\n")
-          # on redirect :
-          if redirect_detected
-            location = response['location']
-            # ... log information and ...
-            @aws.logger.info("##### #{@aws.class.name} redirect requested: #{response.code} #{response.message} #####")
-            @aws.logger.info("##### New location: #{location} #####")
-            # ... fix the connection data
-            request[:server]   = URI.parse(location).host
-            request[:protocol] = URI.parse(location).scheme
-            request[:port]     = URI.parse(location).port
-          end
+          error_parser.parse(response.body)
         end
-      else                               # ... it is not a xml document(probably just a html page?)
+        @aws.last_errors     = error_parser.errors
+        @aws.last_request_id = error_parser.requestID
+        last_errors_text     = @aws.last_errors.flatten.join("\n")
+      else
         @aws.last_errors     = [[response.code, "#{response.message} (#{request_text_data})"]]
         @aws.last_request_id = '-undefined-'
         last_errors_text     = response.message
       end
-        # now - check the error
-      unless redirect_detected
+      
+      # Ok, it is a redirect, find the new destination location
+      if redirect_detected
+        location = response['location']
+        # ... log information and ...
+        @aws.logger.info("##### #{@aws.class.name} redirect requested: #{response.code} #{response.message} #####")
+        @aws.logger.info("      Old location: #{request_text_data}")
+        @aws.logger.info("      New location: #{location}")
+        # ... fix the connection data
+        request[:server]   = URI.parse(location).host
+        request[:protocol] = URI.parse(location).scheme
+        request[:port]     = URI.parse(location).port
+      else
+        # Not a redirect but an error: try to find the error in our list
         @errors_list.each do |error_to_find|
           if last_errors_text[/#{error_to_find}/i]
             error_found = true
@@ -689,6 +692,7 @@ module RightAws
           end
         end
       end
+      
         # check the time has gone from the first error come
       if redirect_detected || error_found
         # Close the connection to the server and recreate a new one. 
