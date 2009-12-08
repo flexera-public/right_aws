@@ -269,7 +269,7 @@ module RightAws
     #
     def create_image(instance_aws_id, options={})
       params = { 'InstanceId' => instance_aws_id }
-      params['name']        = options[:name]            unless options[:name].blank?
+      params['Name']        = options[:name]            unless options[:name].blank?
       params['Description'] = options[:description]     unless options[:description].blank?
       params['NoReboot']    = options[:no_reboot].to_s  unless options[:no_reboot].nil?
       link = generate_request("CreateImage", params)
