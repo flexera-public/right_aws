@@ -881,8 +881,13 @@ module RightAws
         # Parse the xml text
       case @xml_lib
       when 'libxml'  
-        xml        = XML::SaxParser.new 
-        xml.string = xml_text 
+        if XML::Parser::VERSION >= '0.9.9'
+          # avoid warning on every usage
+          xml        = XML::SaxParser.string(xml_text)
+        else
+          xml        = XML::SaxParser.new 
+          xml.string = xml_text 
+        end
         # check libxml-ruby version 
         if XML::Parser::VERSION >= '0.5.1.0'
           xml.callbacks = RightSaxParserCallback.new(self) 
