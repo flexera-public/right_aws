@@ -229,3 +229,11 @@ the source key.
   - SDB: added: SQL-like query, select and query_with_attributes support
   - SDB: fixed no method error when searching for id that doesn't exist
   
+=== 1.11.0
+
+  Release Notes:
+  - Full Amazon RDS instances support added with RightAws::RdsInterface
+  - Boot from EBS support added
+  - VPC support added
+  - Latest EC2 API 2009-10-31 support added
+  - Some of bugs fixed
