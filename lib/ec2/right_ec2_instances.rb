@@ -535,7 +535,11 @@ module RightAws
         block_device_mappings = [block_device_mappings] unless block_device_mappings.is_a?(Array)
         block_device_mappings.each_with_index do |b, idx|
           BLOCK_DEVICE_KEY_MAPPING.each do |local_name, remote_name|
-            result["BlockDeviceMapping.#{idx+1}.#{remote_name}"] = b[local_name] unless b[local_name].nil?
+            value = b[local_name]
+            case local_name
+            when :no_device then value = value ? '' : nil   # allow to pass :no_device as boolean
+            end
+            result["BlockDeviceMapping.#{idx+1}.#{remote_name}"] = value unless value.nil?
           end
         end
       end
