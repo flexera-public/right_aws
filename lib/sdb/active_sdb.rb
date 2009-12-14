@@ -364,7 +364,7 @@ module RightAws
         end
 
         def generate_id # :nodoc:
-          UUID.timestamp_create().to_s
+          UUIDTools::UUID.timestamp_create().to_s
         end
 
       protected
