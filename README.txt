@@ -9,17 +9,20 @@ The RightScale AWS gems have been designed to provide a robust, fast, and secure
 These gems have been used in production by RightScale since late 2006 and are being maintained to track enhancements made by Amazon. 
 The RightScale AWS gems comprise:
 
-- RightAws::Ec2 -- interface to Amazon EC2 (Elastic Compute Cloud) and the
-  associated EBS (Elastic Block Store)
+- RightAws::Ec2 -- interface to Amazon EC2 (Elastic Compute Cloud), VPC (Virtual Private Cloud) and the associated EBS (Elastic Block Store)
 - RightAws::S3 and RightAws::S3Interface -- interface to Amazon S3 (Simple Storage Service)
-- RightAws::Sqs and RightAws::SqsInterface -- interface to first-generation Amazon SQS (Simple Queue Service) (API version 2007-05-01)
-- RightAws::SqsGen2 and RightAws::SqsGen2Interface -- interface to second-generation Amazon SQS (Simple Queue Service) (API version 2008-01-01)
+- RightAws::Sqs and RightAws::SqsInterface -- interface to first-generation Amazon SQS (Simple Queue Service)
+- RightAws::SqsGen2 and RightAws::SqsGen2Interface -- interface to second-generation Amazon SQS (Simple Queue Service)
 - RightAws::SdbInterface and RightAws::ActiveSdb -- interface to Amazon SDB (SimpleDB)
 - RightAws::AcfInterface -- interface to Amazon CloudFront, a content distribution service
+- RightAws::AsInterface  -- interface to Amazon Auto Scaling
+- RightAws::AcwInterface -- interface to Amazon Cloud Watch
+- RightAws::ElbInterface -- interface to Amazon Elastic Load Balancer
+- RightAws::RdsInterface -- interface to Amazon RDS instances
 
 == FEATURES:
 
-- Full programmmatic access to EC2, EBS, S3, SQS, SDB, and CloudFront.
+- Full programmmatic access to EC2, EBS, S3, SQS, SDB, CloudFront, AS, ACW, ELB and RDS.
 - Complete error handling: all operations check for errors and report complete
   error information by raising an AwsError.
 - Persistent HTTP connections with robust network-level retry layer using
@@ -142,7 +145,7 @@ sudo gem install right_aws
 
 == LICENSE:
 
-Copyright (c) 2007-2008 RightScale, Inc. 
+Copyright (c) 2007-2009 RightScale, Inc. 
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
