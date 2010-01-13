@@ -32,6 +32,13 @@ module RightAws
     if OpenSSL::OPENSSL_VERSION_NUMBER > 0x00908000
       @@digest256 = OpenSSL::Digest::Digest.new("sha256") rescue nil # Some installation may not support sha256
     end
+
+    def self.utc_iso8601(time)
+      if    time.is_a?(Fixnum) then time = Time::at(time)
+      elsif time.is_a?(String) then time = Time::parse(time)
+      end
+      time.utc.strftime("%Y-%m-%dT%H:%M:%S.000Z")
+    end
     
     def self.sign(aws_secret_access_key, auth_string)
       Base64.encode64(OpenSSL::HMAC.digest(@@digest1, aws_secret_access_key, auth_string)).strip
@@ -47,7 +54,7 @@ module RightAws
 
     # Set a timestamp and a signature version
     def self.fix_service_params(service_hash, signature)
-      service_hash["Timestamp"] ||= Time.now.utc.strftime("%Y-%m-%dT%H:%M:%S.000Z") unless service_hash["Expires"]
+      service_hash["Timestamp"] ||= utc_iso8601(Time.now) unless service_hash["Expires"]
       service_hash["SignatureVersion"] = signature
       service_hash
     end
