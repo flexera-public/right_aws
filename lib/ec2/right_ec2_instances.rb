@@ -544,8 +544,12 @@ module RightAws
     end
 
     # Create a Spot Instance request.
-    # Mandatory options: :image_id, :spot_price, :instance_type
-    # Optional:
+    #
+    # Mandatory params: :image_id, :spot_price, :instance_type
+    # Optional params: :valid_from, :valid_until, :instance_count, :type, :launch_group,
+    # :availability_zone_group, :key_name, :user_data, :addressing_type, :kernel_id,
+    # :ramdisk_id, :subnet_id, :availability_zone, :monitoring_enabled, :groups,
+    # :block_device_mappings (?)
     #
     #  # example 1
     #  ec2.request_spot_instances(:image_id => 'ami-08f41161', :spot_price => 0.01, :instance_type => 'm1.small') #=>
@@ -590,7 +594,8 @@ module RightAws
     #      :valid_from=>"2010-01-13T02:08:49.000Z",
     #      :availability_zone=>"us-east-1a"}]
     #      
-    # PS: should it support block device mapping?
+    # TODO: KD: should it support block device mappings?
+    # Amazon docs says yes but actually it does not work.
     #
     def request_spot_instances(options)
       options = options.dup
@@ -612,7 +617,7 @@ module RightAws
       request_hash['LaunchSpecification.Placement.AvailabilityZone'] = options[:availability_zone]  unless options[:availability_zone].blank?
       request_hash['LaunchSpecification.Monitoring.Enabled']         = options[:monitoring_enabled] unless options[:monitoring_enabled].blank?
       request_hash.merge!(amazonize_list('LaunchSpecification.SecurityGroup', options[:groups]))    unless options[:groups].blank?
- #     request_hash.merge!(amazonize_block_device_mappings(options[:block_device_mappings], 'LaunchSpecification.blockDeviceMapping'))
+      request_hash.merge!(amazonize_block_device_mappings(options[:block_device_mappings], 'LaunchSpecification.BlockDeviceMapping'))
       link = generate_request("RequestSpotInstances", request_hash)
       request_info(link, QEc2DescribeSpotInstanceParser.new(:logger => @logger))
     end
