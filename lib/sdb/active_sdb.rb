@@ -711,7 +711,7 @@ module RightAws
       #
       def [](attribute)
         raw = @attributes[attribute.to_s]
-        self.class.column?(attribute) ? self.class.deserialize(attribute, raw.first) : raw
+        self.class.column?(attribute) && raw ? self.class.deserialize(attribute, raw.first) : raw
       end
 
       # Updates the attribute identified by +attribute+ with the specified +values+.
@@ -955,7 +955,7 @@ module RightAws
         setter = method_name[-1,1] == '='
         method_name.chop! if setter
 
-        if @attributes.has_key? method_name
+        if @attributes.has_key?(method_name) || self.class.column?(method_name)
           setter ? self[method_name] = args.first : self[method_name]
         else
           super
