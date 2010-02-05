@@ -388,6 +388,7 @@ module RightAws
         when 'attachTime'       then @volume[:aws_attached_at] = Time.parse(@text)
         when 'snapshotId'       then @volume[:snapshot_id]     = @text.blank? ? nil : @text
         when 'availabilityZone' then @volume[:zone]            = @text
+        when 'deleteOnTermination' then @volume[:delete_on_termination] = (@text == 'true')
         when 'item'
           case @xmlpath
           when 'DescribeVolumesResponse/volumeSet' then @result << @volume
