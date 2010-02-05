@@ -599,6 +599,9 @@ module RightAws
         when 'rootDeviceType'   then @item[:root_device_type]      = @text
         when 'rootDeviceName'   then @item[:root_device_name]      = @text
         when 'instanceClass'    then @item[:instance_class]        = @text
+        when 'instanceLifecycle'     then @item[:instance_lifecycle]       = @text
+        when 'spotInstanceRequestId' then @item[:spot_instance_request_id] = @text
+        when 'requesterId'           then @item[:requester_id]             = @text
         else
           case full_tag_name
           when %r{/stateReason/code$}    then @item[:state_reason_code]    = @text.to_i
