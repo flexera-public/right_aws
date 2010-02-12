@@ -431,6 +431,25 @@ module RightAws
       on_exception
     end
 
+    # Get Initial windows instance password using Amazon API call GetPasswordData.
+    #
+    #  puts ec2.get_initial_password_v2(my_awesome_instance[:aws_instance_id], my_awesome_key[:aws_material]) #=> "MhjWcgZuY6"
+    #
+    # P.S. To say the truth there is absolutely no any speedup if to compare to the old get_initial_password method... ;(
+    #
+    def get_initial_password_v2(instance_id, private_key)
+      link = generate_request('GetPasswordData',
+                              'InstanceId' => instance_id )
+      response = request_info(link, QEc2GetPasswordDataParser.new(:logger => @logger))
+      if response[:password_data].blank?
+        raise AwsError.new("Initial password is not yet created for #{instance_id}")
+      else
+        OpenSSL::PKey::RSA.new(private_key).private_decrypt(Base64.decode64(response[:password_data]))
+      end
+    rescue Exception
+      on_exception
+    end
+
     # Bundle a Windows image.
     # Internally, it queues the bundling task and shuts down the instance.
     # It then takes a snapshot of the Windows volume bundles it, and uploads it to
@@ -751,6 +770,19 @@ module RightAws
         when 'progress'   then @result[:aws_progress]      = @text
         when 'code'       then @result[:aws_error_code]    = @text
         when 'message'    then @result[:aws_error_message] = @text
+        end
+      end
+      def reset
+        @result = {}
+      end
+    end
+
+    class QEc2GetPasswordDataParser < RightAWSParser #:nodoc:
+      def tagend(name)
+        case name
+        when 'instanceId'   then @result[:aws_instance_id] = @text
+        when 'timestamp'    then @result[:timestamp]       = @text
+        when 'passwordData' then @result[:password_data]   = @text
         end
       end
       def reset
