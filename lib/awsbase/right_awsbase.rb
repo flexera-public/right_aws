@@ -189,6 +189,8 @@ module RightAws
 
       # Current aws_access_key_id
     attr_reader :aws_access_key_id
+      # Current aws_secret_access_key
+    attr_reader :aws_secret_access_key
       # Last HTTP request object
     attr_reader :last_request
       # Last HTTP response object
