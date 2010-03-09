@@ -139,7 +139,6 @@ module RightAws
       request_info_impl(:ec2_connection, @@bench, request, parser)
     end
 
-
   #-----------------------------------------------------------------
   #      Keys
   #-----------------------------------------------------------------
@@ -152,9 +151,10 @@ module RightAws
       #     {:aws_fingerprint=> "1e:29:30:47:58:6d:7b:8c:9f:08:11:20:3c:44:52:69:74:80:97:08", :aws_key_name=>"key-2"},
       #      ..., {...} ]
       #
-    def describe_key_pairs(list=[])
-      link = generate_request("DescribeKeyPairs", amazonize_list('KeyName',list.to_a))
-      request_cache_or_info :describe_key_pairs, link,  QEc2DescribeKeyPairParser, @@bench, list.blank?
+    def describe_key_pairs(*key_pairs)
+      key_pairs = key_pairs.flatten
+      link = generate_request("DescribeKeyPairs", amazonize_list('KeyName', key_pairs))
+      request_cache_or_info :describe_key_pairs, link,  QEc2DescribeKeyPairParser, @@bench, key_pairs.blank?
     rescue Exception
       on_exception
     end
@@ -224,10 +224,10 @@ module RightAws
     #
     #  ec2.describe_addresses('75.101.154.140') #=> [{:instance_id=>"i-d630cbbf", :public_ip=>"75.101.154.140"}]
     #
-    def describe_addresses(list=[])
-      link = generate_request("DescribeAddresses", 
-                              amazonize_list('PublicIp',list.to_a))
-      request_cache_or_info :describe_addresses, link,  QEc2DescribeAddressesParser, @@bench, list.blank?
+    def describe_addresses(*addresses)
+      addresses = addresses.flatten
+      link = generate_request("DescribeAddresses", amazonize_list('PublicIp', addresses))
+      request_cache_or_info :describe_addresses, link,  QEc2DescribeAddressesParser, @@bench, addresses.blank?
     rescue Exception
       on_exception
     end
@@ -273,10 +273,10 @@ module RightAws
     #                                                      :zone_state=>"available",
     #                                                      :zone_name=>"us-east-1c"}]
     #
-    def describe_availability_zones(list=[])
-      link = generate_request("DescribeAvailabilityZones", 
-                              amazonize_list('ZoneName',list.to_a))
-      request_cache_or_info :describe_availability_zones, link,  QEc2DescribeAvailabilityZonesParser, @@bench, list.blank?
+    def describe_availability_zones(*availability_zones)
+      availability_zones = availability_zones.flatten
+      link = generate_request("DescribeAvailabilityZones", amazonize_list('ZoneName', availability_zones))
+      request_cache_or_info :describe_availability_zones, link,  QEc2DescribeAvailabilityZonesParser, @@bench, availability_zones.blank?
     rescue Exception
       on_exception
     end
@@ -289,10 +289,10 @@ module RightAws
     #
     #  ec2.describe_regions  #=> ["eu-west-1", "us-east-1"]
     #
-    def describe_regions(list=[])
-      link = generate_request("DescribeRegions",
-                              amazonize_list('RegionName',list.to_a))
-      request_cache_or_info :describe_regions, link,  QEc2DescribeRegionsParser, @@bench, list.blank?
+    def describe_regions(*regions)
+      regions = regions.flatten
+      link = generate_request("DescribeRegions", amazonize_list('RegionName', regions))
+      request_cache_or_info :describe_regions, link,  QEc2DescribeRegionsParser, @@bench, regions.blank?
     rescue Exception
       on_exception
     end

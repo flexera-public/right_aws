@@ -144,7 +144,7 @@ module RightAws
       # Period (60 sec by default)
       period = (options[:period] && options[:period].to_i) || 60
       # Statistics ('Average' by default)
-      statistics = options[:statistics].to_a.flatten
+      statistics = Array(options[:statistics]).flatten
       statistics = statistics.blank? ? ['Average'] : statistics.map{|statistic| statistic.to_s.capitalize }
       # Times (5.min.ago up to now by default)
       start_time = options[:start_time] || (Time.now.utc - 5*60)
@@ -167,7 +167,7 @@ module RightAws
       # dimentions
       dim = []
       dimentions.each do |key, values|
-        values.to_a.each { |value|  dim << [key, value] }
+        Array(values).each { |value|  dim << [key, value] }
       end
       request_hash.merge!(amazonize_list(['Dimensions.member.?.Name', 'Dimensions.member.?.Value'], dim))
       #

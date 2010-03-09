@@ -49,10 +49,10 @@ module RightAws
     #        :aws_id         => "vol-58957031",
     #        :aws_created_at => Wed Jun 18 08:19:21 UTC 2008,}, ... ]
     #
-    def describe_volumes(list=[])
-      link = generate_request("DescribeVolumes",
-                              amazonize_list('VolumeId',list.to_a))
-      request_cache_or_info :describe_volumes, link,  QEc2DescribeVolumesParser, @@bench, list.blank?
+    def describe_volumes(*volumes)
+      volumes = volumes.flatten
+      link = generate_request("DescribeVolumes", amazonize_list('VolumeId', volumes))
+      request_cache_or_info :describe_volumes, link,  QEc2DescribeVolumesParser, @@bench, volumes.blank?
     rescue Exception
       on_exception
     end
@@ -158,10 +158,10 @@ module RightAws
     #      :aws_volume_size=>180,
     #      :aws_status=>"completed"}, ...]
     #
-    def describe_snapshots(list=[])
-      link = generate_request("DescribeSnapshots",
-                              amazonize_list('SnapshotId',list.to_a))
-      request_cache_or_info :describe_snapshots, link,  QEc2DescribeSnapshotsParser, @@bench, list.blank?
+    def describe_snapshots(*snapshots)
+      snapshots = snapshots.flatten
+      link = generate_request("DescribeSnapshots", amazonize_list('SnapshotId', snapshots))
+      request_cache_or_info :describe_snapshots, link,  QEc2DescribeSnapshotsParser, @@bench, snapshots.blank?
     rescue Exception
       on_exception
     end
@@ -270,8 +270,8 @@ module RightAws
       params =  {'SnapshotId'    => snapshot_id,
                  'Attribute'     => attribute,
                  'OperationType' => operation_type}
-      params.update(amazonize_list('UserId',    vars[:user_id].to_a))    if vars[:user_id]
-      params.update(amazonize_list('UserGroup', vars[:user_group].to_a)) if vars[:user_group]
+      params.update(amazonize_list('UserId',    Array(vars[:user_id])))    if vars[:user_id]
+      params.update(amazonize_list('UserGroup', Array(vars[:user_group]))) if vars[:user_group]
       link = generate_request("ModifySnapshotAttribute", params)
       request_info(link, RightBoolResponseParser.new(:logger => @logger))
     rescue Exception

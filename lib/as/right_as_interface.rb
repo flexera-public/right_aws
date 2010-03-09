@@ -153,8 +153,8 @@ module RightAws
       options[:min_size] ||= 1
       options[:max_size] ||= 20
       options[:cooldown] ||= 0
-      request_hash = amazonize_list('AvailabilityZones.member', availability_zones.to_a)
-      request_hash.merge!( amazonize_list('LoadBalancerNames', options[:load_balancer_names].to_a) )
+      request_hash = amazonize_list('AvailabilityZones.member', availability_zones)
+      request_hash.merge!( amazonize_list('LoadBalancerNames', options[:load_balancer_names]) )
       request_hash.merge!( 'AutoScalingGroupName'    => auto_scaling_group_name,
                            'LaunchConfigurationName' => launch_configuration_name,
                            'MinSize'                 => options[:min_size],
@@ -204,7 +204,7 @@ module RightAws
     #  as.update_auto_scaling_group('CentOS.5.1-c', :min_size => 1, :max_size => 4) #=> true
     #
     def update_auto_scaling_group(auto_scaling_group_name, options={})
-      request_hash = amazonize_list('AvailabilityZones.member', options[:availability_zones].to_a)
+      request_hash = amazonize_list('AvailabilityZones.member', options[:availability_zones])
       request_hash['AutoScalingGroupName']    = auto_scaling_group_name
       request_hash['LaunchConfigurationName'] = options[:launch_configuration_name] if options[:launch_configuration_name]
       request_hash['MinSize']  = options[:min_size] if options[:min_size]
@@ -486,7 +486,7 @@ module RightAws
       request_hash['CustomUnit'] = options[:custom_unit] if options[:custom_unit]
       dimentions = []
       (options[:dimentions] || {}).each do |key, values|
-        values.to_a.each { |value| dimentions << [key, value] }
+        Array(values).each { |value| dimentions << [key, value] }
       end
       request_hash.merge!(amazonize_list(['Dimensions.member.?.Name', 'Dimensions.member.?.Value'], dimentions))
       link = generate_request("CreateOrUpdateScalingTrigger", request_hash)

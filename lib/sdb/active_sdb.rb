@@ -376,7 +376,7 @@ module RightAws
           # detect amount of records requested
           bunch_of_records_requested = args.size > 1 || args.first.is_a?(Array)
           # flatten ids
-          args = args.to_a.flatten
+          args = Array(args).flatten
           args.each { |id| cond << "id=#{self.connection.escape(id)}" }
           ids_cond = "(#{cond.join(' OR ')})"
           # user defined :conditions to string (if it was defined)
@@ -518,7 +518,7 @@ module RightAws
           # detect amount of records requested
           bunch_of_records_requested = args.size > 1 || args.first.is_a?(Array)
           # flatten ids
-          args = args.to_a.flatten
+          args = Array(args).flatten
           args.each { |id| cond << "'id'=#{self.connection.escape(id)}" }
           ids_cond = "[#{cond.join(' OR ')}]"
           # user defined :conditions to string (if it was defined)
@@ -686,7 +686,7 @@ module RightAws
       #
       def []=(attribute, values)
         attribute = attribute.to_s
-        @attributes[attribute] = attribute == 'id' ? values.to_s : values.to_a.uniq
+        @attributes[attribute] = attribute == 'id' ? values.to_s : Array(values).uniq
       end
 
       # Reload attributes from SDB. Replaces in-memory attributes.
@@ -920,7 +920,7 @@ module RightAws
         attrs = {}
         attributes.each do |attribute, values|
           attribute = attribute.to_s
-          attrs[attribute] = attribute == 'id' ? values.to_s : values.to_a.uniq
+          attrs[attribute] = attribute == 'id' ? values.to_s : Array(values).uniq
           attrs.delete(attribute) if values.blank?
         end
         attrs

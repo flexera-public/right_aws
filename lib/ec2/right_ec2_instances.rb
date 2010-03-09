@@ -84,9 +84,10 @@ module RightAws
     #         :ebs_volume_id=>"vol-f900f990"}],
     #      :aws_instance_id=>"i-8ce84ae4"} , ... ]
     #
-    def describe_instances(list=[])
-      link = generate_request("DescribeInstances", amazonize_list('InstanceId',list.to_a))
-      request_cache_or_info(:describe_instances, link,  QEc2DescribeInstancesParser, @@bench, list.blank?) do |parser|
+    def describe_instances(*instances)
+      instances = instances.flatten
+      link = generate_request("DescribeInstances", amazonize_list('InstanceId', instances))
+      request_cache_or_info(:describe_instances, link,  QEc2DescribeInstancesParser, @@bench, instances.blank?) do |parser|
         get_desc_instances(parser.result)
       end
     rescue Exception
@@ -191,7 +192,7 @@ module RightAws
     #
     def launch_instances(image_id, options={})
       @logger.info("Launching instance of image #{image_id} for #{@aws_access_key_id}, " +
-                   "key: #{options[:key_name]}, groups: #{(options[:group_ids]).to_a.join(',')}")
+                   "key: #{options[:key_name]}, groups: #{Array(options[:group_ids]).join(',')}")
       options[:image_id]    = image_id
       options[:min_count] ||= 1
       options[:max_count] ||= options[:min_count]
@@ -204,7 +205,7 @@ module RightAws
     end
 
     def prepare_instance_launch_params(options={}) # :nodoc:
-      params = amazonize_list('SecurityGroup', options[:group_ids].to_a)
+      params = amazonize_list('SecurityGroup', Array(options[:group_ids]))
       params['InstanceType']                      = options[:instance_type] || DEFAULT_INSTANCE_TYPE
       params['ImageId']                           = options[:image_id]                             unless options[:image_id].blank?
       params['AddressingType']                    = options[:addressing_type]                      unless options[:addressing_type].blank?
@@ -299,8 +300,9 @@ module RightAws
     #
     #  ec2.reboot_instances(['i-f222222d','i-f222222e']) #=> true
     #
-    def reboot_instances(list)
-      link = generate_request("RebootInstances", amazonize_list('InstanceId', list.to_a))
+    def reboot_instances(*instances)
+      instances = instances.flatten
+      link = generate_request("RebootInstances", amazonize_list('InstanceId', instances))
       request_info(link, RightBoolResponseParser.new(:logger => @logger))
     rescue Exception
       on_exception
@@ -495,8 +497,9 @@ module RightAws
     #      :aws_state         => "failed",
     #      :aws_instance_id   => "i-e3e24e8a"}]
     #
-    def describe_bundle_tasks(list=[])
-      link = generate_request("DescribeBundleTasks", amazonize_list('BundleId', list.to_a))
+    def describe_bundle_tasks(*tasks)
+      tasks = tasks.flatten
+      link = generate_request("DescribeBundleTasks", amazonize_list('BundleId', tasks))
       request_info(link, QEc2DescribeBundleTasksParser.new)
     rescue Exception
       on_exception

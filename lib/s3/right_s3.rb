@@ -759,7 +759,7 @@ module RightAws
         @thing = thing
         @id    = id
         @name  = name
-        @perms = perms.to_a
+        @perms = Array(perms)
         case action
           when :apply             then apply
           when :refresh           then refresh

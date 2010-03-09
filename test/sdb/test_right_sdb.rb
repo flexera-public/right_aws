@@ -51,7 +51,7 @@ class TestSdb < Test::Unit::TestCase
   
   def test_03_get_attributes
     # get attributes
-    values = @sdb.get_attributes(@domain, @item)[:attributes]['Jon'].to_a.sort
+    values = Array(@sdb.get_attributes(@domain, @item)[:attributes]['Jon']).sort
     # compare to original list
     assert_equal values, @attr['Jon'].sort
   end
@@ -62,7 +62,7 @@ class TestSdb < Test::Unit::TestCase
     @sdb.put_attributes @domain, @item, {'Jon' => new_value}
     wait SDB_DELAY, 'after putting attributes'
     # get attributes ('girls' must be added to already existent attributes)
-    values = @sdb.get_attributes(@domain, @item)[:attributes]['Jon'].to_a.sort
+    values = Array(@sdb.get_attributes(@domain, @item)[:attributes]['Jon']).sort
     assert_equal values, (@attr['Jon'] << new_value).sort
   end
   
@@ -80,7 +80,7 @@ class TestSdb < Test::Unit::TestCase
     @sdb.put_attributes @domain, @item, {'Jon' => ['girls','vodka']}
     wait SDB_DELAY, 'after adding attributes'
     # get attributes ('girls' and 'vodka' must be added 'pub')
-    values = @sdb.get_attributes(@domain, @item)[:attributes]['Jon'].to_a.sort
+    values = Array(@sdb.get_attributes(@domain, @item)[:attributes]['Jon']).sort
     assert_equal values, ['girls', 'pub', 'vodka']
     # delete a single value 'girls' from attribute 'Jon'
     @sdb.delete_attributes @domain, @item, 'Jon' => ['girls']
@@ -100,7 +100,7 @@ class TestSdb < Test::Unit::TestCase
     @sdb.put_attributes @domain, @item, {'Volodya' => ['girls','vodka']}
     wait SDB_DELAY, 'after adding attributes'
     # get attributes ('girls' and 'vodka' must be there)
-    values = @sdb.get_attributes(@domain, @item)[:attributes]['Volodya'].to_a.sort
+    values = Array(@sdb.get_attributes(@domain, @item)[:attributes]['Volodya']).sort
     assert_equal values, ['girls', 'vodka']
     # delete an item
     @sdb.delete_attributes @domain, @item
@@ -128,7 +128,7 @@ class TestSdb < Test::Unit::TestCase
     assert sdb.put_attributes(@domain, item, attributes) 
     wait SDB_DELAY, 'after putting attributes' 
     # get attributes 
-    values = sdb.get_attributes(@domain, item)[:attributes]['Jurgen'].to_a.sort 
+    values = Array(sdb.get_attributes(@domain, item)[:attributes]['Jurgen']).sort
     # compare to original list 
     assert_equal values, attributes['Jurgen'].sort 
     # check that the request has correct signature version

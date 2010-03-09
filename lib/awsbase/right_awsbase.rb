@@ -131,7 +131,7 @@ module RightAws
     end
 
     def self.split_items_and_params(array)
-      items  = array.to_a.flatten.compact
+      items  = Array(array).flatten.compact
       params = items.last.kind_of?(Hash) ? items.pop : {}
       [items, params]
     end
@@ -505,11 +505,11 @@ module RightAws
     #     "Filter.2.Value.2"=>"bb"}
     def amazonize_list(masks, list) #:nodoc:
       groups = {}
-      list.to_a.each_with_index do |list_item, i|
-        masks.to_a.each_with_index do |mask, mask_idx|
+      Array(list).each_with_index do |list_item, i|
+        Array(masks).each_with_index do |mask, mask_idx|
           key = mask[/\?/] ? mask.dup : mask.dup + '.?'
           key.sub!('?', (i+1).to_s)
-          value = list_item.to_a[mask_idx]
+          value = Array(list_item)[mask_idx]
           if value.is_a?(Array)
             groups.merge!(amazonize_list(key, value))
           else

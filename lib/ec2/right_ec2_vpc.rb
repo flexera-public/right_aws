@@ -27,11 +27,11 @@ module RightAws
 
   private
 
-    def vpc__split_list_and_filters(params) # :nodoc:
-      params = params.to_a
+    def vpc__split_list_and_filters(*params) # :nodoc:
+      params = params.flatten
       filters = params.last.is_a?(Hash) ? params.pop : {}
       # Make values to be arrays.
-      filters.each{|key, values| filters[key] = values.to_a }
+      filters.each{|key, values| filters[key] = Array(values) }
       [params, filters]
     end
 
@@ -176,7 +176,7 @@ module RightAws
     #      {"netbios-node-type"=>["1"], "domain-name"=>["my.awesomesite.ru"]}}
     #
     def create_dhcp_options(dhcp_configuration)
-      dhcp_configuration.each{ |key, values| dhcp_configuration[key] = values.to_a }
+      dhcp_configuration.each{ |key, values| dhcp_configuration[key] = Array(values) }
       request_hash = amazonize_list(['DhcpConfiguration.?.Key','DhcpConfiguration.?.Value.?'], dhcp_configuration)
       link = generate_request("CreateDhcpOptions", request_hash)
       request_info(link, QEc2DescribeDhcpOptionsParser.new(:logger => @logger)).first

@@ -476,7 +476,7 @@ module RightAws
     # see: http://docs.amazonwebservices.com/AmazonSimpleDB/2007-11-07/DeveloperGuide/index.html?SDB_API_QueryWithAttributes.html
     #
     def query_with_attributes(domain_name, attributes=[], query_expression = nil, max_number_of_items = nil, next_token = nil)
-      attributes = attributes.to_a
+      attributes = Array(attributes)
       query_expression = query_expression_from_array(query_expression) if query_expression.is_a?(Array)
       @last_query_expression = query_expression
       #

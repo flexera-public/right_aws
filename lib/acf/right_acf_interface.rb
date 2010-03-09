@@ -178,7 +178,7 @@ module RightAws
     def config_to_xml(config) # :nodoc:
       cnames = ''
       unless config[:cnames].blank?
-        config[:cnames].to_a.each { |cname| cnames += "  <CNAME>#{cname}</CNAME>\n" }
+        Array(config[:cnames]).each { |cname| cnames += "  <CNAME>#{cname}</CNAME>\n" }
       end
       # logging
       logging = ''
@@ -291,7 +291,7 @@ module RightAws
       config = { :origin  => origin,
                  :comment => comment,
                  :enabled => enabled,
-                 :cnames  => cnames.to_a,
+                 :cnames  => Array(cnames),
                  :caller_reference => caller_reference }
       config[:logging] = logging unless logging.blank?
       create_distribution_by_config(config)

@@ -740,7 +740,7 @@ module RightAws
         else
           result[:grantees][key] = 
             { :display_name => grantee[:display_name] || grantee[:uri].to_s[/[^\/]*$/],
-              :permissions  => grantee[:permissions].to_a,
+              :permissions  => Array(grantee[:permissions]),
               :attributes   => grantee[:attributes] }
         end
       end

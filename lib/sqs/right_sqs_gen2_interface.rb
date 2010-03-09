@@ -202,7 +202,7 @@ module RightAws
     def get_queue_attributes(queue_url, *attributes)
       attributes.flatten!
       attributes << 'All' if attributes.blank?
-      params = amazonize_list('AttributeName', attributes.to_a)
+      params = amazonize_list('AttributeName', attributes)
       params.merge!(:queue_url  => queue_url)
       req_hash = generate_request('GetQueueAttributes', params)
       request_info(req_hash, SqsGetQueueAttributesParser.new(:logger => @logger))
@@ -245,8 +245,8 @@ module RightAws
     #  see http://docs.amazonwebservices.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/index.html?Query_QueryAddPermission.html
     #      http://docs.amazonwebservices.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/index.html?acp-overview.html
     def add_permissions(queue_url, label, grantees, actions)
-      params      = amazonize_list('AWSAccountId', grantees.to_a)
-      params.merge!(amazonize_list('ActionName', actions.to_a))
+      params      = amazonize_list('AWSAccountId', Array(grantees))
+      params.merge!(amazonize_list('ActionName', Array(actions)))
       params.merge!('Label'    => label,
                     :queue_url => queue_url )
       req_hash = generate_request('AddPermission', params)
@@ -281,7 +281,7 @@ module RightAws
       #
     def receive_message(queue_url, max_number_of_messages=1, visibility_timeout=nil, attributes=nil)
       return [] if max_number_of_messages == 0
-      params = amazonize_list('AttributeName', attributes.to_a)
+      params = amazonize_list('AttributeName', Array(attributes)) unless attributes.blank?
       params.merge!('MaxNumberOfMessages' => max_number_of_messages,
                     'VisibilityTimeout'   => visibility_timeout,
                     :queue_url            => queue_url )

@@ -151,7 +151,7 @@ module RightAws
     def create_load_balancer(load_balancer_name, availability_zones=[], listeners=[])
       request_hash = { 'LoadBalancerName' => load_balancer_name }
       # merge zones
-      request_hash.merge!( amazonize_list("AvailabilityZones.member", availability_zones.to_a) )
+      request_hash.merge!( amazonize_list("AvailabilityZones.member", availability_zones) )
       # merge listeners
       if listeners.blank?
         listeners = { :protocol           => :http,
