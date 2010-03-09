@@ -63,11 +63,11 @@ require 'rds/right_rds_interface'
 
 module RightAws #:nodoc:
   module VERSION #:nodoc:
-    MAJOR = 1
-    MINOR = 11
-    TINY  = 0
+    MAJOR = 1  unless defined?(MAJOR)
+    MINOR = 11 unless defined?(MINOR)
+    TINY  = 0  unless defined?(TINY)
 
-    STRING = [MAJOR, MINOR, TINY].join('.')
+    STRING = [MAJOR, MINOR, TINY].join('.') unless defined?(STRING)
   end
 end
 
