@@ -364,7 +364,11 @@ module RightAws
         end
 
         def generate_id # :nodoc:
-          UUID.timestamp_create().to_s
+          if UUID::VERSION::STRING < '2.0.0'
+            UUID.timestamp_create().to_s
+          else
+            UUIDTools::UUID.timestamp_create().to_s
+          end
         end
 
       protected
