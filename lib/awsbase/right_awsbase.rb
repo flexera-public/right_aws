@@ -349,7 +349,7 @@ module RightAws
       when 'POST'
         request      = Net::HTTP::Post.new(@params[:service])
         request.body = service_params
-        request['Content-Type'] = 'application/x-www-form-urlencoded'
+        request['Content-Type'] = 'application/x-www-form-urlencoded; charset=utf-8'
       else
         raise "Unsupported HTTP verb #{verb.inspect}!"
       end
