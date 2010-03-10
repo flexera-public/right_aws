@@ -78,34 +78,40 @@ module RightAws
 
     # Describe Spot Instance requests.
     #
-    #  ec2.describe_spot_instance_requests
-    #    [{:availability_zone=>"us-east-1a",
-    #      :fault=>
-    #       "EBS block device mappings not supported for instance-store AMIs. (400 response code)\n            ",
-    #      :type=>"one-time",
-    #      :monitoring_enabled=>true,
-    #      :message=>
-    #       "EBS block device mappings not supported for instance-store AMIs. (400 response code)",
-    #      :create_time=>"2010-02-05T18:13:46.000Z",
-    #      :image_id=>"ami-08f41161",
-    #      :launch_group=>"lg1",
-    #      :state=>"failed",
-    #      :valid_until=>"2010-02-05T19:13:44.000Z",
-    #      :groups=>["default", "33"],
-    #      :availability_zone_group=>"azg1",
-    #      :spot_price=>0.01,
-    #      :code=>"Client.UnsupportedOperation",
-    #      :block_device_mappings=>
-    #       [{:ebs_snapshot_id=>"snap-145cbc7d",
-    #         :ebs_delete_on_termination=>true,
-    #         :ebs_volume_size=>3,
-    #         :virtual_name=>"ephemeral2",
-    #         :device_name=>"/dev/sdk"}],
-    #      :instance_type=>"m1.small",
+    #  ec2.describe_spot_instance_requests #=>
+    #    [{:type=>"one-time",
+    #      :create_time=>"2010-03-10T10:30:32.000Z",
+    #      :instance_type=>"c1.medium",
+    #      :state=>"cancelled",
+    #      :groups=>["default"],
     #      :product_description=>"Linux/UNIX",
-    #      :key_name=>"tim",
-    #      :spot_instance_requestId=>"sir-32da8a03",
-    #      :valid_from=>"2010-02-05T18:23:44.000Z"}]
+    #      :spot_instance_request_id=>"sir-bfa06804",
+    #      :image_id=>"ami-08f41161",
+    #      :spot_price=>0.01,
+    #      :monitoring_enabled=>false},
+    #     {:type=>"one-time",
+    #      :create_time=>"2010-03-10T10:33:29.000Z",
+    #      :instance_type=>"c1.medium",
+    #      :state=>"open",
+    #      :groups=>["default", "33"],
+    #      :product_description=>"Linux/UNIX",
+    #      :spot_instance_request_id=>"sir-b1713a03",
+    #      :image_id=>"ami-08f41161",
+    #      :spot_price=>0.01,
+    #      :monitoring_enabled=>false,
+    #      :key_name=>"tim"},
+    #     {:type=>"one-time",
+    #      :instance_id=>"i-c516ceae",
+    #      :create_time=>"2010-03-10T10:43:48.000Z",
+    #      :instance_type=>"c1.medium",
+    #      :state=>"active",
+    #      :groups=>["default", "33"],
+    #      :product_description=>"Linux/UNIX",
+    #      :spot_instance_request_id=>"sir-5eb6c604",
+    #      :image_id=>"ami-08f41161",
+    #      :spot_price=>0.2,
+    #      :monitoring_enabled=>false,
+    #      :key_name=>"tim"}]
     #
     def describe_spot_instance_requests(*spot_instance_request_ids)
       link = generate_request("DescribeSpotInstanceRequests", amazonize_list('SpotInstanceRequestId', spot_instance_request_ids.flatten))
@@ -123,17 +129,33 @@ module RightAws
     #  ec2.request_spot_instances(
     #    :image_id => 'ami-08f41161',
     #    :spot_price => 0.01,
-    #    :instance_type => 'm1.small') #=>
-    #    [{:monitoring_enabled=>false,
+    #    :key_name => 'tim',
+    #    :instance_count => 2,
+    #    :groups => ['33','default'],
+    #    :instance_type => 'c1.medium') #=>
+    #    
+    #    [{:product_description=>"Linux/UNIX",
     #      :type=>"one-time",
-    #      :spot_instance_requestId=>"sir-6992ce04",
+    #      :spot_instance_requestId=>"sir-7a893003",
+    #      :monitoring_enabled=>false,
     #      :image_id=>"ami-08f41161",
     #      :state=>"open",
     #      :spot_price=>0.01,
-    #      :instance_type=>"m1.small",
-    #      :groups=>["default"],
-    #      :create_time=>"2010-01-13T01:32:14.000Z",
-    #      :product_description=>"Linux/UNIX"}]
+    #      :groups=>["default", "33"],
+    #      :key_name=>"tim",
+    #      :create_time=>"2010-03-10T10:33:09.000Z",
+    #      :instance_type=>"c1.medium"},
+    #     {:product_description=>"Linux/UNIX",
+    #      :type=>"one-time",
+    #      :spot_instance_requestId=>"sir-13dc9a03",
+    #      :monitoring_enabled=>false,
+    #      :image_id=>"ami-08f41161",
+    #      :state=>"open",
+    #      :spot_price=>0.01,
+    #      :groups=>["default", "33"],
+    #      :key_name=>"tim",
+    #      :create_time=>"2010-03-10T10:33:09.000Z",
+    #      :instance_type=>"c1.medium"}]
     #
     #  ec2.request_spot_instances(
     #    :image_id => 'ami-08f41161',
@@ -176,7 +198,7 @@ module RightAws
     #      :key_name=>"tim",
     #      :valid_from=>"2010-02-05T18:23:44.000Z",
     #      :availability_zone=>"us-east-1a",
-    #      :spot_instance_requestId=>"sir-32da8a03"}]
+    #      :spot_instance_request_id=>"sir-32da8a03"}]
     #
     def request_spot_instances(options)
       options = options.dup
@@ -288,7 +310,7 @@ module RightAws
       end
       def tagend(name)
         case name
-        when 'spotInstanceRequestId' then @item[:spot_instance_requestId] = @text
+        when 'spotInstanceRequestId' then @item[:spot_instance_request_id]= @text
         when 'spotPrice'             then @item[:spot_price]              = @text.to_f
         when 'type'                  then @item[:type]                    = @text
         when 'state'                 then @item[:state]                   = @text
