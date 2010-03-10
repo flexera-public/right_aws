@@ -203,20 +203,6 @@ module RightAws
       on_exception
     end
 
-=begin
-    # TODO: API does not support this call yet
-    def create_instance(options={})
-      @logger.info("Creating instance #{@aws_access_key_id}, " +
-                   "key: #{options[:key_name]}, groups: #{(options[:group_ids]).to_a.join(',')}")
-      params = prepare_instance_launch_params(options)
-      link = generate_request("CreateInstance", params)
-      instances = request_info(link, QEc2DescribeInstancesParser.new(:logger => @logger))
-      get_desc_instances(instances).first
-    rescue Exception
-      on_exception
-    end
-=end
-
     def prepare_instance_launch_params(options={}) # :nodoc:
       params = amazonize_list('SecurityGroup', options[:group_ids].to_a)
       params['InstanceType']                      = options[:instance_type] || DEFAULT_INSTANCE_TYPE
