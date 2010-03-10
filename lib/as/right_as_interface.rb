@@ -345,7 +345,6 @@ module RightAws
     #                                 :user_data       => "Woohoo: CentOS.5.1-c" ) #=> true
     #
     def create_launch_configuration(launch_configuration_name, image_id, instance_type, options={})
-      availability_zones = availability_zones.to_a
       request_hash = { 'LaunchConfigurationName' => launch_configuration_name,
                        'ImageId'                 => image_id,
                        'InstanceType'            => instance_type }
