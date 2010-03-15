@@ -99,7 +99,9 @@ module RightAws
           result["Attribute.#{idx}.Replace"] = 'true' if replace
           # pack Name/Value
           unless values.nil?
-            Array(values).each do |value|
+            # Array(values) does not work here:
+            #  - Array('') => [] but we wanna get here ['']
+            [values].flatten.each do |value|
               result["Attribute.#{idx}.Name"]  = attribute
               result["Attribute.#{idx}.Value"] = ruby_to_sdb(value) unless skip_values
               idx += 1
