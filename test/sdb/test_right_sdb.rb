@@ -11,7 +11,7 @@ class TestSdb < Test::Unit::TestCase
     @sdb    = Rightscale::SdbInterface.new(TestCredentials.aws_access_key_id, TestCredentials.aws_secret_access_key)
   end
 
-  SDB_DELAY = 2
+  SDB_DELAY = 7
   
   def wait(delay, msg='')
     print "waiting #{delay} seconds #{msg}"
@@ -104,6 +104,7 @@ class TestSdb < Test::Unit::TestCase
     assert_equal values, ['girls', 'vodka']
     # delete an item
     @sdb.delete_attributes @domain, @item
+    wait SDB_DELAY, 'after deleting attributes'
     # get attributes (values must be empty)
     values = @sdb.get_attributes(@domain, @item)[:attributes]['Volodya']
     assert_equal values, nil
@@ -173,6 +174,7 @@ class TestSdb < Test::Unit::TestCase
     assert_nothing_thrown do
       @sdb.put_attributes(@domain, item, {:one=>nil, :two=>nil, :three=>'chunder'})
     end
+    wait SDB_DELAY, 'after putting attributes'
     assert_nothing_thrown do
       res = @sdb.get_attributes(@domain, item)
     end
@@ -186,6 +188,7 @@ class TestSdb < Test::Unit::TestCase
     content = {:a=>"one & two & three",
                :b=>"one ? two / three"}
     @sdb.put_attributes(@domain, item, content)
+    wait SDB_DELAY, 'after putting attributes'
 
     res = @sdb.get_attributes(@domain, item)
     assert_equal(content[:a], res[:attributes]['a'][0])
@@ -201,6 +204,7 @@ class TestSdb < Test::Unit::TestCase
       i += 1
     end
     @sdb.put_attributes(@domain, item, {:a => sa, :b => sa, :c => sa, :d => sa, :e => sa})
+    wait SDB_DELAY, 'after putting attributes'
   end
 
   def test_20_query_with_atributes
@@ -209,12 +213,13 @@ class TestSdb < Test::Unit::TestCase
     items = {};
     response[:items].each{ |item| items.merge!(item) }
     # check we have receied all 5 items each full of attributes
-    assert_equal 5, items.keys.size
+    assert_equal 6, items.keys.size
     assert items['toys'].size > 0
     assert items['nils'].size > 0
     assert items['urlescapes'].size > 0
     assert items['multiples'].size > 0
     assert items['reqgirth'].size > 0
+    assert items['zeroes'].size > 0
     # fetch only Jon's attributes from all items
     response = @sdb.query_with_attributes(@domain,['Jon'])
     items = {};
@@ -227,6 +232,7 @@ class TestSdb < Test::Unit::TestCase
     assert_equal 0, items['urlescapes'].size
     assert_equal 0, items['multiples'].size
     assert_equal 0, items['reqgirth'].size
+    assert_equal 0, items['zeroes'].size
     # kust Jurgen's attriburs
     response = @sdb.query_with_attributes(@domain,['Jurgen'], "['Jurgen'='piglet']")
     items = {};
