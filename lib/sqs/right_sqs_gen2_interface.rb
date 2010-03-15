@@ -281,7 +281,8 @@ module RightAws
       #
     def receive_message(queue_url, max_number_of_messages=1, visibility_timeout=nil, attributes=nil)
       return [] if max_number_of_messages == 0
-      params = amazonize_list('AttributeName', Array(attributes)) unless attributes.blank?
+      params = {}
+      params.merge!(amazonize_list('AttributeName', Array(attributes))) unless attributes.blank?
       params.merge!('MaxNumberOfMessages' => max_number_of_messages,
                     'VisibilityTimeout'   => visibility_timeout,
                     :queue_url            => queue_url )
