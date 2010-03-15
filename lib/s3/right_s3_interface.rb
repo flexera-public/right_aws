@@ -94,8 +94,8 @@ module RightAws
       headers.each do |key, value|
         key = key.downcase
         value = case
-                when value.is_?(Array) then value.join('')
-                else                        value.to_s
+                when value.is_a?(Array) then value.join('')
+                else                         value.to_s
                 end
         s3_headers[key] = value.strip if key[/^#{AMAZON_HEADER_PREFIX}|^content-md5$|^content-type$|^date$/o]
       end
