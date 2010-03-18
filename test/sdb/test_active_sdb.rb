@@ -287,12 +287,23 @@ class TestSdb < Test::Unit::TestCase
     wait SDB_DELAY, 'test 11: after delete item'
     assert_nil Client.find_by_name('Putin')
   end
-  
-  def test_14_delete_domain
+
+  def test_14_dynamic_attribute_accessors
+    bush = Client.find_by_name('Bush')
+    bush.reload
+    assert_nothing_raised {
+      assert_equal ['male'], bush.gender
+      bush.name = 'George'
+      assert_equal ['George'], bush.name
+    }
+    assert_raise(NoMethodError) { bush.flarble }
+  end
+
+  def test_999_delete_domain
     assert Client.delete_domain
-    wait SDB_DELAY, 'test 12: after delete domain'
-    assert_raise(Rightscale::AwsError) do 
-      Client.find :all 
+    wait SDB_DELAY, 'test 999: after delete domain'
+    assert_raise(Rightscale::AwsError) do
+      Client.find :all
     end
   end
     
