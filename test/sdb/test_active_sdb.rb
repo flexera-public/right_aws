@@ -1,11 +1,23 @@
 require File.dirname(__FILE__) + '/test_helper.rb'
 
 class TestSdb < Test::Unit::TestCase
-  
-  DOMAIN_NAME = 'right_sdb_awesome_test_domain'
-  
+  DOMAIN_PREFIX = 'right_sdb_awesome_test'
+  CLIENT_DOMAIN = "#{DOMAIN_PREFIX}_client"
+  PERSON_DOMAIN = "#{DOMAIN_PREFIX}_person"
+
   class Client < RightAws::ActiveSdb::Base
-    set_domain_name DOMAIN_NAME
+    set_domain_name CLIENT_DOMAIN
+  end
+
+  class Person < RightAws::ActiveSdb::Base
+    set_domain_name PERSON_DOMAIN
+
+    columns do
+      name
+      email
+      registered_at :DateTime
+      created_at    :DateTime, :default => lambda{ Time.now }
+    end
   end
 
   def setup
@@ -17,6 +29,13 @@ class TestSdb < Test::Unit::TestCase
       { 'name' => 'Mary',     'country' => 'USA',    'gender' => 'female', 'hobby' => ['patchwork', 'bundle jumping'] },
       { 'name' => 'Sandy',    'country' => 'Russia', 'gender' => 'female', 'hobby' => ['flowers', 'cats', 'cooking'] },
       { 'name' => 'Mary',     'country' => 'Russia', 'gender' => 'female', 'hobby' => ['flowers', 'cats', 'cooking'] } ]
+    @people = [
+      { :name => 'Yetta E. Andrews',    :email => 'nulla.facilisis@metus.com', :registered_at => Time.local(2000, 1, 1) },
+      { :name => 'Sybill O. Olson',     :email => 'nisi.Aenean.eget@urna.com', :registered_at => Time.local(2008, 7, 6) },
+      { :name => 'Isabelle K. Flynn',   :email => 'velit@amet.com',            :registered_at => Time.local(2003, 5, 20) },
+      { :name => 'Juliet H. Witt',      :email => 'egestas@pretiumaliquet.ca', :registered_at => Time.local(2007, 2, 28) },
+      { :name => 'Lucy N. Christensen', :email => 'lacus.v12@stu.edu',         :registered_at => Time.local(2005, 10, 26) }
+    ]
     RightAws::ActiveSdb.establish_connection(TestCredentials.aws_access_key_id, TestCredentials.aws_secret_access_key)
   end
 
@@ -37,18 +56,20 @@ class TestSdb < Test::Unit::TestCase
   #---------------------------
 
   def test_00_delete_domain
-    assert RightAws::ActiveSdb.delete_domain(DOMAIN_NAME)
+    assert RightAws::ActiveSdb.delete_domain(CLIENT_DOMAIN)
+    assert RightAws::ActiveSdb.delete_domain(PERSON_DOMAIN)
     wait SDB_DELAY, 'test 00: after domain deletion'
   end
   
   def test_01_create_domain
     # check that domain does not exist
-    assert !RightAws::ActiveSdb.domains.include?(DOMAIN_NAME)
+    assert !RightAws::ActiveSdb.domains.include?(CLIENT_DOMAIN)
     # create domain
     assert Client.create_domain
+    assert Person.create_domain
     wait SDB_DELAY, 'test 01: after domain creation'
     # check that we have received new domain from Amazin
-    assert RightAws::ActiveSdb.domains.include?(DOMAIN_NAME)
+    assert RightAws::ActiveSdb.domains.include?(CLIENT_DOMAIN)
   end
 
   def test_02_create_items
@@ -299,8 +320,21 @@ class TestSdb < Test::Unit::TestCase
     assert_raise(NoMethodError) { bush.flarble }
   end
 
+  def test_15_column_emulation
+    @people.each do |person|
+      Person.create person
+    end
+    wait SDB_DELAY, 'test 15: after people creation'
+
+    person = Person.find_by_email 'nulla.facilisis@metus.com'
+    person.reload
+
+    assert_equal 'Yetta E. Andrews', person.name
+  end
+
   def test_999_delete_domain
     assert Client.delete_domain
+    assert Person.delete_domain
     wait SDB_DELAY, 'test 999: after delete domain'
     assert_raise(Rightscale::AwsError) do
       Client.find :all

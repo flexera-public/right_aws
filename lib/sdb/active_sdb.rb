@@ -242,7 +242,17 @@ module RightAws
         def delete_domain
           connection.delete_domain(domain)
         end
-        
+
+        def columns(&block)
+          @columns ||= ColumnSet.new
+          @columns.instance_eval(&block) if block
+          @columns
+        end
+
+        def column?(col_name)
+          columns.include?(col_name)
+        end
+
         # Perform a find request.
         #  
         # Single record: 
@@ -679,7 +689,8 @@ module RightAws
       #  puts item['Cat'].inspect  #=> ["Jons socks", "clew", "mice"]
       #
       def [](attribute)
-        @attributes[attribute.to_s]
+        raw = @attributes[attribute.to_s]
+        self.class.column?(attribute) ? raw.first : raw # TODO : deserialization procs per data type
       end
 
       # Updates the attribute identified by +attribute+ with the specified +values+.
@@ -690,7 +701,14 @@ module RightAws
       #
       def []=(attribute, values)
         attribute = attribute.to_s
-        @attributes[attribute] = attribute == 'id' ? values.to_s : Array(values).uniq
+        @attributes[attribute] = case
+        when attribute == 'id'
+          values.to_s
+        when self.class.column?(attribute)
+          values.to_s # TODO : serialization procs per data type
+        else
+          Array(values).uniq
+        end
       end
 
       # Reload attributes from SDB. Replaces in-memory attributes.
@@ -941,6 +959,32 @@ module RightAws
           attrs.delete(attribute) if values.blank?
         end
         attrs
+      end
+    end
+
+    class ColumnSet
+      attr_accessor :columns
+      def initialize
+        @columns = {}
+      end
+
+      def column(col_name)
+        @columns[col_name.to_s]
+      end
+      alias_method :include?, :column
+
+      def type_of(col_name)
+        column(col_name) && column(col_name)[:type]
+      end
+
+      def default(col_name)
+        column(col_name) && column(col_name)[:default]
+      end
+
+      def method_missing(method_sym, *args)
+        data_type = args.shift || :String
+        options = args.shift || {}
+        @columns[method_sym.to_s] = options.merge( :type => data_type )
       end
     end
   end
