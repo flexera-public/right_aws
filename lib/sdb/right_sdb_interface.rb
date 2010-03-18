@@ -89,26 +89,42 @@ module RightAws
 
     # Prepare attributes for putting.
     # (used by put_attributes)
-    def pack_attributes(attributes, replace = false) #:nodoc:
+    def pack_attributes(items_or_attributes, replace = false, batch = false) #:nodoc:
+      if batch
+        index = 0
+        items_or_attributes.inject({}){|result, (item_name, attributes)|
+          item_prefix = "Item.#{index}."
+          result["#{item_prefix}ItemName"] = item_name.to_s
+          result.merge!(
+            pack_single_item_attributes(attributes, replace, item_prefix))
+          index += 1
+          result
+        }
+      else
+        pack_single_item_attributes(items_or_attributes, replace)
+      end
+    end
+
+    def pack_single_item_attributes(attributes, replace, prefix = "")
       result = {}
       if attributes
         idx = 0
         skip_values = attributes.is_a?(Array)
         attributes.each do |attribute, values|
           # set replacement attribute
-          result["Attribute.#{idx}.Replace"] = 'true' if replace
+          result["#{prefix}Attribute.#{idx}.Replace"] = 'true' if replace
           # pack Name/Value
           unless values.nil?
             # Array(values) does not work here:
             #  - Array('') => [] but we wanna get here ['']
             [values].flatten.each do |value|
-              result["Attribute.#{idx}.Name"]  = attribute
-              result["Attribute.#{idx}.Value"] = ruby_to_sdb(value) unless skip_values
+              result["#{prefix}Attribute.#{idx}.Name"]  = attribute
+              result["#{prefix}Attribute.#{idx}.Value"] = ruby_to_sdb(value) unless skip_values
               idx += 1
             end
           else
-            result["Attribute.#{idx}.Name"] = attribute
-            result["Attribute.#{idx}.Value"] = ruby_to_sdb(nil) unless skip_values
+            result["#{prefix}Attribute.#{idx}.Name"] = attribute
+            result["#{prefix}Attribute.#{idx}.Value"] = ruby_to_sdb(nil) unless skip_values
             idx += 1
           end
         end
@@ -306,6 +322,37 @@ module RightAws
                  'ItemName'   => item_name }.merge(pack_attributes(attributes, replace))
       link = generate_request("PutAttributes", params)
       request_info( link, QSdbSimpleParser.new )
+    rescue Exception
+      on_exception
+    end
+
+    # Add/Replace attributes for multiple items at a time.
+    #
+    # Params:
+    #   domain_name = DomainName
+    #   items       = {
+    #     'Item1' => {
+    #       'nameA'  => [valueA1, valueA2,..., valueAN],
+    #       ...
+    #       'nameB'  => [valueB1, valueB2,..., valueBN]
+    #     },
+    #     'Item2' => {
+    #       'nameC'  => [valueC1, valueC2,..., valueCN],
+    #       ...
+    #       'nameD'  => [valueD1, valueD2,..., valueDN]
+    #     }
+    #   }
+    #   replace = :replace | any other value to skip replacement
+    #
+    # Usage of batch_put_attributes is similar to put_attributes except that
+    # instead of supplying an item_name and a hash of attributes, you supply a
+    # hash of item names to attributes.
+    #
+    # See: http://docs.amazonwebservices.com/AmazonSimpleDB/latest/DeveloperGuide/index.html?SDB_API_BatchPutAttributes.html
+    def batch_put_attributes(domain_name, items, replace = false)
+      params = { 'DomainName' => domain_name }.merge(pack_attributes(items, replace, true))
+      link = generate_request("BatchPutAttributes", params)
+      request_info( link, QSdbSimpleParser.new)
     rescue Exception
       on_exception
     end
