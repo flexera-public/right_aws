@@ -15,6 +15,8 @@ class TestSdb < Test::Unit::TestCase
     columns do
       name
       email
+      score         :Integer
+      is_active     :Boolean
       registered_at :DateTime
       created_at    :DateTime, :default => lambda{ Time.now }
     end
@@ -30,11 +32,11 @@ class TestSdb < Test::Unit::TestCase
       { 'name' => 'Sandy',    'country' => 'Russia', 'gender' => 'female', 'hobby' => ['flowers', 'cats', 'cooking'] },
       { 'name' => 'Mary',     'country' => 'Russia', 'gender' => 'female', 'hobby' => ['flowers', 'cats', 'cooking'] } ]
     @people = [
-      { :name => 'Yetta E. Andrews',    :email => 'nulla.facilisis@metus.com', :registered_at => Time.local(2000, 1, 1) },
-      { :name => 'Sybill O. Olson',     :email => 'nisi.Aenean.eget@urna.com', :registered_at => Time.local(2008, 7, 6) },
-      { :name => 'Isabelle K. Flynn',   :email => 'velit@amet.com',            :registered_at => Time.local(2003, 5, 20) },
-      { :name => 'Juliet H. Witt',      :email => 'egestas@pretiumaliquet.ca', :registered_at => Time.local(2007, 2, 28) },
-      { :name => 'Lucy N. Christensen', :email => 'lacus.v12@stu.edu',         :registered_at => Time.local(2005, 10, 26) }
+      { :name => 'Yetta E. Andrews',    :email => 'nulla.facilisis@metus.com', :score => 100, :is_active => true,  :registered_at => Time.local(2000, 1, 1) },
+      { :name => 'Sybill O. Olson',     :email => 'nisi.Aenean.eget@urna.com', :score =>  87, :is_active => true,  :registered_at => Time.local(2008, 7, 6) },
+      { :name => 'Isabelle K. Flynn',   :email => 'velit@amet.com',            :score =>  98, :is_active => false, :registered_at => Time.local(2003, 5, 20) },
+      { :name => 'Juliet H. Witt',      :email => 'egestas@pretiumaliquet.ca', :score =>  72, :is_active => true,  :registered_at => Time.local(2007, 2, 28) },
+      { :name => 'Lucy N. Christensen', :email => 'lacus.v12@stu.edu',         :score =>  94, :is_active => false, :registered_at => Time.local(2005, 10, 26) }
     ]
     RightAws::ActiveSdb.establish_connection(TestCredentials.aws_access_key_id, TestCredentials.aws_secret_access_key)
   end
@@ -325,11 +327,17 @@ class TestSdb < Test::Unit::TestCase
       Person.create person
     end
     wait SDB_DELAY, 'test 15: after people creation'
-
     person = Person.find_by_email 'nulla.facilisis@metus.com'
     person.reload
 
     assert_equal 'Yetta E. Andrews', person.name
+    assert_equal DateTime, person.registered_at.class
+    assert person['registered_at'].is_a?(DateTime)
+    assert person[:registered_at].is_a?(DateTime)
+
+    assert person.is_active
+
+    assert_equal 100, person.score
   end
 
   def test_999_delete_domain

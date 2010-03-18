@@ -253,6 +253,20 @@ module RightAws
           columns.include?(col_name)
         end
 
+        def type_of(col_name)
+          columns.type_of(col_name)
+        end
+
+        def serialize(attribute, value)
+          s = serialization_for_type(type_of(attribute))
+          s ? s.serialize(value) : value.to_s
+        end
+
+        def deserialize(attribute, value)
+          s = serialization_for_type(type_of(attribute))
+          s ? s.deserialize(value) : value
+        end
+
         # Perform a find request.
         #  
         # Single record: 
@@ -604,6 +618,13 @@ module RightAws
           end
         end
 
+        def serialization_for_type(type)
+          @serializations ||= {}
+          unless @serializations.has_key? type
+            @serializations[type] = ::RightAws::ActiveSdb.const_get("#{type}Serialization") rescue false
+          end
+          @serializations[type]
+        end
       end
       
       public
@@ -690,7 +711,7 @@ module RightAws
       #
       def [](attribute)
         raw = @attributes[attribute.to_s]
-        self.class.column?(attribute) ? raw.first : raw # TODO : deserialization procs per data type
+        self.class.column?(attribute) ? self.class.deserialize(attribute, raw.first) : raw
       end
 
       # Updates the attribute identified by +attribute+ with the specified +values+.
@@ -705,7 +726,7 @@ module RightAws
         when attribute == 'id'
           values.to_s
         when self.class.column?(attribute)
-          values.to_s # TODO : serialization procs per data type
+          self.class.serialize(attribute, values)
         else
           Array(values).uniq
         end
@@ -955,7 +976,14 @@ module RightAws
         attrs = {}
         attributes.each do |attribute, values|
           attribute = attribute.to_s
-          attrs[attribute] = attribute == 'id' ? values.to_s : Array(values).uniq
+          attrs[attribute] = case
+          when attribute == 'id'
+            values.to_s
+          when self.class.column?(attribute)
+            values.is_a?(String) ? values : self.class.serialize(attribute, values)
+          else
+            Array(values).uniq
+          end
           attrs.delete(attribute) if values.blank?
         end
         attrs
@@ -987,5 +1015,42 @@ module RightAws
         @columns[method_sym.to_s] = options.merge( :type => data_type )
       end
     end
+
+    class DateTimeSerialization
+      class << self
+        def serialize(date)
+          date.strftime('%Y-%m-%dT%H:%M:%S%z')
+        end
+
+        def deserialize(string)
+          r = DateTime.parse(string) rescue nil
+        end
+      end
+    end
+
+    class BooleanSerialization
+      class << self
+        def serialize(boolean)
+          boolean ? 'T' : 'F'
+        end
+
+        def deserialize(string)
+          string == 'T'
+        end
+      end
+    end
+
+    class IntegerSerialization
+      class << self
+        def serialize(int)
+          int.to_s
+        end
+
+        def deserialize(string)
+          string.to_i
+        end
+      end
+    end
+
   end
 end
