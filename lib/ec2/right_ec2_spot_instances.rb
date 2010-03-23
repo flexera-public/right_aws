@@ -212,7 +212,6 @@ module RightAws
       request_hash['LaunchGroup']                        = options[:launch_group]                   unless options[:launch_group].blank?
       request_hash['AvailabilityZoneGroup']              = options[:availability_zone_group]        unless options[:availability_zone_group].blank?
       request_hash['LaunchSpecification.KeyName']        = options[:key_name]                       unless options[:key_name].blank?
-      request_hash['LaunchSpecification.UserData']       = options[:user_data]                      unless options[:user_data].blank?
       request_hash['LaunchSpecification.AddressingType'] = options[:addressing_type]                unless options[:addressing_type].blank?
       request_hash['LaunchSpecification.KernelId']       = options[:kernel_id]                      unless options[:kernel_id].blank?
       request_hash['LaunchSpecification.RamdiskId']      = options[:ramdisk_id]                     unless options[:ramdisk_id].blank?
@@ -221,6 +220,11 @@ module RightAws
       request_hash['LaunchSpecification.Monitoring.Enabled']         = options[:monitoring_enabled] unless options[:monitoring_enabled].blank?
       request_hash.merge!(amazonize_list('LaunchSpecification.SecurityGroup', options[:groups]))    unless options[:groups].blank?
       request_hash.merge!(amazonize_block_device_mappings(options[:block_device_mappings], 'LaunchSpecification.BlockDeviceMapping'))
+      unless options[:user_data].blank?
+        # See RightAws::Ec2#run_instances
+        options[:user_data].strip!
+        request_hash['LaunchSpecification.UserData'] = Base64.encode64(options[:user_data]).delete("\n") unless options[:user_data].blank?
+      end
       link = generate_request("RequestSpotInstances", request_hash)
       request_info(link, QEc2DescribeSpotInstanceParser.new(:logger => @logger))
     end
@@ -314,9 +318,8 @@ module RightAws
         when 'spotPrice'             then @item[:spot_price]              = @text.to_f
         when 'type'                  then @item[:type]                    = @text
         when 'state'                 then @item[:state]                   = @text
-        when 'fault'                 then @item[:fault]                   = @text
-        when 'code'                  then @item[:code]                    = @text
-        when 'message'               then @item[:message]                 = @text
+        when 'code'                  then @item[:fault_code]              = @text
+        when 'message'               then @item[:fault_message]           = @text
         when 'validFrom'             then @item[:valid_from]              = @text
         when 'validUntil'            then @item[:valid_until]             = @text
         when 'launchGroup'           then @item[:launch_group]            = @text
