@@ -609,7 +609,7 @@ module RightAws
         when 'requesterId'           then @item[:requester_id]             = @text
         else
           case full_tag_name
-          when %r{/stateReason/code$}    then @item[:state_reason_code]    = @text.to_i
+          when %r{/stateReason/code$}    then @item[:state_reason_code]    = @text
           when %r{/stateReason/message$} then @item[:state_reason_message] = @text
           when %r{/instanceState/code$}  then @item[:aws_state_code]       = @text.to_i
           when %r{/instanceState/name$}  then @item[:aws_state]            = @text
