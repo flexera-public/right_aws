@@ -70,11 +70,11 @@ module RightAws
     #        {:to_port=>"22",
     #         :protocol=>"tcp",
     #         :from_port=>"22",
-    #         :cidr_ips=>"0.0.0.0/0"},
+    #         :cidr_ip=>"0.0.0.0/0"},
     #        {:to_port=>"9997",
     #         :protocol=>"tcp",
     #         :from_port=>"9997",
-    #         :cidr_ips=>"0.0.0.0/0"}],
+    #         :cidr_ip=>"0.0.0.0/0"}],
     #      :aws_group_name=>"photo_us",
     #      :aws_description=>"default group",
     #      :aws_owner=>"826693181925"}]
@@ -97,7 +97,10 @@ module RightAws
             # IP permissions
             permission[:ip_ranges].to_a.each do |ip_range|
               perm = result_perm.dup
-              perm[:cidr_ips] = ip_range
+              # Mhhh... For Eucalyptus we somehow get used to use ":cidr_ip" instead of ":cidr_ips"...
+              if @params[:eucalyptus] then  perm[:cidr_ip]  = ip_range
+              else                          perm[:cidr_ips] = ip_range
+              end
               aws_perms << perm
             end
             # Group permissions
