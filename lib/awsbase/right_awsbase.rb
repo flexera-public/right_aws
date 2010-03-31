@@ -962,5 +962,11 @@ module RightAws
     end
   end
 
+  class RightBoolResponseParser < RightAWSParser #:nodoc:
+    def tagend(name)
+      @result = (@text=='true') if name == 'return'
+    end
+  end
+
 end
 

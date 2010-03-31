@@ -8,6 +8,7 @@ lib/awsbase/support.rb
 lib/ec2/right_ec2.rb
 lib/ec2/right_ec2_images.rb
 lib/ec2/right_ec2_instances.rb
+lib/ec2/right_ec2_security_groups.rb
 lib/ec2/right_ec2_spot_instances.rb
 lib/ec2/right_ec2_ebs.rb
 lib/ec2/right_ec2_reserved_instances.rb
