@@ -519,6 +519,32 @@ module RightAws
       end
       groups
     end
+
+    BLOCK_DEVICE_KEY_MAPPING = {                                                           # :nodoc:
+      :device_name               => 'DeviceName',
+      :virtual_name              => 'VirtualName',
+      :no_device                 => 'NoDevice',
+      :ebs_snapshot_id           => 'Ebs.SnapshotId',
+      :ebs_volume_size           => 'Ebs.VolumeSize',
+      :ebs_delete_on_termination => 'Ebs.DeleteOnTermination' }
+
+    def amazonize_block_device_mappings(block_device_mappings, key = 'BlockDeviceMapping') # :nodoc:
+      result = {}
+      unless block_device_mappings.blank?
+        block_device_mappings = [block_device_mappings] unless block_device_mappings.is_a?(Array)
+        block_device_mappings.each_with_index do |b, idx|
+          BLOCK_DEVICE_KEY_MAPPING.each do |local_name, remote_name|
+            value = b[local_name]
+            case local_name
+            when :no_device then value = value ? '' : nil   # allow to pass :no_device as boolean
+            end
+            result["#{key}.#{idx+1}.#{remote_name}"] = value unless value.nil?
+          end
+        end
+      end
+      result
+    end
+
   end
 
 
