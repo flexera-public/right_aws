@@ -80,7 +80,7 @@ module RightAws
     #      :aws_owner=>"826693181925"}]
     #
     def describe_security_groups(list=[])
-      link = generate_request("DescribeSecurityGroups", amazonize_list('GroupName',list.to_a))
+      link = generate_request("DescribeSecurityGroups", amazonize_list('GroupName', list))
 
       request_cache_or_info( :describe_security_groups, link,  QEc2DescribeSecurityGroupsParser, @@bench, list.blank?) do |parser|
         result = []
@@ -95,7 +95,7 @@ module RightAws
             result_perm[:to_port]   = permission[:to_port]
             result_perm[:protocol]  = permission[:ip_protocol]
             # IP permissions
-            permission[:ip_ranges].to_a.each do |ip_range|
+            Array(permission[:ip_ranges]).each do |ip_range|
               perm = result_perm.dup
               # Mhhh... For Eucalyptus we somehow get used to use ":cidr_ip" instead of ":cidr_ips"...
               if @params[:eucalyptus] then  perm[:cidr_ip]  = ip_range
@@ -104,7 +104,7 @@ module RightAws
               aws_perms << perm
             end
             # Group permissions
-            permission[:groups].to_a.each do |group|
+            Array(permission[:groups]).each do |group|
               perm = result_perm.dup
               perm[:group] = group[:group_name]
               perm[:owner] = group[:user_id]
