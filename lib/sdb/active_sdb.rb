@@ -119,7 +119,7 @@ module RightAws
   #      score         :Integer
   #      is_active     :Boolean
   #      registered_at :DateTime
-  #      created_at    :DateTime
+  #      created_at    :DateTime, :default => lambda{ Time.now }
   #    end
   #  end
   #  Person::create( :name => 'Yetta E. Andrews', :email => 'nulla.facilisis@metus.com', :score => 100, :is_active => true, :registered_at => Time.local(2000, 1, 1) )
@@ -127,19 +127,9 @@ module RightAws
   #  person = Person.find_by_email 'nulla.facilisis@metus.com'
   #  person.reload
   #
-  #  pp Person.columns #=>
-  #    #<RightAws::ActiveSdb::ColumnSet:0x7fa0a24d6620
-  #     @columns=
-  #      {"name"=>{:type=>:String},
-  #       "created_at"=>
-  #        {:type=>:DateTime},
-  #       "registered_at"=>{:type=>:DateTime},
-  #       "is_active"=>{:type=>:Boolean},
-  #       "score"=>{:type=>:Integer},
-  #       "email"=>{:type=>:String}}>
-  #
   #  pp person.attributes #=>
   #    {"name"=>["Yetta E. Andrews"],
+  #     "created_at"=>["2010-04-02T20:51:58+0400"],
   #     "id"=>"0ee24946-3e60-11df-9d4c-0025b37efad0",
   #     "registered_at"=>["2000-01-01T00:00:00+0300"],
   #     "is_active"=>["T"],
@@ -153,6 +143,7 @@ module RightAws
   #  pp person.is_active.class     #=> TrueClass
   #  pp person.score               #=> 100
   #  pp person.score.class         #=> Fixnum
+  #  pp person.created_at.to_s     #=> "2010-04-02T20:51:58+04:00"
   #
   class ActiveSdb
     
