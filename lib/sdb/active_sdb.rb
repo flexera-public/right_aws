@@ -92,6 +92,68 @@ module RightAws
   #  # remove domain
   #  Client.delete_domain
   #
+  #  # Dynamic attribute accessors
+  #
+  #  class KdClient < RightAws::ActiveSdb::Base
+  #  end
+  #
+  #  client = KdClient.select(:all, :order => 'expiration').first
+  #    pp client.attributes #=>
+  #      {"name"=>["Putin"],
+  #       "post"=>["president"],
+  #       "country"=>["Russia"],
+  #       "expiration"=>["2008"],
+  #       "id"=>"376d2e00-75b0-11dd-9557-001bfc466dd7",
+  #       "gender"=>["male"]}
+  #
+  #    pp client.name    #=> ["Putin"]
+  #    pp client.country #=> ["Russia"]
+  #    pp client.post    #=> ["president"]
+  #
+  # # Columns and simple typecasting
+  #
+  #  class Person < RightAws::ActiveSdb::Base
+  #    columns do
+  #      name
+  #      email
+  #      score         :Integer
+  #      is_active     :Boolean
+  #      registered_at :DateTime
+  #      created_at    :DateTime
+  #    end
+  #  end
+  #  Person::create( :name => 'Yetta E. Andrews', :email => 'nulla.facilisis@metus.com', :score => 100, :is_active => true, :registered_at => Time.local(2000, 1, 1) )
+  #
+  #  person = Person.find_by_email 'nulla.facilisis@metus.com'
+  #  person.reload
+  #
+  #  pp Person.columns #=>
+  #    #<RightAws::ActiveSdb::ColumnSet:0x7fa0a24d6620
+  #     @columns=
+  #      {"name"=>{:type=>:String},
+  #       "created_at"=>
+  #        {:type=>:DateTime},
+  #       "registered_at"=>{:type=>:DateTime},
+  #       "is_active"=>{:type=>:Boolean},
+  #       "score"=>{:type=>:Integer},
+  #       "email"=>{:type=>:String}}>
+  #
+  #  pp person.attributes #=>
+  #    {"name"=>["Yetta E. Andrews"],
+  #     "id"=>"0ee24946-3e60-11df-9d4c-0025b37efad0",
+  #     "registered_at"=>["2000-01-01T00:00:00+0300"],
+  #     "is_active"=>["T"],
+  #     "score"=>["100"],
+  #     "email"=>["nulla.facilisis@metus.com"]}
+  #  pp person.name                #=> "Yetta E. Andrews"
+  #  pp person.name.class          #=> String
+  #  pp person.registered_at.to_s  #=> "2000-01-01T00:00:00+03:00"
+  #  pp person.registered_at.class #=> DateTime
+  #  pp person.is_active           #=> true
+  #  pp person.is_active.class     #=> TrueClass
+  #  pp person.score               #=> 100
+  #  pp person.score.class         #=> Fixnum
+  #
   class ActiveSdb
     
     module ActiveSdbConnect

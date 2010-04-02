@@ -237,3 +237,22 @@ the source key.
   - VPC support added
   - Latest EC2 API 2009-10-31 support added
   - Some of bugs fixed
+
+=== 2.0.0
+
+  Release Notes:
+  - Added:
+    - Ec2:
+      - SpotInstances support
+      - m2.xlarge instances
+      - GetPasswordData API call (see get_password_data_v2)
+      - SecurityGroups support for Eucalyptus clouds
+    - EBS:
+      - :delete_on_termination field for volumes
+    - SimpleDB:
+      - BatchPutAttributes support
+    - ActiveSDB:
+      - Dynamic attribute accessors
+      - "Columns" support
+      - Simple Type Casting support
+  - Bunch of small issues were fixed
