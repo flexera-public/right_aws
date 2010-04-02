@@ -335,6 +335,11 @@ class TestSdb < Test::Unit::TestCase
     assert person['registered_at'].is_a?(DateTime)
     assert person[:registered_at].is_a?(DateTime)
 
+    assert ! person[:created_at].nil?
+    assert_equal DateTime, person.created_at.class
+    assert person['created_at'].is_a?(DateTime)
+    assert person[:created_at].is_a?(DateTime)
+
     assert person.is_active
 
     assert_equal 100, person.score
