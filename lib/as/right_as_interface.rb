@@ -51,7 +51,7 @@ module RightAws
   #  as.create_or_update_scaling_trigger('kd.tr.1', 'CentOS.5.1-c-array',
   #                                      :measure_name => 'CPUUtilization',
   #                                      :statistic => :average,
-  #                                      :dimentions => {
+  #                                      :dimensions => {
   #                                         'AutoScalingGroupName' => 'CentOS.5.1-c-array',
   #                                         'Namespace' => 'AWS',
   #                                         'Service' => 'EC2' },
@@ -455,12 +455,12 @@ module RightAws
     # Returns +true+ or an exception.
     #
     # Options: +:measure_name+, +:statistic+, +:period+, +:lower_threshold+, +:lower_breach_scale_increment+,
-    # +:upper_threshold+, +:upper_breach_scale_increment+, +:dimentions+, +:breach_duration+, +:unit+, +:custom_unit+
+    # +:upper_threshold+, +:upper_breach_scale_increment+, +:dimensions+, +:breach_duration+, +:unit+, +:custom_unit+
     #
     #  as.create_or_update_scaling_trigger('kd.tr.1', 'CentOS.5.1-c-array',
     #                                      :measure_name => 'CPUUtilization',
     #                                      :statistic => :average,
-    #                                      :dimentions => {
+    #                                      :dimensions => {
     #                                         'AutoScalingGroupName' => 'CentOS.5.1-c-array',
     #                                         'Namespace' => 'AWS',
     #                                         'Service' => 'EC2' },
@@ -484,11 +484,11 @@ module RightAws
                        'BreachDuration'            => options[:breach_duration] }
       request_hash['Unit']       = options[:unit]        if options[:unit]
       request_hash['CustomUnit'] = options[:custom_unit] if options[:custom_unit]
-      dimentions = []
-      (options[:dimentions] || {}).each do |key, values|
-        Array(values).each { |value| dimentions << [key, value] }
+      dimensions = []
+      (options[:dimensions] || {}).each do |key, values|
+        Array(values).each { |value| dimensions << [key, value] }
       end
-      request_hash.merge!(amazonize_list(['Dimensions.member.?.Name', 'Dimensions.member.?.Value'], dimentions))
+      request_hash.merge!(amazonize_list(['Dimensions.member.?.Name', 'Dimensions.member.?.Value'], dimensions))
       link = generate_request("CreateOrUpdateScalingTrigger", request_hash)
       request_info(link, RightHttp2xxParser.new(:logger => @logger))
     end
