@@ -20,6 +20,7 @@ begin
     
     gem.add_dependency('right_http_connection',  '>= 1.2.1')
   end
+  Jeweler::GemcutterTasks.new
 rescue LoadError
   puts "Jeweler (or a dependency) not available. Install it with: sudo gem install jeweler"
 end
