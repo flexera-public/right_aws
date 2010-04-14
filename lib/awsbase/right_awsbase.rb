@@ -23,7 +23,7 @@
 
 # Test
 module RightAws
-  require 'md5'
+  require 'digest/md5'
   require 'pp'
   
   class AwsUtils #:nodoc:
