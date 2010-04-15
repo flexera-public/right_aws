@@ -41,6 +41,7 @@ module RightAws
     #      :aws_state=>"payment-pending",
     #      :aws_product_description=>"Test",
     #      :aws_fixed_price=>325.0,
+    #      :aws_start=>"2009-12-18T20:39:39.569Z"
     #      :aws_instance_count=>1}]
     #
     def describe_reserved_instances(*reserved_instances)
@@ -123,6 +124,7 @@ module RightAws
           when 'instanceCount'       then @item[:aws_instance_count]      = @text.to_i
           when 'productDescription'  then @item[:aws_product_description] = @text
           when 'state'               then @item[:aws_state]               = @text
+          when 'start'               then @item[:aws_start]               = @text
           when 'item'                then @result << @item
         end
       end
