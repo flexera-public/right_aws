@@ -58,6 +58,7 @@ require 'sqs/right_sqs_gen2_interface'
 require 'sqs/right_sqs_gen2'
 require 'sdb/right_sdb_interface'
 require 'acf/right_acf_interface'
+require 'acf/right_acf_origin_access_identities'
 require 'rds/right_rds_interface'
 
 

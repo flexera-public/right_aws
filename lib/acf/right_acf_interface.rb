@@ -76,7 +76,7 @@ module RightAws
     
     include RightAwsBaseInterface
 
-    API_VERSION      = "2009-04-02"
+    API_VERSION      = "2010-03-01"
     DEFAULT_HOST     = 'cloudfront.amazonaws.com'
     DEFAULT_PORT     = 443
     DEFAULT_PROTOCOL = 'https'
@@ -252,7 +252,7 @@ module RightAws
     #   # list distributions by 10
     #   incrementally_list_distributions(:max_items => 10) do |response|
     #     puts response.inspect # a list of 10 distributions
-    #     false # return false if the listing should be broken otherwise use true
+    #     true # return false if the listing should be broken otherwise use true
     #   end
     #
     def incrementally_list_distributions(params={}, &block)
