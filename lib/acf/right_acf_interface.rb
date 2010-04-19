@@ -20,7 +20,6 @@
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-
 module RightAws
 
   # = RightAws::AcfInterface -- RightScale Amazon's CloudFront interface
@@ -175,7 +174,7 @@ module RightAws
       hash
     end
 
-    def config_to_xml(config) # :nodoc:
+    def distribution_config_to_xml(config, xml_wrapper='DistributionConfig') # :nodoc:
       cnames = ''
       logging = ''
       origin_access_identity = ''
@@ -214,7 +213,7 @@ module RightAws
 
       # XML
       "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
-      "<DistributionConfig xmlns=\"http://#{@params[:server]}/doc/#{API_VERSION}/\">\n" +
+      "<#{xml_wrapper} xmlns=\"http://#{@params[:server]}/doc/#{API_VERSION}/\">\n" +
       "  <Origin>#{config[:origin]}</Origin>\n" +
       "  <CallerReference>#{config[:caller_reference]}</CallerReference>\n" +
       "  <Comment>#{AcfInterface::escape(config[:comment].to_s)}</Comment>\n" +
@@ -223,7 +222,7 @@ module RightAws
       logging +
       origin_access_identity +
       trusted_signers +
-      "</DistributionConfig>"
+      "</#{xml_wrapper}>"
     end
 
     #-----------------------------------------------------------------
@@ -260,13 +259,11 @@ module RightAws
     #      {:distributions=>
     #        [{:status=>"Deployed",
     #          :aws_id=>"E2Q0AOOMFNPSYL",
-    #          :logging=>{},
     #          :origin=>"my-bucket.s3.amazonaws.com",
     #          :domain_name=>"d1s5gmdtmafnre.6hops.net",
     #          :comment=>"ONE LINE OF COMMENT",
     #          :last_modified_time=>Wed Oct 22 19:31:23 UTC 2008,
-    #          :enabled=>true,
-    #          :cnames=>[]}],
+    #          :enabled=>true}],
     #       :is_truncated=>true,
     #       :max_items=>1,
     #       :marker=>"",
@@ -298,7 +295,7 @@ module RightAws
     # Create a new distribution.
     # Returns the just created distribution or RightAws::AwsError exception.
     #
-    #  acf.create_distribution('my-bucket.s3.amazonaws.com', 'Woo-Hoo!', true, ['web1.my-awesome-site.net'],
+    #  acf.create_distribution('my-bucket.s3.amazonaws.com', 'Woo-Hoo!', true, ['web1.my-awesome-site.net'], nil,
     #                          { :prefix=>"log/", :bucket=>"my-logs.s3.amazonaws.com" } ) #=>
     #    {:comment            => "Woo-Hoo!",
     #     :enabled            => true,
@@ -325,7 +322,7 @@ module RightAws
 
     def create_distribution_by_config(config)
       config[:caller_reference] ||= generate_call_reference
-      link = generate_request('POST', 'distribution', {}, config_to_xml(config))
+      link = generate_request('POST', 'distribution', {}, distribution_config_to_xml(config))
       merge_headers(request_info(link, AcfDistributionListParser.new(:logger => @logger))[:distributions].first)
     end
 
@@ -381,7 +378,6 @@ module RightAws
     #
     #  acf.get_distribution_config('E2FNSBHNVVF11E') #=>
     #    {:e_tag=>"E1Q2DJEPTQOLJD",
-    #     :cnames=>[],
     #     :logging=>{:prefix=>"xlog/", :bucket=>"my-bucket.s3.amazonaws.com"},
     #     :enabled=>true,
     #     :caller_reference=>"201004171154450740700072",
@@ -417,7 +413,7 @@ module RightAws
     #  acf.set_distribution_config('E2REJM3VUN5RSI', config) #=> true
     #
     def set_distribution_config(aws_id, config)
-      link = generate_request('PUT', "distribution/#{aws_id}/config", {}, config_to_xml(config),
+      link = generate_request('PUT', "distribution/#{aws_id}/config", {}, distribution_config_to_xml(config),
                                      'If-Match' => config[:e_tag])
       request_info(link, RightHttp2xxParser.new(:logger => @logger))
     end
@@ -445,11 +441,10 @@ module RightAws
         case full_tag_name
         when %r{/Signer$}
           @active_signer = {}
-        when %r{DistributionSummary$},
-             %r{^Distribution$},
-             %r{^DistributionConfig$}
-          @distribution = { :cnames  => [], 
-                            :logging => {} }
+        when %r{(Streaming)?DistributionSummary$},
+             %r{^(Streaming)?Distribution$},
+             %r{^(Streaming)?DistributionConfig$}
+          @distribution = { }
         end
       end
       def tagend(name)
@@ -465,10 +460,10 @@ module RightAws
           when 'Origin'           then @distribution[:origin]             = @text
           when 'Comment'          then @distribution[:comment]            = AcfInterface::unescape(@text)
           when 'CallerReference'  then @distribution[:caller_reference]   = @text
-          when 'CNAME'            then @distribution[:cnames]            << @text
+          when 'CNAME'            then (@distribution[:cnames] ||= [])   << @text
           when 'Enabled'          then @distribution[:enabled]            = (@text == 'true')
-          when 'Bucket'           then @distribution[:logging][:bucket]   = @text
-          when 'Prefix'           then @distribution[:logging][:prefix]   = @text
+          when 'Bucket'           then (@distribution[:logging] ||= {})[:bucket] = @text
+          when 'Prefix'           then (@distribution[:logging] ||= {})[:prefix] = @text
           when 'OriginAccessIdentity' then @distribution[:origin_access_identity] = @text
         end
         case full_tag_name
@@ -478,9 +473,9 @@ module RightAws
         when %r{/Signer/AwsAccountNumber$}         then @active_signer[:aws_account_number] = @text
         when %r{/Signer/KeyPairId$}                then (@active_signer[:key_pair_ids] ||= []) << @text
         when %r{/Signer$}                          then (@distribution[:active_trusted_signers] ||= []) << @active_signer
-        when %r{DistributionSummary$},
-             %r{^Distribution$},
-             %r{^DistributionConfig$}
+        when %r{(Streaming)?DistributionSummary$},
+             %r{^(Streaming)?Distribution$},
+             %r{^(Streaming)?DistributionConfig$}
           @result[:distributions] << @distribution
         end
       end

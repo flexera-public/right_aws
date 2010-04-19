@@ -27,6 +27,7 @@ lib/sqs/right_sqs_gen2.rb
 lib/sqs/right_sqs_gen2_interface.rb
 lib/sqs/right_sqs_interface.rb
 lib/acf/right_acf_interface.rb
+lib/acf/right_acf_streaming_interface.rb
 lib/acf/right_acf_origin_access_identities.rb
 lib/rds/right_rds_interface.rb
 test/ec2/test_helper.rb
