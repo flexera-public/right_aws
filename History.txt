@@ -242,6 +242,7 @@ the source key.
 
   Release Notes:
   - Added:
+    - Ruby 1.9 support
     - Ec2:
       - SpotInstances support
       - m2.xlarge instances
