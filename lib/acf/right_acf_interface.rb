@@ -177,18 +177,42 @@ module RightAws
 
     def config_to_xml(config) # :nodoc:
       cnames = ''
+      logging = ''
+      origin_access_identity = ''
+      trusted_signers = ''
+      # CNAMES
       unless config[:cnames].blank?
         Array(config[:cnames]).each { |cname| cnames += "  <CNAME>#{cname}</CNAME>\n" }
       end
-      # logging
-      logging = ''
+      # Logging
       unless config[:logging].blank?
         logging = "  <Logging>\n" +
                   "    <Bucket>#{config[:logging][:bucket]}</Bucket>\n" +
                   "    <Prefix>#{config[:logging][:prefix]}</Prefix>\n" +
                   "  </Logging>\n"
       end
-      # xml
+      # Origin Access Identity
+      unless config[:origin_access_identity].blank?
+        origin_access_identity = config[:origin_access_identity]
+        unless origin_access_identity[%r{^origin-access-identity}]
+          origin_access_identity = "origin-access-identity/cloudfront/#{origin_access_identity}"
+        end
+        origin_access_identity = "  <OriginAccessIdentity>#{origin_access_identity}</OriginAccessIdentity>\n"
+      end
+      # Trusted Signers
+      unless config[:trusted_signers].blank?
+        trusted_signers = "  <TrustedSigners>\n"
+        Array(config[:trusted_signers]).each do |trusted_signer|
+          trusted_signers += if trusted_signer.to_s[/self/i]
+                               "    <Self/>\n"
+                             else
+                               "    <AwsAccountNumber>#{trusted_signer}</AwsAccountNumber>\n"
+                             end
+        end
+        trusted_signers += "  </TrustedSigners>\n"
+      end
+
+      # XML
       "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
       "<DistributionConfig xmlns=\"http://#{@params[:server]}/doc/#{API_VERSION}/\">\n" +
       "  <Origin>#{config[:origin]}</Origin>\n" +
@@ -197,6 +221,8 @@ module RightAws
       "  <Enabled>#{config[:enabled]}</Enabled>\n" +
       cnames  +
       logging +
+      origin_access_identity +
+      trusted_signers +
       "</DistributionConfig>"
     end
 
@@ -318,6 +344,25 @@ module RightAws
     #     :origin             => "my-bucket.s3.amazonaws.com",
     #     :last_modified_time => Wed Sep 10 17:00:54 UTC 2008 }
     #
+    #  acf.get_distribution('E2FNSBHNVVF11E') #=>
+    #    {:e_tag=>"E1Q2DJEPTQOLJD",
+    #     :status=>"InProgress",
+    #     :last_modified_time=>"2010-04-17T17:24:25.000Z",
+    #     :cnames=>["web1.my-awesome-site.net", "web2.my-awesome-site.net"],
+    #     :aws_id=>"E2FNSBHNVVF11E",
+    #     :logging=>{:prefix=>"xlog/", :bucket=>"my-bucket.s3.amazonaws.com"},
+    #     :enabled=>true,
+    #     :active_trusted_signers=>
+    #      [{:aws_account_number=>"120288270000",
+    #        :key_pair_ids=>["APKAJTD5OHNDX0000000", "APKAIK74BJWCL0000000"]},
+    #       {:aws_account_number=>"self"},
+    #       {:aws_account_number=>"648772220000"}],
+    #     :caller_reference=>"201004171154450740700072",
+    #     :domain_name=>"d1f6lpevremt5m.cloudfront.net",
+    #     :origin_access_identity=>"origin-access-identity/cloudfront/E3JPJZ80ZBX24G",
+    #     :trusted_signers=>["self", "648772220000", "120288270000"],
+    #     :origin=>"my-bucket.s3.amazonaws.com"}
+    #
     def get_distribution(aws_id)
       link = generate_request('GET', "distribution/#{aws_id}")
       merge_headers(request_info(link, AcfDistributionListParser.new(:logger => @logger))[:distributions].first)
@@ -333,6 +378,16 @@ module RightAws
     #     :cnames           => ["web1.my-awesome-site.net", "web2.my-awesome-site.net"]
     #     :comment          => "Woo-Hoo!",
     #     :origin           => "my-bucket.s3.amazonaws.com"}
+    #
+    #  acf.get_distribution_config('E2FNSBHNVVF11E') #=>
+    #    {:e_tag=>"E1Q2DJEPTQOLJD",
+    #     :cnames=>[],
+    #     :logging=>{:prefix=>"xlog/", :bucket=>"my-bucket.s3.amazonaws.com"},
+    #     :enabled=>true,
+    #     :caller_reference=>"201004171154450740700072",
+    #     :origin_access_identity=>"origin-access-identity/cloudfront/E3JPJZ80ZBX24G",
+    #     :trusted_signers=>["self", "648772220000", "120288270000"],
+    #     :origin=>"my-bucket.s3.amazonaws.com"}
     #
     def get_distribution_config(aws_id)
       link = generate_request('GET', "distribution/#{aws_id}/config")
@@ -350,8 +405,15 @@ module RightAws
     #     :cnames           => ["web1.my-awesome-site.net", "web2.my-awesome-site.net"]
     #     :comment          => "Woo-Hoo!",
     #     :origin           => "my-bucket.s3.amazonaws.com"}
-    #  config[:comment] = 'Olah-lah!'
-    #  config[:enabled] = false
+    #
+    #  config[:comment]                = 'Olah-lah!'
+    #  config[:enabled]                = false
+    #  config[:origin_access_identity] = "origin-access-identity/cloudfront/E3JPJZ80ZBX24G"
+    #  # or just
+    #  # config[:origin_access_identity] = "E3JPJZ80ZBX24G"
+    #  config[:trusted_signers]        = ['self', '648772220000', '120288270000']
+    #  config[:logging]                = { :bucket => 'my-bucket.s3.amazonaws.com', :prefix => 'xlog/' }
+    #  
     #  acf.set_distribution_config('E2REJM3VUN5RSI', config) #=> true
     #
     def set_distribution_config(aws_id, config)
@@ -380,9 +442,14 @@ module RightAws
         @result = { :distributions => [] }
       end
       def tagstart(name, attributes)
-        if name == 'DistributionSummary' || name == 'Distribution' ||
-          (name == 'DistributionConfig' && @xmlpath.blank?)
-          @distribution = { :cnames  => [], :logging => {} }
+        case full_tag_name
+        when %r{/Signer$}
+          @active_signer = {}
+        when %r{DistributionSummary$},
+             %r{^Distribution$},
+             %r{^DistributionConfig$}
+          @distribution = { :cnames  => [], 
+                            :logging => {} }
         end
       end
       def tagend(name)
@@ -390,7 +457,7 @@ module RightAws
           when 'Marker'      then @result[:marker]       = @text
           when 'NextMarker'  then @result[:next_marker]  = @text
           when 'MaxItems'    then @result[:max_items]    = @text.to_i
-          when 'IsTruncated' then @result[:is_truncated] = @text == 'true' ? true : false
+          when 'IsTruncated' then @result[:is_truncated] = (@text == 'true')
           when 'Id'               then @distribution[:aws_id]             = @text
           when 'Status'           then @distribution[:status]             = @text
           when 'LastModifiedTime' then @distribution[:last_modified_time] = Time.parse(@text)
@@ -399,12 +466,21 @@ module RightAws
           when 'Comment'          then @distribution[:comment]            = AcfInterface::unescape(@text)
           when 'CallerReference'  then @distribution[:caller_reference]   = @text
           when 'CNAME'            then @distribution[:cnames]            << @text
-          when 'Enabled'          then @distribution[:enabled]            = @text == 'true' ? true : false
+          when 'Enabled'          then @distribution[:enabled]            = (@text == 'true')
           when 'Bucket'           then @distribution[:logging][:bucket]   = @text
           when 'Prefix'           then @distribution[:logging][:prefix]   = @text
+          when 'OriginAccessIdentity' then @distribution[:origin_access_identity] = @text
         end
-        if name == 'DistributionSummary' || name == 'Distribution' ||
-          (name == 'DistributionConfig' && @xmlpath.blank?)
+        case full_tag_name
+        when %r{/TrustedSigners/Self$}             then (@distribution[:trusted_signers] ||= []) << 'self'
+        when %r{/TrustedSigners/AwsAccountNumber$} then (@distribution[:trusted_signers] ||= []) << @text
+        when %r{/Signer/Self$}                     then @active_signer[:aws_account_number] = 'self'
+        when %r{/Signer/AwsAccountNumber$}         then @active_signer[:aws_account_number] = @text
+        when %r{/Signer/KeyPairId$}                then (@active_signer[:key_pair_ids] ||= []) << @text
+        when %r{/Signer$}                          then (@distribution[:active_trusted_signers] ||= []) << @active_signer
+        when %r{DistributionSummary$},
+             %r{^Distribution$},
+             %r{^DistributionConfig$}
           @result[:distributions] << @distribution
         end
       end
