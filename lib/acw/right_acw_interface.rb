@@ -199,7 +199,7 @@ module RightAws
       end
       def tagend(name)
         case name
-        when 'Timestamp'  then @item[:timestamp]   = Time.parse(@text)
+        when 'Timestamp'  then @item[:timestamp]   = @text
         when 'Unit'       then @item[:unit]        = @text
         when 'CustomUnit' then @item[:custom_unit] = @text
         when 'Samples'    then @item[:samples]     = @text.to_f

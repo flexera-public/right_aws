@@ -41,7 +41,7 @@ module RightAws
   #      :origin             => "my-bucket.s3.amazonaws.com",
   #      :cnames             => ["x1.my-awesome-site.net", "x1.my-awesome-site.net"]
   #      :comment            => "My comments",
-  #      :last_modified_time => Wed Sep 10 17:00:04 UTC 2008 }, ..., {...} ]
+  #      :last_modified_time => "2008-09-10T17:00:04.000Z" }, ..., {...} ]
   #
   #  distibution = list.first
   #
@@ -55,7 +55,7 @@ module RightAws
   #     :aws_id             => "E2REJM3VUN5RSI",
   #     :comment            => "Woo-Hoo!",
   #     :origin             => "my-bucket.s3.amazonaws.com",
-  #     :last_modified_time => Wed Sep 10 17:00:54 UTC 2008 }
+  #     :last_modified_time => "2008-09-10T17:00:54.000Z" }
   #
   #  config = acf.get_distribution_config(distibution[:aws_id]) #=>
   #    {:enabled          => true,
@@ -262,8 +262,9 @@ module RightAws
     #          :origin=>"my-bucket.s3.amazonaws.com",
     #          :domain_name=>"d1s5gmdtmafnre.6hops.net",
     #          :comment=>"ONE LINE OF COMMENT",
-    #          :last_modified_time=>Wed Oct 22 19:31:23 UTC 2008,
-    #          :enabled=>true}],
+    #          :last_modified_time=>"2008-10-22T19:31:23.000Z",
+    #          :enabled=>true,
+    #          :cnames=>[]}],
     #       :is_truncated=>true,
     #       :max_items=>1,
     #       :marker=>"",
@@ -307,7 +308,7 @@ module RightAws
     #     :cnames             => ["web1.my-awesome-site.net"],
     #     :logging            => { :prefix => "log/",
     #                              :bucket => "my-logs.s3.amazonaws.com"},
-    #     :last_modified_time => Wed Sep 10 17:00:54 UTC 2008,
+    #     :last_modified_time => "2008-10-22T19:31:23.000Z",
     #     :caller_reference   => "200809102100536497863003"}
     #
     def create_distribution(origin, comment='', enabled=true, cnames=[], caller_reference=nil, logging={})
@@ -339,7 +340,7 @@ module RightAws
     #     :aws_id             => "E2REJM3VUN5RSI",
     #     :comment            => "Woo-Hoo!",
     #     :origin             => "my-bucket.s3.amazonaws.com",
-    #     :last_modified_time => Wed Sep 10 17:00:54 UTC 2008 }
+    #     :last_modified_time => "2008-09-10T17:00:54.000Z" }
     #
     #  acf.get_distribution('E2FNSBHNVVF11E') #=>
     #    {:e_tag=>"E1Q2DJEPTQOLJD",
@@ -455,7 +456,7 @@ module RightAws
           when 'IsTruncated' then @result[:is_truncated] = (@text == 'true')
           when 'Id'               then @distribution[:aws_id]             = @text
           when 'Status'           then @distribution[:status]             = @text
-          when 'LastModifiedTime' then @distribution[:last_modified_time] = Time.parse(@text)
+          when 'LastModifiedTime' then @distribution[:last_modified_time] = @text
           when 'DomainName'       then @distribution[:domain_name]        = @text
           when 'Origin'           then @distribution[:origin]             = @text
           when 'Comment'          then @distribution[:comment]            = AcfInterface::unescape(@text)

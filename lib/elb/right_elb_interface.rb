@@ -128,7 +128,7 @@ module RightAws
     #        :listeners =>
     #         [ { :protocol => "HTTP", :load_balancer_port => "80",  :instance_port => "80" },
     #           { :protocol => "TCP",  :load_balancer_port => "443", :instance_port => "443" } ],
-    #        :created_time => Wed May 27 11:59:11 UTC 2009,
+    #        :created_time => "2009-05-27T11:59:11.000Z",
     #        :dns_name => "test-kd1-1519253964.us-east-1.elb.amazonaws.com",
     #        :instances => [] } ]
     #
@@ -155,7 +155,7 @@ module RightAws
     #         :policy_names=>[],
     #         :instance_port=>"443",
     #         :protocol=>"TCP"}],
-    #      :created_time=>Thu Apr 15 12:04:49 UTC 2010,
+    #      :created_time=>"2010-04-15T12:04:49.000Z",
     #      :availability_zones=>["us-east-1a", "us-east-1b"],
     #      :app_cookie_stickiness_policies=>
     #       [{:policy_name=>"my-policy-1", :cookie_name=>"my-cookie-1"}],
@@ -376,7 +376,7 @@ module RightAws
         case name
         when 'LoadBalancerName'   then @item[:load_balancer_name]   = @text
         when 'DNSName'            then @item[:dns_name]             = @text
-        when 'CreatedTime'        then @item[:created_time]         = Time::parse(@text)
+        when 'CreatedTime'        then @item[:created_time]         = @text
         when 'Interval'           then @item[:health_check][:interval]            = @text.to_i
         when 'Target'             then @item[:health_check][:target]              = @text
         when 'HealthyThreshold'   then @item[:health_check][:healthy_threshold]   = @text.to_i

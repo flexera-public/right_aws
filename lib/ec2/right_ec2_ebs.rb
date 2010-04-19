@@ -37,10 +37,10 @@ module RightAws
     #        :aws_attachment_status => "attached",
     #        :zone                  => "merlot",
     #        :snapshot_id           => nil,
-    #        :aws_attached_at       => Wed Jun 18 08:19:28 UTC 2008,
+    #        :aws_attached_at       => "2008-06-18T08:19:28.000Z",
     #        :aws_status            => "in-use",
     #        :aws_id                => "vol-60957009",
-    #        :aws_created_at        => Wed Jun 18 08:19:20s UTC 2008,
+    #        :aws_created_at        => "2008-06-18T08:19:20.000Z",
     #        :aws_instance_id       => "i-c014c0a9"},
     #       {:aws_size       => 1,
     #        :zone           => "merlot",
@@ -65,7 +65,7 @@ module RightAws
     #       :aws_status     => "creating",
     #       :aws_id         => "vol-fc9f7a95",
     #       :zone           => "merlot",
-    #       :aws_created_at => Tue Jun 24 18:13:32 UTC 2008,
+    #       :aws_created_at => "2008-06-24T18:13:32.000Z",
     #       :aws_size       => 94}
     #
     def create_volume(snapshot_id, size, zone)
@@ -144,7 +144,7 @@ module RightAws
     #   [ {:aws_volume_id=>"vol-545fac3d",
     #      :aws_description=>"Wikipedia XML Backups (Linux)",
     #      :aws_progress=>"100%",
-    #      :aws_started_at=>Mon Sep 28 23:49:50 UTC 2009,
+    #      :aws_started_at=>"2009-09-28T23:49:50.000Z",
     #      :aws_owner=>"amazon",
     #      :aws_id=>"snap-8041f2e9",
     #      :aws_volume_size=>500,
@@ -152,7 +152,7 @@ module RightAws
     #     {:aws_volume_id=>"vol-185fac71",
     #      :aws_description=>"Sloan Digital Sky Survey DR6 Subset (Linux)",
     #      :aws_progress=>"100%",
-    #      :aws_started_at=>Mon Sep 28 23:56:10 UTC 2009,
+    #      :aws_started_at=>"2009-09-28T23:56:10.000Z",
     #      :aws_owner=>"amazon",
     #      :aws_id=>"snap-3740f35e",
     #      :aws_volume_size=>180,
@@ -170,7 +170,7 @@ module RightAws
     #
     #  ec2.create_snapshot('vol-898a6fe0', 'KD: WooHoo!!') #=>
     #    {:aws_volume_id=>"vol-e429db8d",
-    #     :aws_started_at=>Thu Oct 01 09:23:38 UTC 2009,
+    #     :aws_started_at=>"2009-10-01T09:23:38.000Z",
     #     :aws_description=>"KD: WooHoo!!",
     #     :aws_owner=>"648770000000",
     #     :aws_progress=>"",
@@ -194,7 +194,7 @@ module RightAws
     #
     #  ec2.try_create_snapshot('vol-898a6fe0', 'KD: WooHoo!!') #=>
     #    {:aws_volume_id=>"vol-e429db8d",
-    #     :aws_started_at=>Thu Oct 01 09:23:38 UTC 2009,
+    #     :aws_started_at=>"2009-10-01T09:23:38.000Z",
     #     :aws_description=>"KD: WooHoo!!",
     #     :aws_owner=>"648770000000",
     #     :aws_progress=>"",
@@ -335,7 +335,7 @@ module RightAws
         case name
         when 'volumeId'         then @result[:aws_id]         = @text
         when 'status'           then @result[:aws_status]     = @text
-        when 'createTime'       then @result[:aws_created_at] = Time.parse(@text)
+        when 'createTime'       then @result[:aws_created_at] = @text
         when 'size'             then @result[:aws_size]       = @text.to_i ###
         when 'snapshotId'       then @result[:snapshot_id]    = @text.blank? ? nil : @text ###
         when 'availabilityZone' then @result[:zone]           = @text ###
@@ -353,7 +353,7 @@ module RightAws
         when 'instanceId' then @result[:aws_instance_id]       = @text
         when 'device'     then @result[:aws_device]            = @text
         when 'status'     then @result[:aws_attachment_status] = @text
-        when 'attachTime' then @result[:aws_attached_at]       = Time.parse(@text)
+        when 'attachTime' then @result[:aws_attached_at]       = @text
         end
       end
       def reset
@@ -382,10 +382,10 @@ module RightAws
           when 'DescribeVolumesResponse/volumeSet/item/attachmentSet/item' then @volume[:aws_attachment_status] = @text
           end
         when 'size'             then @volume[:aws_size]        = @text.to_i
-        when 'createTime'       then @volume[:aws_created_at]  = Time.parse(@text)
+        when 'createTime'       then @volume[:aws_created_at]  = @text
         when 'instanceId'       then @volume[:aws_instance_id] = @text
         when 'device'           then @volume[:aws_device]      = @text
-        when 'attachTime'       then @volume[:aws_attached_at] = Time.parse(@text)
+        when 'attachTime'       then @volume[:aws_attached_at] = @text
         when 'snapshotId'       then @volume[:snapshot_id]     = @text.blank? ? nil : @text
         when 'availabilityZone' then @volume[:zone]            = @text
         when 'deleteOnTermination' then @volume[:delete_on_termination] = (@text == 'true')
@@ -415,7 +415,7 @@ module RightAws
         when 'volumeId'    then @snapshot[:aws_volume_id]   = @text
         when 'snapshotId'  then @snapshot[:aws_id]          = @text
         when 'status'      then @snapshot[:aws_status]      = @text
-        when 'startTime'   then @snapshot[:aws_started_at]  = Time.parse(@text)
+        when 'startTime'   then @snapshot[:aws_started_at]  = @text
         when 'progress'    then @snapshot[:aws_progress]    = @text
         when 'description' then @snapshot[:aws_description] = @text
         when 'ownerId'     then @snapshot[:aws_owner]       = @text
