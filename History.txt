@@ -280,5 +280,5 @@ the source key.
         RightAws::Ec2#describe_snapshots,
         RightAws::Ec2#create_snapshot,
         RightAws::Ec2#try_create_snapshot
-    - :describe_load_balancers in:
+    - :created_time in:
         RightAws::ElbInterface#describe_load_balancers
