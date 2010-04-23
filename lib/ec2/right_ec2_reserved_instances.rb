@@ -41,11 +41,13 @@ module RightAws
     #      :aws_state=>"payment-pending",
     #      :aws_product_description=>"Test",
     #      :aws_fixed_price=>325.0,
+    #      :aws_start=>"2009-12-18T20:39:39.569Z"
     #      :aws_instance_count=>1}]
     #
-    def describe_reserved_instances(list=[])
-      link = generate_request("DescribeReservedInstances", amazonize_list('ReservedInstancesId',list.to_a))
-      request_cache_or_info(:describe_reserved_instances, link,  QEc2DescribeReservedInstancesParser, @@bench, list.blank?)
+    def describe_reserved_instances(*reserved_instances)
+      reserved_instances = reserved_instances.flatten
+      link = generate_request("DescribeReservedInstances", amazonize_list('ReservedInstancesId', reserved_instances))
+      request_cache_or_info(:describe_reserved_instances, link,  QEc2DescribeReservedInstancesParser, @@bench, reserved_instances.blank?)
     rescue Exception
       on_exception
     end
@@ -78,7 +80,7 @@ module RightAws
     def describe_reserved_instances_offerings(*list_and_params)
       list, params = AwsUtils::split_items_and_params(list_and_params)
       # backward compartibility with the old way
-      list ||= params[:aws_ids].to_a
+      list ||= Array(params[:aws_ids])
       rparams = {}
       rparams.update(amazonize_list('ReservedInstancesOfferingId', list)) unless list.blank?
       rparams['InstanceType']       = params[:aws_instance_type]       if params[:aws_instance_type]
@@ -122,6 +124,7 @@ module RightAws
           when 'instanceCount'       then @item[:aws_instance_count]      = @text.to_i
           when 'productDescription'  then @item[:aws_product_description] = @text
           when 'state'               then @item[:aws_state]               = @text
+          when 'start'               then @item[:aws_start]               = @text
           when 'item'                then @result << @item
         end
       end

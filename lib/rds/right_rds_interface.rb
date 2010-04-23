@@ -316,8 +316,8 @@ module RightAws
     #  rds.describe_db_security_groups('kd3')
     #
     def describe_db_security_groups(*db_security_group_name, &block)
-      item, params = AwsUtils::split_items_and_params(db_security_group_name)
-      params['DBSecurityGroupName'] = item if item
+      items, params = AwsUtils::split_items_and_params(db_security_group_name)
+      params['DBSecurityGroupName'] = items.first unless items.blank?
       result = []
       incrementally_list_items('DescribeDBSecurityGroups', DescribeDbSecurityGroupsParser, params) do |response|
         result += response[:db_security_groups]
@@ -433,8 +433,8 @@ module RightAws
     #  end
     #
     def describe_db_parameter_groups(*db_parameter_group_name, &block)
-      item, params = AwsUtils::split_items_and_params(db_parameter_group_name)
-      params['DBParameterGroupName'] = item if item
+      items, params = AwsUtils::split_items_and_params(db_parameter_group_name)
+      params['DBParameterGroupName'] = items.first unless items.blank?
       result = []
       incrementally_list_items('DescribeDBParameterGroups', DescribeDbParameterGroupsParser, params) do |response|
         result += response[:db_parameter_groups]

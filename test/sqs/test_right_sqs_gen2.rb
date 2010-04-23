@@ -10,7 +10,10 @@ class TestSqsGen2 < Test::Unit::TestCase
     $stdout.sync = true
     @grantee_aws_id = '100000000001'
     @sqs = Rightscale::SqsGen2Interface.new(TestCredentials.aws_access_key_id, TestCredentials.aws_secret_access_key)
-    @queue_name = 'right_sqs_test_gen2_queue'
+    @queue_name  = 'right_sqs_test_gen2_queue'
+    @queue2_name = @queue_name + '_2'
+    @queue3_name = @queue_name + '_3'
+    @queue4_name = @queue_name + '_4'
       # for classes
     @s = Rightscale::SqsGen2.new(TestCredentials.aws_access_key_id, TestCredentials.aws_secret_access_key)
   end
@@ -24,7 +27,7 @@ class TestSqsGen2 < Test::Unit::TestCase
     do_sleep(180) do
       queue_url = @sqs.queue_url_by_name(queue_name)
     end
-    sleep 10
+    sleep 30
     queue_url
   end
 
@@ -83,8 +86,8 @@ class TestSqsGen2 < Test::Unit::TestCase
 
   def test_05_add_permissions
     queue_url = @sqs.queue_url_by_name(@queue_name)
-    assert @sqs.add_permissions(queue_url, 'test01', @grantee_aws_id => 'SendMessage')
-    assert @sqs.add_permissions(queue_url, 'test02', @grantee_aws_id => ['DeleteMessage','ReceiveMessage'])
+    assert @sqs.add_permissions(queue_url, 'test01', @grantee_aws_id, 'SendMessage')
+    assert @sqs.add_permissions(queue_url, 'test02', @grantee_aws_id, ['DeleteMessage','ReceiveMessage'])
     do_sleep 60
   end
 
@@ -108,7 +111,7 @@ class TestSqsGen2 < Test::Unit::TestCase
     assert @sqs.send_message(queue_url, RIGHT_MESSAGE_TEXT)
     assert @sqs.send_message(queue_url, RIGHT_MESSAGE_TEXT)
     assert @sqs.send_message(queue_url, RIGHT_MESSAGE_TEXT)
-    do_sleep 30
+    do_sleep 60
   end
   
   def test_15_get_queue_length
@@ -144,7 +147,7 @@ class TestSqsGen2 < Test::Unit::TestCase
       # get queues list
     queues_size = @s.queues.size
       # create new queue
-    queue = @s.queue("#{@queue_name}_20", true)
+    queue = @s.queue(@queue2_name, true)
       # check that it is created
     assert queue.is_a?(Rightscale::SqsGen2::Queue)
     wait_for_queue_url(queue.name)
@@ -154,21 +157,21 @@ class TestSqsGen2 < Test::Unit::TestCase
   end
 
   def test_21_sqs_delete_queue
-    queue = @s.queue("#{@queue_name}_20", false)
+    queue = @s.queue(@queue2_name, false)
     assert queue.delete
   end
   
   def test_22_queue_create
       # create new queue
-    queue = Rightscale::SqsGen2::Queue.create(@s, "#{@queue_name}_21", true)
+    queue = Rightscale::SqsGen2::Queue.create(@s, @queue3_name, true)
       # check that it is created
     assert queue.is_a?(Rightscale::SqsGen2::Queue)
-    wait_for_queue_url(@queue_name)
+    wait_for_queue_url("#{@queue_name}_21")
     do_sleep 10
   end
   
   def test_23_queue_attributes
-    queue = Rightscale::SqsGen2::Queue.create(@s, "#{@queue_name}_21", false)
+    queue = Rightscale::SqsGen2::Queue.create(@s, @queue3_name, false)
       # get a list of attrinutes
     attributes = queue.get_attribute
     assert attributes.is_a?(Hash) && attributes.size>0
@@ -177,7 +180,7 @@ class TestSqsGen2 < Test::Unit::TestCase
       # set attribute
     assert queue.set_attribute('VisibilityTimeout', v)
       # wait a bit
-    do_sleep 30
+    do_sleep 60
       # check that attribute has changed
     assert_equal v, queue.get_attribute('VisibilityTimeout')
       # get queue visibility timeout
@@ -189,12 +192,12 @@ class TestSqsGen2 < Test::Unit::TestCase
   end
 
   def test_24
-    queue = Rightscale::SqsGen2::Queue.create(@s, "#{@queue_name}_21", false)
+    queue = Rightscale::SqsGen2::Queue.create(@s, @queue3_name, false)
     assert queue.delete
   end
   
   def test_25_send_size
-    queue = Rightscale::SqsGen2::Queue.create(@s, "#{@queue_name}_24", true)
+    queue = Rightscale::SqsGen2::Queue.create(@s, @queue4_name, true)
       # send 5 messages
     assert queue.push('a1')
     assert queue.push('a2')
@@ -202,19 +205,19 @@ class TestSqsGen2 < Test::Unit::TestCase
     assert queue.push('a4')
     assert queue.push('a5')
       #
-    do_sleep 15
+    do_sleep(300){ queue.size == 5 }
       # check queue size
     assert_equal 5, queue.size
       # send one more
     assert queue.push('a6')
       #
-    do_sleep 15
+    do_sleep(300){ queue.size == 6 }
       # check queue size again
     assert_equal 6, queue.size
   end
   
   def test_26_message_receive_pop_delete
-    queue = Rightscale::SqsGen2::Queue.create(@s, "#{@queue_name}_24", false)
+    queue = Rightscale::SqsGen2::Queue.create(@s,  @queue4_name, false)
       # get queue size
     size = queue.size
       # get first message
@@ -224,7 +227,7 @@ class TestSqsGen2 < Test::Unit::TestCase
     m2 = queue.pop
     assert m2.is_a?(Rightscale::SqsGen2::Message)
       #
-    do_sleep 15
+    do_sleep 30
       # make sure that queue size has decreased
     assert_equal size-1, queue.size
       # delete messsage
@@ -236,7 +239,7 @@ class TestSqsGen2 < Test::Unit::TestCase
   end
  
   def test_27
-    queue = Rightscale::SqsGen2::Queue.create(@s, "#{@queue_name}_24", false)
+    queue = Rightscale::SqsGen2::Queue.create(@s, @queue4_name, false)
       # lock message 
     queue.receive(100)
       # clear queue
@@ -256,21 +259,6 @@ class TestSqsGen2 < Test::Unit::TestCase
 
     Rightscale::SqsGen2Interface.amazon_problems= nil
     assert_nil(Rightscale::SqsGen2Interface.amazon_problems)
-  end
-
-  def test_29_check_threading_model
-    assert(!@sqs.multi_thread)
-    newsqs = Rightscale::SqsGen2Interface.new(TestCredentials.aws_access_key_id, TestCredentials.aws_secret_access_key, {:multi_thread => true})
-    assert(newsqs.multi_thread)
-  end
-
-  def test_30_signature_version_0
-    sqs = Rightscale::SqsInterface.new(TestCredentials.aws_access_key_id, TestCredentials.aws_secret_access_key, :signature_version => '0')
-    assert_nothing_raised do
-      sqs.list_queues
-    end
-    # check that the request has correct signature version
-    assert sqs.last_request.path.include?('SignatureVersion=0')
   end
   
 end

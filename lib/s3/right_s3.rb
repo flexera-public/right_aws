@@ -460,6 +460,30 @@ module RightAws
         get if !@data and exists?
         @data
       end
+        
+        # Getter for the 'content-type' metadata
+      def content_type
+        @headers['content-type'] if @headers
+      end
+      
+        # Helper to get and URI-decode a header metadata.
+        # Metadata have to be HTTP encoded (rfc2616) as we use the Amazon S3 REST api
+        # see http://docs.amazonwebservices.com/AmazonS3/latest/index.html?UsingMetadata.html
+      def decoded_meta_headers(key = nil)
+        if key
+          # Get one metadata value by its key
+          URI.decode(@meta_headers[key.to_s])
+        else
+          # Get a hash of all metadata with a decoded value
+          @decoded_meta_headers ||= begin
+            metadata = {}
+            @meta_headers.each do |key, value|
+              metadata[key.to_sym] = URI.decode(value)
+            end
+            metadata
+          end
+        end
+      end
       
         # Retrieve object data and attributes from Amazon. 
         # Returns a +String+. 
@@ -759,7 +783,7 @@ module RightAws
         @thing = thing
         @id    = id
         @name  = name
-        @perms = perms.to_a
+        @perms = Array(perms)
         case action
           when :apply             then apply
           when :refresh           then refresh

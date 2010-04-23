@@ -92,6 +92,59 @@ module RightAws
   #  # remove domain
   #  Client.delete_domain
   #
+  #  # Dynamic attribute accessors
+  #
+  #  class KdClient < RightAws::ActiveSdb::Base
+  #  end
+  #
+  #  client = KdClient.select(:all, :order => 'expiration').first
+  #    pp client.attributes #=>
+  #      {"name"=>["Putin"],
+  #       "post"=>["president"],
+  #       "country"=>["Russia"],
+  #       "expiration"=>["2008"],
+  #       "id"=>"376d2e00-75b0-11dd-9557-001bfc466dd7",
+  #       "gender"=>["male"]}
+  #
+  #    pp client.name    #=> ["Putin"]
+  #    pp client.country #=> ["Russia"]
+  #    pp client.post    #=> ["president"]
+  #
+  # # Columns and simple typecasting
+  #
+  #  class Person < RightAws::ActiveSdb::Base
+  #    columns do
+  #      name
+  #      email
+  #      score         :Integer
+  #      is_active     :Boolean
+  #      registered_at :DateTime
+  #      created_at    :DateTime, :default => lambda{ Time.now }
+  #    end
+  #  end
+  #  Person::create( :name => 'Yetta E. Andrews', :email => 'nulla.facilisis@metus.com', :score => 100, :is_active => true, :registered_at => Time.local(2000, 1, 1) )
+  #
+  #  person = Person.find_by_email 'nulla.facilisis@metus.com'
+  #  person.reload
+  #
+  #  pp person.attributes #=>
+  #    {"name"=>["Yetta E. Andrews"],
+  #     "created_at"=>["2010-04-02T20:51:58+0400"],
+  #     "id"=>"0ee24946-3e60-11df-9d4c-0025b37efad0",
+  #     "registered_at"=>["2000-01-01T00:00:00+0300"],
+  #     "is_active"=>["T"],
+  #     "score"=>["100"],
+  #     "email"=>["nulla.facilisis@metus.com"]}
+  #  pp person.name                #=> "Yetta E. Andrews"
+  #  pp person.name.class          #=> String
+  #  pp person.registered_at.to_s  #=> "2000-01-01T00:00:00+03:00"
+  #  pp person.registered_at.class #=> DateTime
+  #  pp person.is_active           #=> true
+  #  pp person.is_active.class     #=> TrueClass
+  #  pp person.score               #=> 100
+  #  pp person.score.class         #=> Fixnum
+  #  pp person.created_at.to_s     #=> "2010-04-02T20:51:58+04:00"
+  #
   class ActiveSdb
     
     module ActiveSdbConnect
@@ -242,7 +295,31 @@ module RightAws
         def delete_domain
           connection.delete_domain(domain)
         end
-        
+
+        def columns(&block)
+          @columns ||= ColumnSet.new
+          @columns.instance_eval(&block) if block
+          @columns
+        end
+
+        def column?(col_name)
+          columns.include?(col_name)
+        end
+
+        def type_of(col_name)
+          columns.type_of(col_name)
+        end
+
+        def serialize(attribute, value)
+          s = serialization_for_type(type_of(attribute))
+          s ? s.serialize(value) : value.to_s
+        end
+
+        def deserialize(attribute, value)
+          s = serialization_for_type(type_of(attribute))
+          s ? s.deserialize(value) : value
+        end
+
         # Perform a find request.
         #  
         # Single record: 
@@ -364,7 +441,11 @@ module RightAws
         end
 
         def generate_id # :nodoc:
-          UUIDTools::UUID.timestamp_create().to_s
+          if UUID::VERSION::STRING < '2.0.0'
+            UUID.timestamp_create().to_s
+          else
+            UUIDTools::UUID.timestamp_create().to_s
+          end
         end
 
       protected
@@ -376,7 +457,7 @@ module RightAws
           # detect amount of records requested
           bunch_of_records_requested = args.size > 1 || args.first.is_a?(Array)
           # flatten ids
-          args = args.to_a.flatten
+          args = Array(args).flatten
           args.each { |id| cond << "id=#{self.connection.escape(id)}" }
           ids_cond = "(#{cond.join(' OR ')})"
           # user defined :conditions to string (if it was defined)
@@ -518,7 +599,7 @@ module RightAws
           # detect amount of records requested
           bunch_of_records_requested = args.size > 1 || args.first.is_a?(Array)
           # flatten ids
-          args = args.to_a.flatten
+          args = Array(args).flatten
           args.each { |id| cond << "'id'=#{self.connection.escape(id)}" }
           ids_cond = "[#{cond.join(' OR ')}]"
           # user defined :conditions to string (if it was defined)
@@ -590,6 +671,13 @@ module RightAws
           end
         end
 
+        def serialization_for_type(type)
+          @serializations ||= {}
+          unless @serializations.has_key? type
+            @serializations[type] = ::RightAws::ActiveSdb.const_get("#{type}Serialization") rescue false
+          end
+          @serializations[type]
+        end
       end
       
       public
@@ -661,7 +749,11 @@ module RightAws
         self.attributes
       end
 
-      def connection 
+      def columns
+        self.class.columns
+      end
+
+      def connection
         self.class.connection
       end
 
@@ -675,7 +767,8 @@ module RightAws
       #  puts item['Cat'].inspect  #=> ["Jons socks", "clew", "mice"]
       #
       def [](attribute)
-        @attributes[attribute.to_s]
+        raw = @attributes[attribute.to_s]
+        self.class.column?(attribute) && raw ? self.class.deserialize(attribute, raw.first) : raw
       end
 
       # Updates the attribute identified by +attribute+ with the specified +values+.
@@ -686,7 +779,14 @@ module RightAws
       #
       def []=(attribute, values)
         attribute = attribute.to_s
-        @attributes[attribute] = attribute == 'id' ? values.to_s : values.to_a.uniq
+        @attributes[attribute] = case
+        when attribute == 'id'
+          values.to_s
+        when self.class.column?(attribute)
+          self.class.serialize(attribute, values)
+        else
+          Array(values).uniq
+        end
       end
 
       # Reload attributes from SDB. Replaces in-memory attributes.
@@ -906,25 +1006,117 @@ module RightAws
         @new_record = false
       end
 
-    private    
-    
+      # support accessing attribute values via method call
+      def method_missing(method_sym, *args)
+        method_name = method_sym.to_s
+        setter = method_name[-1,1] == '='
+        method_name.chop! if setter
+
+        if @attributes.has_key?(method_name) || self.class.column?(method_name)
+          setter ? self[method_name] = args.first : self[method_name]
+        else
+          super
+        end
+      end
+
+    private
+
       def raise_on_id_absence
         raise ActiveSdbError.new('Unknown record id') unless id
       end
       
       def prepare_for_update
         @attributes['id'] = self.class.generate_id if @attributes['id'].blank?
+        columns.all.each do |col_name|
+          self[col_name] ||= columns.default(col_name)
+        end
       end
       
       def uniq_values(attributes=nil) # :nodoc:
         attrs = {}
         attributes.each do |attribute, values|
           attribute = attribute.to_s
-          attrs[attribute] = attribute == 'id' ? values.to_s : values.to_a.uniq
+          attrs[attribute] = case
+          when attribute == 'id'
+            values.to_s
+          when self.class.column?(attribute)
+            values.is_a?(String) ? values : self.class.serialize(attribute, values)
+          else
+            Array(values).uniq
+          end
           attrs.delete(attribute) if values.blank?
         end
         attrs
       end
     end
+
+    class ColumnSet
+      attr_accessor :columns
+      def initialize
+        @columns = {}
+      end
+
+      def all
+        @columns.keys
+      end
+
+      def column(col_name)
+        @columns[col_name.to_s]
+      end
+      alias_method :include?, :column
+
+      def type_of(col_name)
+        column(col_name) && column(col_name)[:type]
+      end
+
+      def default(col_name)
+        return nil unless include?(col_name)
+        default = column(col_name)[:default]
+        default.respond_to?(:call) ? default.call : default
+      end
+
+      def method_missing(method_sym, *args)
+        data_type = args.shift || :String
+        options = args.shift || {}
+        @columns[method_sym.to_s] = options.merge( :type => data_type )
+      end
+    end
+
+    class DateTimeSerialization
+      class << self
+        def serialize(date)
+          date.strftime('%Y-%m-%dT%H:%M:%S%z')
+        end
+
+        def deserialize(string)
+          r = DateTime.parse(string) rescue nil
+        end
+      end
+    end
+
+    class BooleanSerialization
+      class << self
+        def serialize(boolean)
+          boolean ? 'T' : 'F'
+        end
+
+        def deserialize(string)
+          string == 'T'
+        end
+      end
+    end
+
+    class IntegerSerialization
+      class << self
+        def serialize(int)
+          int.to_s
+        end
+
+        def deserialize(string)
+          string.to_i
+        end
+      end
+    end
+
   end
 end

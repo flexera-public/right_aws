@@ -41,6 +41,8 @@ require 'awsbase/right_awsbase'
 require 'ec2/right_ec2'
 require 'ec2/right_ec2_images'
 require 'ec2/right_ec2_instances'
+require 'ec2/right_ec2_security_groups'
+require 'ec2/right_ec2_spot_instances'
 require 'ec2/right_ec2_ebs'
 require 'ec2/right_ec2_reserved_instances'
 require 'ec2/right_ec2_vpc'
@@ -56,16 +58,18 @@ require 'sqs/right_sqs_gen2_interface'
 require 'sqs/right_sqs_gen2'
 require 'sdb/right_sdb_interface'
 require 'acf/right_acf_interface'
+require 'acf/right_acf_streaming_interface'
+require 'acf/right_acf_origin_access_identities'
 require 'rds/right_rds_interface'
 
 
 module RightAws #:nodoc:
   module VERSION #:nodoc:
-    MAJOR = 1
-    MINOR = 11
-    TINY  = 0
+    MAJOR = 2  unless defined?(MAJOR)
+    MINOR = 0 unless defined?(MINOR)
+    TINY  = 0  unless defined?(TINY)
 
-    STRING = [MAJOR, MINOR, TINY].join('.')
+    STRING = [MAJOR, MINOR, TINY].join('.') unless defined?(STRING)
   end
 end
 

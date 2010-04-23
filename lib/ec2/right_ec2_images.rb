@@ -38,7 +38,7 @@ module RightAws
     def ec2_describe_images(params={}, image_type=nil, cache_for=nil) #:nodoc:
       request_hash = {}
       params.each do |list_by, list|
-        request_hash.merge! amazonize_list(list_by, list.to_a)
+        request_hash.merge! amazonize_list(list_by, Array(list))
       end
       request_hash['ImageType'] = image_type if image_type
       link = generate_request("DescribeImages", request_hash)
@@ -80,10 +80,10 @@ module RightAws
     #
     #  ec2.describe_images(['ami-5aa1f74c'])
     #
-    def describe_images(list=[], image_type=nil)
-      list = list.to_a
-      cache_for = list.empty? && !image_type ? :describe_images : nil
-      ec2_describe_images({ 'ImageId' => list }, image_type, cache_for)
+    def describe_images(images=[], image_type=nil)
+      images = Array(images)
+      cache_for = images.empty? && !image_type ? :describe_images : nil
+      ec2_describe_images({ 'ImageId' => images }, image_type, cache_for)
     end
 
     #  Example:
@@ -91,10 +91,10 @@ module RightAws
     #   ec2.describe_images_by_owner('522821470517')
     #   ec2.describe_images_by_owner('self')
     #
-    def describe_images_by_owner(list=['self'], image_type=nil)
-      list = list.to_a
-      cache_for = list==['self'] && !image_type ? :describe_images_by_owner : nil
-      ec2_describe_images({ 'Owner' => list }, image_type, cache_for)
+    def describe_images_by_owner(owners=['self'], image_type=nil)
+      owners = Array(owners)
+      cache_for = (owners == ['self']) && (!image_type ? :describe_images_by_owner : nil)
+      ec2_describe_images({ 'Owner' => owners }, image_type, cache_for)
     end
 
     #  Example:
@@ -103,10 +103,10 @@ module RightAws
     #   ec2.describe_images_by_executable_by('self')
     #   ec2.describe_images_by_executable_by('all')
     #
-    def describe_images_by_executable_by(list=['self'], image_type=nil)
-      list = list.to_a
-      cache_for = list==['self'] && !image_type ? :describe_images_by_executable_by : nil
-      ec2_describe_images({ 'ExecutableBy' => list }, image_type, cache_for)
+    def describe_images_by_executable_by(executable_by=['self'], image_type=nil)
+      executable_by = Array(executable_by)
+      cache_for = (executable_by==['self']) && (!image_type ? :describe_images_by_executable_by : nil)
+      ec2_describe_images({ 'ExecutableBy' => executable_by }, image_type, cache_for)
     end
 
 
@@ -209,9 +209,9 @@ module RightAws
       params =  {'ImageId'   => image_id,
                  'Attribute' => attribute}
       params['OperationType'] = operation_type if operation_type
-      params.update(amazonize_list('UserId',      vars[:user_id].to_a))    if vars[:user_id]
-      params.update(amazonize_list('UserGroup',   vars[:user_group].to_a)) if vars[:user_group]
-      params.update(amazonize_list('ProductCode', vars[:product_code]))    if vars[:product_code]
+      params.update(amazonize_list('UserId',      vars[:user_id]))      if vars[:user_id]
+      params.update(amazonize_list('UserGroup',   vars[:user_group]))   if vars[:user_group]
+      params.update(amazonize_list('ProductCode', vars[:product_code])) if vars[:product_code]
       link = generate_request("ModifyImageAttribute", params)
       request_info(link, RightBoolResponseParser.new(:logger => @logger))
     rescue Exception
@@ -224,7 +224,7 @@ module RightAws
     #
     #  ec2.modify_image_launch_perm_add_users('ami-e444444d',['000000000777','000000000778']) #=> true
     def modify_image_launch_perm_add_users(image_id, user_id=[])
-      modify_image_attribute(image_id, 'launchPermission', 'add', :user_id => user_id.to_a)
+      modify_image_attribute(image_id, 'launchPermission', 'add', :user_id => user_id)
     end
 
     # Revokes image launch permissions for users. +user_id+ is a list of users AWS accounts ids. Returns +true+ or an exception.
@@ -232,7 +232,7 @@ module RightAws
     #  ec2.modify_image_launch_perm_remove_users('ami-e444444d',['000000000777','000000000778']) #=> true
     #
     def modify_image_launch_perm_remove_users(image_id, user_id=[])
-      modify_image_attribute(image_id, 'launchPermission', 'remove', :user_id => user_id.to_a)
+      modify_image_attribute(image_id, 'launchPermission', 'remove', :user_id => user_id)
     end
 
     # Add image launch permissions for users groups (currently only 'all' is supported, which gives public launch permissions).
@@ -241,7 +241,7 @@ module RightAws
     #  ec2.modify_image_launch_perm_add_groups('ami-e444444d') #=> true
     #
     def modify_image_launch_perm_add_groups(image_id, user_group=['all'])
-      modify_image_attribute(image_id, 'launchPermission', 'add', :user_group => user_group.to_a)
+      modify_image_attribute(image_id, 'launchPermission', 'add', :user_group => user_group)
     end
 
     # Remove image launch permissions for users groups (currently only 'all' is supported, which gives public launch permissions).
@@ -249,7 +249,7 @@ module RightAws
     #  ec2.modify_image_launch_perm_remove_groups('ami-e444444d') #=> true
     #
     def modify_image_launch_perm_remove_groups(image_id, user_group=['all'])
-      modify_image_attribute(image_id, 'launchPermission', 'remove', :user_group => user_group.to_a)
+      modify_image_attribute(image_id, 'launchPermission', 'remove', :user_group => user_group)
     end
 
     # Add product code to image
@@ -257,7 +257,7 @@ module RightAws
     #  ec2.modify_image_product_code('ami-e444444d','0ABCDEF') #=> true
     #
     def modify_image_product_code(image_id, product_code=[])
-      modify_image_attribute(image_id, 'productCodes', nil, :product_code => product_code.to_a)
+      modify_image_attribute(image_id, 'productCodes', nil, :product_code => product_code)
     end
 
     # Create a new image.

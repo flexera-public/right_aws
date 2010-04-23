@@ -51,7 +51,7 @@ module RightAws
   #  as.create_or_update_scaling_trigger('kd.tr.1', 'CentOS.5.1-c-array',
   #                                      :measure_name => 'CPUUtilization',
   #                                      :statistic => :average,
-  #                                      :dimentions => {
+  #                                      :dimensions => {
   #                                         'AutoScalingGroupName' => 'CentOS.5.1-c-array',
   #                                         'Namespace' => 'AWS',
   #                                         'Service' => 'EC2' },
@@ -153,8 +153,8 @@ module RightAws
       options[:min_size] ||= 1
       options[:max_size] ||= 20
       options[:cooldown] ||= 0
-      request_hash = amazonize_list('AvailabilityZones.member', availability_zones.to_a)
-      request_hash.merge!( amazonize_list('LoadBalancerNames', options[:load_balancer_names].to_a) )
+      request_hash = amazonize_list('AvailabilityZones.member', availability_zones)
+      request_hash.merge!( amazonize_list('LoadBalancerNames', options[:load_balancer_names]) )
       request_hash.merge!( 'AutoScalingGroupName'    => auto_scaling_group_name,
                            'LaunchConfigurationName' => launch_configuration_name,
                            'MinSize'                 => options[:min_size],
@@ -204,7 +204,7 @@ module RightAws
     #  as.update_auto_scaling_group('CentOS.5.1-c', :min_size => 1, :max_size => 4) #=> true
     #
     def update_auto_scaling_group(auto_scaling_group_name, options={})
-      request_hash = amazonize_list('AvailabilityZones.member', options[:availability_zones].to_a)
+      request_hash = amazonize_list('AvailabilityZones.member', options[:availability_zones])
       request_hash['AutoScalingGroupName']    = auto_scaling_group_name
       request_hash['LaunchConfigurationName'] = options[:launch_configuration_name] if options[:launch_configuration_name]
       request_hash['MinSize']  = options[:min_size] if options[:min_size]
@@ -339,21 +339,26 @@ module RightAws
     # Options: +:security_groups+, +:block_device_mappings+, +:key_name+,
     # +:user_data+, +:kernel_id+, +:ramdisk_id+
     #
-    #  as.create_launch_configuration('CentOS.5.1-c', 'ami-08f41161', 'm1.small',
-    #                                 :key_name        => 'kd-moo-test',
-    #                                 :security_groups => ['default'],
-    #                                 :user_data       => "Woohoo: CentOS.5.1-c" ) #=> true
+    #  as.create_launch_configuration('kd: CentOS.5.1-c.1', 'ami-08f41161', 'c1.medium',
+    #    :key_name        => 'tim',
+    #    :security_groups => ['default'],
+    #    :user_data       => "Woohoo: CentOS.5.1-c",
+    #    :block_device_mappings => [ { :device_name     => '/dev/sdk',
+    #                                  :ebs_snapshot_id => 'snap-145cbc7d',
+    #          :ebs_delete_on_termination => true,
+    #          :ebs_volume_size => 3,
+    #          :virtual_name => 'ephemeral2'
+    #                                } ]
+    #    ) #=> true
     #
     def create_launch_configuration(launch_configuration_name, image_id, instance_type, options={})
-      availability_zones = availability_zones.to_a
       request_hash = { 'LaunchConfigurationName' => launch_configuration_name,
                        'ImageId'                 => image_id,
                        'InstanceType'            => instance_type }
       request_hash.merge!(amazonize_list('SecurityGroups.member',      options[:security_groups]))       unless options[:security_groups].blank?
-      request_hash.merge!(amazonize_list(['BlockDeviceMappings.member.?.DeviceName', 'BlockDeviceMappings.member.?.VirtualName'],
-                                          options[:block_device_mappings].to_a)) unless options[:block_device_mappings].blank?
+      request_hash.merge!(amazonize_block_device_mappings(options[:block_device_mappings], 'BlockDeviceMappings.member'))
       request_hash['KeyName']   = options[:key_name]   if options[:key_name]
-      request_hash['UserData']  = options[:user_data]  if options[:user_data]
+      request_hash['UserData']  = Base64.encode64(options[:user_data]).delete("\n") unless options[:user_data].blank? if options[:user_data]
       request_hash['KernelId']  = options[:kernel_id]  if options[:kernel_id]
       request_hash['RamdiskId'] = options[:ramdisk_id] if options[:ramdisk_id]
       link = generate_request("CreateLaunchConfiguration", request_hash)
@@ -365,16 +370,17 @@ module RightAws
     # Returns an array of configurations.
     #
     #  as.describe_launch_configurations #=>
-    #    [{:created_time=>Thu May 28 09:31:20 UTC 2009,
-    #      :kernel_id=>"",
-    #      :launch_configuration_name=>"CentOS.5.1-c",
+    #    [{:security_groups=>["default"],
     #      :ramdisk_id=>"",
-    #      :security_groups=>["default"],
-    #      :key_name=>"kd-moo-test",
-    #      :user_data=>"Woohoo: CentOS.5.1-c-array",
+    #      :user_data=>"V29vaG9vOiBDZW50T1MuNS4xLWM=",
+    #      :instance_type=>"c1.medium",
+    #      :block_device_mappings=>
+    #       [{:virtual_name=>"ephemeral2", :device_name=>"/dev/sdk"}],
+    #      :launch_configuration_name=>"kd: CentOS.5.1-c.1",
+    #      :created_time=>"2010-03-29T10:00:32.742Z",
     #      :image_id=>"ami-08f41161",
-    #      :block_device_mappings=>[],
-    #      :instance_type=>"m1.small"}, ... ]
+    #      :key_name=>"tim",
+    #      :kernel_id=>""}, ...]
     #
     def describe_launch_configurations(*launch_configuration_names)
       result = []
@@ -449,12 +455,12 @@ module RightAws
     # Returns +true+ or an exception.
     #
     # Options: +:measure_name+, +:statistic+, +:period+, +:lower_threshold+, +:lower_breach_scale_increment+,
-    # +:upper_threshold+, +:upper_breach_scale_increment+, +:dimentions+, +:breach_duration+, +:unit+, +:custom_unit+
+    # +:upper_threshold+, +:upper_breach_scale_increment+, +:dimensions+, +:breach_duration+, +:unit+, +:custom_unit+
     #
     #  as.create_or_update_scaling_trigger('kd.tr.1', 'CentOS.5.1-c-array',
     #                                      :measure_name => 'CPUUtilization',
     #                                      :statistic => :average,
-    #                                      :dimentions => {
+    #                                      :dimensions => {
     #                                         'AutoScalingGroupName' => 'CentOS.5.1-c-array',
     #                                         'Namespace' => 'AWS',
     #                                         'Service' => 'EC2' },
@@ -478,11 +484,11 @@ module RightAws
                        'BreachDuration'            => options[:breach_duration] }
       request_hash['Unit']       = options[:unit]        if options[:unit]
       request_hash['CustomUnit'] = options[:custom_unit] if options[:custom_unit]
-      dimentions = []
-      (options[:dimentions] || {}).each do |key, values|
-        values.to_a.each { |value| dimentions << [key, value] }
+      dimensions = []
+      (options[:dimensions] || {}).each do |key, values|
+        Array(values).each { |value| dimensions << [key, value] }
       end
-      request_hash.merge!(amazonize_list(['Dimensions.member.?.Name', 'Dimensions.member.?.Value'], dimentions))
+      request_hash.merge!(amazonize_list(['Dimensions.member.?.Name', 'Dimensions.member.?.Value'], dimensions))
       link = generate_request("CreateOrUpdateScalingTrigger", request_hash)
       request_info(link, RightHttp2xxParser.new(:logger => @logger))
     end
@@ -537,8 +543,8 @@ module RightAws
       def tagend(name)
         case name
         when 'ActivityId'    then @item[:activity_id]    = @text
-        when 'StartTime'     then @item[:start_time]     = Time::parse(@text)
-        when 'EndTime'       then @item[:end_time]       = Time::parse(@text)
+        when 'StartTime'     then @item[:start_time]     = @text
+        when 'EndTime'       then @item[:end_time]       = @text
         when 'Progress'      then @item[:progress]       = @text.to_i
         when 'StatusCode'    then @item[:status_code]    = @text
         when 'Cause'         then @item[:cause]          = @text
@@ -570,7 +576,7 @@ module RightAws
       end
       def tagend(name)
         case name
-        when 'CreatedTime'             then @item[:created_time]              = Time::parse(@text)
+        when 'CreatedTime'             then @item[:created_time]              = @text
         when 'MinSize'                 then @item[:min_size]                  = @text.to_i
         when 'MaxSize'                 then @item[:max_size]                  = @text.to_i
         when 'DesiredCapacity'         then @item[:desired_capacity]          = @text.to_i
@@ -603,18 +609,17 @@ module RightAws
 
     class DescribeLaunchConfigurationsParser < RightAWSParser #:nodoc:
       def tagstart(name, attributes)
-        case name
-        when 'member'
-          case @xmlpath
-            when @p
-              @item = { :block_device_mappings => [],
-                        :security_groups       => [] }
-          end
+        case full_tag_name
+        when %r{/LaunchConfigurations/member$}
+          @item = { :block_device_mappings => [],
+                    :security_groups       => [] }
+        when %r{/BlockDeviceMappings/member$}
+          @block_device_mapping = {}
         end
       end
       def tagend(name)
         case name
-        when 'CreatedTime'             then @item[:created_time]              = Time::parse(@text)
+        when 'CreatedTime'             then @item[:created_time]              = @text
         when 'InstanceType'            then @item[:instance_type]             = @text
         when 'KeyName'                 then @item[:key_name]                  = @text
         when 'ImageId'                 then @item[:image_id]                  = @text
@@ -622,20 +627,24 @@ module RightAws
         when 'RamdiskId'               then @item[:ramdisk_id]                = @text
         when 'LaunchConfigurationName' then @item[:launch_configuration_name] = @text
         when 'UserData'                then @item[:user_data]                 = @text
-        when 'member'
-          case @xmlpath
-          when "#@p/member/BlockDeviceMappings" then @item[:block_device_mappings]   << @text
-          when "#@p/member/SecurityGroups"      then @item[:security_groups]         << @text
-          when @p
-            @item[:block_device_mappings].sort!
+        when 'NextToken'               then @result[:next_token]              = @text
+        else
+          case full_tag_name
+          when %r{/BlockDeviceMappings/member} # no trailing $
+            case name
+            when 'DeviceName'          then @block_device_mapping[:device_name]  = @text
+            when 'VirtualName'         then @block_device_mapping[:virtual_name] = @text
+            when 'member'              then @item[:block_device_mappings]        << @block_device_mapping
+            end
+          when %r{member/SecurityGroups/member$} 
+            @item[:security_groups] << @text
+          when %r{/LaunchConfigurations/member$}
             @item[:security_groups].sort!
             @result[:launch_configurations] << @item
           end
-        when 'NextToken' then @result[:next_token] = @text
         end
       end
       def reset
-        @p      = 'DescribeLaunchConfigurationsResponse/DescribeLaunchConfigurationsResult/LaunchConfigurations'
         @result = { :launch_configurations => []}
       end
     end
@@ -660,7 +669,7 @@ module RightAws
         case name
         when 'AutoScalingGroupName'      then @item[:auto_scaling_group_name]      = @text
         when 'MeasureName'               then @item[:measure_name]                 = @text
-        when 'CreatedTime'               then @item[:created_time]                 = Time::parse(@text)
+        when 'CreatedTime'               then @item[:created_time]                 = @text
         when 'BreachDuration'            then @item[:breach_duration]              = @text.to_i
         when 'UpperBreachScaleIncrement' then @item[:upper_breach_scale_increment] = @text.to_i
         when 'UpperThreshold'            then @item[:upper_threshold]              = @text.to_f

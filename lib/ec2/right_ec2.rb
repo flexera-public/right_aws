@@ -68,7 +68,7 @@ module RightAws
     include RightAwsBaseInterface
     
     # Amazon EC2 API version being used
-    API_VERSION       = "2009-10-31"
+    API_VERSION       = "2009-11-30"
     DEFAULT_HOST      = "ec2.amazonaws.com"
     DEFAULT_PATH      = '/'
     DEFAULT_PROTOCOL  = 'https'
@@ -81,7 +81,7 @@ module RightAws
     # Amazon EC2 Instance Types : http://www.amazon.com/b?ie=UTF8&node=370375011
     # Default EC2 instance type (platform) 
     DEFAULT_INSTANCE_TYPE   =  'm1.small' 
-    INSTANCE_TYPES          = ['m1.small','c1.medium','m1.large','m1.xlarge','c1.xlarge', 'm2.2xlarge', 'm2.4xlarge']
+    INSTANCE_TYPES          = ['m1.small','c1.medium','m1.large','m1.xlarge','c1.xlarge', 'm2.xlarge', 'm2.2xlarge', 'm2.4xlarge']
     
     @@bench = AwsBenchmarkingBlock.new
     def self.bench_xml
@@ -123,6 +123,10 @@ module RightAws
            aws_access_key_id    || ENV['AWS_ACCESS_KEY_ID'] , 
            aws_secret_access_key|| ENV['AWS_SECRET_ACCESS_KEY'],
            params)
+      # Eucalyptus supports some yummy features but Amazon does not
+      if @params[:eucalyptus]
+        @params[:port_based_group_ingress] = true unless @params.has_key?(:port_based_group_ingress)
+      end
     end
 
     def generate_request(action, params={}) #:nodoc:
@@ -133,153 +137,6 @@ module RightAws
       # Raises AwsError if any banana happened
     def request_info(request, parser)  #:nodoc:
       request_info_impl(:ec2_connection, @@bench, request, parser)
-    end
-
-  #-----------------------------------------------------------------
-  #      Security groups
-  #-----------------------------------------------------------------
-
-      # Retrieve Security Group information. If +list+ is omitted the returns the whole list of groups.
-      #
-      #  ec2.describe_security_groups #=>
-      #    [{:aws_group_name  => "default-1",
-      #      :aws_owner       => "000000000888",
-      #      :aws_description => "Default allowing SSH, HTTP, and HTTPS ingress",
-      #      :aws_perms       =>
-      #        [{:owner => "000000000888", :group => "default"},
-      #         {:owner => "000000000888", :group => "default-1"},
-      #         {:to_port => "-1",  :protocol => "icmp", :from_port => "-1",  :cidr_ips => "0.0.0.0/0"},
-      #         {:to_port => "22",  :protocol => "tcp",  :from_port => "22",  :cidr_ips => "0.0.0.0/0"},
-      #         {:to_port => "80",  :protocol => "tcp",  :from_port => "80",  :cidr_ips => "0.0.0.0/0"},
-      #         {:to_port => "443", :protocol => "tcp",  :from_port => "443", :cidr_ips => "0.0.0.0/0"}]},
-      #    ..., {...}]
-      #
-    def describe_security_groups(list=[])
-      link = generate_request("DescribeSecurityGroups", amazonize_list('GroupName',list.to_a))
-      request_cache_or_info( :describe_security_groups, link,  QEc2DescribeSecurityGroupsParser, @@bench, list.blank?) do |parser|
-        result = []     
-        parser.result.each do |item|
-          perms = []
-          item.ipPermissions.each do |perm|
-            perm.groups.each do |ngroup|
-              perms << {:group => ngroup.groupName,
-                        :owner => ngroup.userId}
-            end
-            perm.ipRanges.each do |cidr_ip|
-              perms << {:from_port => perm.fromPort, 
-                        :to_port   => perm.toPort, 
-                        :protocol  => perm.ipProtocol,
-                        :cidr_ips  => cidr_ip}
-            end
-          end
-
-             # delete duplication
-          perms.each_index do |i|
-            (0...i).each do |j|
-              if perms[i] == perms[j] then perms[i] = nil; break; end
-            end
-          end
-          perms.compact!
-
-          result << {:aws_owner       => item.ownerId, 
-                     :aws_group_name  => item.groupName, 
-                     :aws_description => item.groupDescription,
-                     :aws_perms       => perms}
-        
-        end
-        result
-      end
-    rescue Exception
-      on_exception
-    end
-    
-      # Create new Security Group. Returns +true+ or an exception.
-      #
-      #  ec2.create_security_group('default-1',"Default allowing SSH, HTTP, and HTTPS ingress") #=> true
-      #
-    def create_security_group(name, description)
-      # EC2 doesn't like an empty description...
-      description = " " if description.blank?
-      link = generate_request("CreateSecurityGroup", 
-                              'GroupName'        => name.to_s,
-                              'GroupDescription' => description.to_s)
-      request_info(link, RightBoolResponseParser.new(:logger => @logger))
-    rescue Exception
-      on_exception
-    end
-
-      # Remove Security Group. Returns +true+ or an exception.
-      #
-      #  ec2.delete_security_group('default-1') #=> true
-      #
-    def delete_security_group(name)
-      link = generate_request("DeleteSecurityGroup", 
-                              'GroupName' => name.to_s)
-      request_info(link, RightBoolResponseParser.new(:logger => @logger))
-    rescue Exception
-      on_exception
-    end
-    
-      # Authorize named ingress for security group. Allows instances that are member of someone
-      # else's security group to open connections to instances in my group.
-      #
-      #  ec2.authorize_security_group_named_ingress('my_awesome_group', '7011-0219-8268', 'their_group_name') #=> true
-      #
-    def authorize_security_group_named_ingress(name, owner, group)
-      link = generate_request("AuthorizeSecurityGroupIngress", 
-                              'GroupName'                  => name.to_s,
-                                'SourceSecurityGroupName'    => group.to_s,
-                              'SourceSecurityGroupOwnerId' => owner.to_s.gsub(/-/,''))
-      request_info(link, RightBoolResponseParser.new(:logger => @logger))
-    rescue Exception
-      on_exception
-    end
-    
-      # Revoke named ingress for security group.
-      #
-      #  ec2.revoke_security_group_named_ingress('my_awesome_group', aws_user_id, 'another_group_name') #=> true
-      #
-    def revoke_security_group_named_ingress(name, owner, group)
-      link = generate_request("RevokeSecurityGroupIngress", 
-                              'GroupName'                  => name.to_s,
-                              'SourceSecurityGroupName'    => group.to_s,
-                              'SourceSecurityGroupOwnerId' => owner.to_s.gsub(/-/,''))
-      request_info(link, RightBoolResponseParser.new(:logger => @logger))
-    rescue Exception
-      on_exception
-    end
-    
-      # Add permission to a security group. Returns +true+ or an exception. +protocol+ is one of :'tcp'|'udp'|'icmp'.
-      #
-      #  ec2.authorize_security_group_IP_ingress('my_awesome_group', 80, 82, 'udp', '192.168.1.0/8') #=> true
-      #  ec2.authorize_security_group_IP_ingress('my_awesome_group', -1, -1, 'icmp') #=> true
-      #
-    def authorize_security_group_IP_ingress(name, from_port, to_port, protocol='tcp', cidr_ip='0.0.0.0/0')
-      link = generate_request("AuthorizeSecurityGroupIngress", 
-                              'GroupName'  => name.to_s,
-                              'IpProtocol' => protocol.to_s,
-                              'FromPort'   => from_port.to_s,
-                              'ToPort'     => to_port.to_s,
-                              'CidrIp'     => cidr_ip.to_s)
-      request_info(link, RightBoolResponseParser.new(:logger => @logger))
-    rescue Exception
-      on_exception
-    end
-    
-      # Remove permission from a security group. Returns +true+ or an exception. +protocol+ is one of :'tcp'|'udp'|'icmp' ('tcp' is default). 
-      #
-      #  ec2.revoke_security_group_IP_ingress('my_awesome_group', 80, 82, 'udp', '192.168.1.0/8') #=> true
-      #
-    def revoke_security_group_IP_ingress(name, from_port, to_port, protocol='tcp', cidr_ip='0.0.0.0/0')
-      link = generate_request("RevokeSecurityGroupIngress", 
-                              'GroupName'  => name.to_s,
-                              'IpProtocol' => protocol.to_s,
-                              'FromPort'   => from_port.to_s,
-                              'ToPort'     => to_port.to_s,
-                              'CidrIp'     => cidr_ip.to_s)
-      request_info(link, RightBoolResponseParser.new(:logger => @logger))
-    rescue Exception
-      on_exception
     end
 
   #-----------------------------------------------------------------
@@ -294,9 +151,10 @@ module RightAws
       #     {:aws_fingerprint=> "1e:29:30:47:58:6d:7b:8c:9f:08:11:20:3c:44:52:69:74:80:97:08", :aws_key_name=>"key-2"},
       #      ..., {...} ]
       #
-    def describe_key_pairs(list=[])
-      link = generate_request("DescribeKeyPairs", amazonize_list('KeyName',list.to_a))
-      request_cache_or_info :describe_key_pairs, link,  QEc2DescribeKeyPairParser, @@bench, list.blank?
+    def describe_key_pairs(*key_pairs)
+      key_pairs = key_pairs.flatten
+      link = generate_request("DescribeKeyPairs", amazonize_list('KeyName', key_pairs))
+      request_cache_or_info :describe_key_pairs, link,  QEc2DescribeKeyPairParser, @@bench, key_pairs.blank?
     rescue Exception
       on_exception
     end
@@ -366,10 +224,10 @@ module RightAws
     #
     #  ec2.describe_addresses('75.101.154.140') #=> [{:instance_id=>"i-d630cbbf", :public_ip=>"75.101.154.140"}]
     #
-    def describe_addresses(list=[])
-      link = generate_request("DescribeAddresses", 
-                              amazonize_list('PublicIp',list.to_a))
-      request_cache_or_info :describe_addresses, link,  QEc2DescribeAddressesParser, @@bench, list.blank?
+    def describe_addresses(*addresses)
+      addresses = addresses.flatten
+      link = generate_request("DescribeAddresses", amazonize_list('PublicIp', addresses))
+      request_cache_or_info :describe_addresses, link,  QEc2DescribeAddressesParser, @@bench, addresses.blank?
     rescue Exception
       on_exception
     end
@@ -415,10 +273,10 @@ module RightAws
     #                                                      :zone_state=>"available",
     #                                                      :zone_name=>"us-east-1c"}]
     #
-    def describe_availability_zones(list=[])
-      link = generate_request("DescribeAvailabilityZones", 
-                              amazonize_list('ZoneName',list.to_a))
-      request_cache_or_info :describe_availability_zones, link,  QEc2DescribeAvailabilityZonesParser, @@bench, list.blank?
+    def describe_availability_zones(*availability_zones)
+      availability_zones = availability_zones.flatten
+      link = generate_request("DescribeAvailabilityZones", amazonize_list('ZoneName', availability_zones))
+      request_cache_or_info :describe_availability_zones, link,  QEc2DescribeAvailabilityZonesParser, @@bench, availability_zones.blank?
     rescue Exception
       on_exception
     end
@@ -431,22 +289,12 @@ module RightAws
     #
     #  ec2.describe_regions  #=> ["eu-west-1", "us-east-1"]
     #
-    def describe_regions(list=[])
-      link = generate_request("DescribeRegions",
-                              amazonize_list('RegionName',list.to_a))
-      request_cache_or_info :describe_regions, link,  QEc2DescribeRegionsParser, @@bench, list.blank?
+    def describe_regions(*regions)
+      regions = regions.flatten
+      link = generate_request("DescribeRegions", amazonize_list('RegionName', regions))
+      request_cache_or_info :describe_regions, link,  QEc2DescribeRegionsParser, @@bench, regions.blank?
     rescue Exception
       on_exception
-    end
-
-  #-----------------------------------------------------------------
-  #      PARSERS: Boolean Response Parser
-  #-----------------------------------------------------------------
-    
-    class RightBoolResponseParser < RightAWSParser #:nodoc:
-      def tagend(name)
-        @result = @text=='true' ? true : false if name == 'return'
-      end
     end
 
   #-----------------------------------------------------------------
@@ -479,76 +327,6 @@ module RightAws
           when 'keyFingerprint' then @result[:aws_fingerprint] = @text
           when 'keyMaterial'    then @result[:aws_material]    = @text
         end
-      end
-    end
-
-  #-----------------------------------------------------------------
-  #      PARSERS: Security Groups
-  #-----------------------------------------------------------------
-
-    class QEc2UserIdGroupPairType #:nodoc:
-      attr_accessor :userId
-      attr_accessor :groupName
-    end
-
-    class QEc2IpPermissionType #:nodoc:
-      attr_accessor :ipProtocol
-      attr_accessor :fromPort
-      attr_accessor :toPort
-      attr_accessor :groups
-      attr_accessor :ipRanges
-    end
-
-    class QEc2SecurityGroupItemType #:nodoc:
-      attr_accessor :groupName
-      attr_accessor :groupDescription
-      attr_accessor :ownerId
-      attr_accessor :ipPermissions
-    end
-
-    class QEc2DescribeSecurityGroupsParser < RightAWSParser #:nodoc:
-      def tagstart(name, attributes)
-        case name
-          when 'item' 
-            if @xmlpath=='DescribeSecurityGroupsResponse/securityGroupInfo'
-              @group = QEc2SecurityGroupItemType.new 
-              @group.ipPermissions = []
-            elsif @xmlpath=='DescribeSecurityGroupsResponse/securityGroupInfo/item/ipPermissions'
-              @perm = QEc2IpPermissionType.new
-              @perm.ipRanges = []
-              @perm.groups   = []
-            elsif @xmlpath=='DescribeSecurityGroupsResponse/securityGroupInfo/item/ipPermissions/item/groups'
-              @sgroup = QEc2UserIdGroupPairType.new
-            end
-        end
-      end
-      def tagend(name)
-        case name
-          when 'ownerId'          then @group.ownerId   = @text
-          when 'groupDescription' then @group.groupDescription = @text
-          when 'groupName'
-            if @xmlpath=='DescribeSecurityGroupsResponse/securityGroupInfo/item'
-              @group.groupName  = @text 
-            elsif @xmlpath=='DescribeSecurityGroupsResponse/securityGroupInfo/item/ipPermissions/item/groups/item'
-              @sgroup.groupName = @text 
-            end
-          when 'ipProtocol'       then @perm.ipProtocol = @text
-          when 'fromPort'         then @perm.fromPort   = @text
-          when 'toPort'           then @perm.toPort     = @text
-          when 'userId'           then @sgroup.userId   = @text
-          when 'cidrIp'           then @perm.ipRanges  << @text
-          when 'item'
-            if @xmlpath=='DescribeSecurityGroupsResponse/securityGroupInfo/item/ipPermissions/item/groups'
-              @perm.groups << @sgroup
-            elsif @xmlpath=='DescribeSecurityGroupsResponse/securityGroupInfo/item/ipPermissions'
-              @group.ipPermissions << @perm
-            elsif @xmlpath=='DescribeSecurityGroupsResponse/securityGroupInfo'
-              @result << @group
-            end
-        end
-      end
-      def reset
-        @result = []
       end
     end
 

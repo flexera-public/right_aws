@@ -84,9 +84,10 @@ module RightAws
     #         :ebs_volume_id=>"vol-f900f990"}],
     #      :aws_instance_id=>"i-8ce84ae4"} , ... ]
     #
-    def describe_instances(list=[])
-      link = generate_request("DescribeInstances", amazonize_list('InstanceId',list.to_a))
-      request_cache_or_info(:describe_instances, link,  QEc2DescribeInstancesParser, @@bench, list.blank?) do |parser|
+    def describe_instances(*instances)
+      instances = instances.flatten
+      link = generate_request("DescribeInstances", amazonize_list('InstanceId', instances))
+      request_cache_or_info(:describe_instances, link,  QEc2DescribeInstancesParser, @@bench, instances.blank?) do |parser|
         get_desc_instances(parser.result)
       end
     rescue Exception
@@ -191,7 +192,7 @@ module RightAws
     #
     def launch_instances(image_id, options={})
       @logger.info("Launching instance of image #{image_id} for #{@aws_access_key_id}, " +
-                   "key: #{options[:key_name]}, groups: #{(options[:group_ids]).to_a.join(',')}")
+                   "key: #{options[:key_name]}, groups: #{Array(options[:group_ids]).join(',')}")
       options[:image_id]    = image_id
       options[:min_count] ||= 1
       options[:max_count] ||= options[:min_count]
@@ -203,22 +204,8 @@ module RightAws
       on_exception
     end
 
-=begin
-    # TODO: API does not support this call yet
-    def create_instance(options={})
-      @logger.info("Creating instance #{@aws_access_key_id}, " +
-                   "key: #{options[:key_name]}, groups: #{(options[:group_ids]).to_a.join(',')}")
-      params = prepare_instance_launch_params(options)
-      link = generate_request("CreateInstance", params)
-      instances = request_info(link, QEc2DescribeInstancesParser.new(:logger => @logger))
-      get_desc_instances(instances).first
-    rescue Exception
-      on_exception
-    end
-=end
-
     def prepare_instance_launch_params(options={}) # :nodoc:
-      params = amazonize_list('SecurityGroup', options[:group_ids].to_a)
+      params = amazonize_list('SecurityGroup', Array(options[:group_ids]))
       params['InstanceType']                      = options[:instance_type] || DEFAULT_INSTANCE_TYPE
       params['ImageId']                           = options[:image_id]                             unless options[:image_id].blank?
       params['AddressingType']                    = options[:addressing_type]                      unless options[:addressing_type].blank?
@@ -313,8 +300,9 @@ module RightAws
     #
     #  ec2.reboot_instances(['i-f222222d','i-f222222e']) #=> true
     #
-    def reboot_instances(list)
-      link = generate_request("RebootInstances", amazonize_list('InstanceId', list.to_a))
+    def reboot_instances(*instances)
+      instances = instances.flatten
+      link = generate_request("RebootInstances", amazonize_list('InstanceId', instances))
       request_info(link, RightBoolResponseParser.new(:logger => @logger))
     rescue Exception
       on_exception
@@ -431,6 +419,25 @@ module RightAws
       on_exception
     end
 
+    # Get Initial windows instance password using Amazon API call GetPasswordData.
+    #
+    #  puts ec2.get_initial_password_v2(my_awesome_instance[:aws_instance_id], my_awesome_key[:aws_material]) #=> "MhjWcgZuY6"
+    #
+    # P.S. To say the truth there is absolutely no any speedup if to compare to the old get_initial_password method... ;(
+    #
+    def get_initial_password_v2(instance_id, private_key)
+      link = generate_request('GetPasswordData',
+                              'InstanceId' => instance_id )
+      response = request_info(link, QEc2GetPasswordDataParser.new(:logger => @logger))
+      if response[:password_data].blank?
+        raise AwsError.new("Initial password is not yet created for #{instance_id}")
+      else
+        OpenSSL::PKey::RSA.new(private_key).private_decrypt(Base64.decode64(response[:password_data]))
+      end
+    rescue Exception
+      on_exception
+    end
+
     # Bundle a Windows image.
     # Internally, it queues the bundling task and shuts down the instance.
     # It then takes a snapshot of the Windows volume bundles it, and uploads it to
@@ -455,7 +462,7 @@ module RightAws
       s3_owner_aws_secret_access_key ||= @aws_secret_access_key
       s3_expires = Time.now.utc + s3_expires if s3_expires.is_a?(Fixnum) && (s3_expires < S3Interface::ONE_YEAR_IN_SECONDS)
       # policy
-      policy = { 'expiration' => s3_expires.strftime('%Y-%m-%dT%H:%M:%SZ'),
+      policy = { 'expiration' => AwsUtils::utc_iso8601(s3_expires),
                  'conditions' => [ { 'bucket' => s3_bucket },
                                    { 'acl'    => s3_upload_policy },
                                    [ 'starts-with', '$key', s3_prefix ] ] }.to_json
@@ -490,8 +497,9 @@ module RightAws
     #      :aws_state         => "failed",
     #      :aws_instance_id   => "i-e3e24e8a"}]
     #
-    def describe_bundle_tasks(list=[])
-      link = generate_request("DescribeBundleTasks", amazonize_list('BundleId', list.to_a))
+    def describe_bundle_tasks(*tasks)
+      tasks = tasks.flatten
+      link = generate_request("DescribeBundleTasks", amazonize_list('BundleId', tasks))
       request_info(link, QEc2DescribeBundleTasksParser.new)
     rescue Exception
       on_exception
@@ -515,35 +523,6 @@ module RightAws
       request_info(link, QEc2BundleInstanceParser.new)
     rescue Exception
       on_exception
-    end
-
-    #-----------------------------------------------------------------
-    #      Helpers
-    #-----------------------------------------------------------------
-
-    BLOCK_DEVICE_KEY_MAPPING = {                               # :nodoc:
-      :device_name               => 'DeviceName',
-      :virtual_name              => 'VirtualName',
-      :no_device                 => 'NoDevice',
-      :ebs_snapshot_id           => 'Ebs.SnapshotId',
-      :ebs_volume_size           => 'Ebs.VolumeSize',
-      :ebs_delete_on_termination => 'Ebs.DeleteOnTermination' }
-
-    def amazonize_block_device_mappings(block_device_mappings) # :nodoc:
-      result = {}
-      unless block_device_mappings.blank?
-        block_device_mappings = [block_device_mappings] unless block_device_mappings.is_a?(Array)
-        block_device_mappings.each_with_index do |b, idx|
-          BLOCK_DEVICE_KEY_MAPPING.each do |local_name, remote_name|
-            value = b[local_name]
-            case local_name
-            when :no_device then value = value ? '' : nil   # allow to pass :no_device as boolean
-            end
-            result["BlockDeviceMapping.#{idx+1}.#{remote_name}"] = value unless value.nil?
-          end
-        end
-      end
-      result
     end
 
     #-----------------------------------------------------------------
@@ -599,9 +578,12 @@ module RightAws
         when 'rootDeviceType'   then @item[:root_device_type]      = @text
         when 'rootDeviceName'   then @item[:root_device_name]      = @text
         when 'instanceClass'    then @item[:instance_class]        = @text
+        when 'instanceLifecycle'     then @item[:instance_lifecycle]       = @text
+        when 'spotInstanceRequestId' then @item[:spot_instance_request_id] = @text
+        when 'requesterId'           then @item[:requester_id]             = @text
         else
           case full_tag_name
-          when %r{/stateReason/code$}    then @item[:state_reason_code]    = @text.to_i
+          when %r{/stateReason/code$}    then @item[:state_reason_code]    = @text
           when %r{/stateReason/message$} then @item[:state_reason_message] = @text
           when %r{/instanceState/code$}  then @item[:aws_state_code]       = @text.to_i
           when %r{/instanceState/name$}  then @item[:aws_state]            = @text
@@ -748,6 +730,19 @@ module RightAws
         when 'progress'   then @result[:aws_progress]      = @text
         when 'code'       then @result[:aws_error_code]    = @text
         when 'message'    then @result[:aws_error_message] = @text
+        end
+      end
+      def reset
+        @result = {}
+      end
+    end
+
+    class QEc2GetPasswordDataParser < RightAWSParser #:nodoc:
+      def tagend(name)
+        case name
+        when 'instanceId'   then @result[:aws_instance_id] = @text
+        when 'timestamp'    then @result[:timestamp]       = @text
+        when 'passwordData' then @result[:password_data]   = @text
         end
       end
       def reset

@@ -6,8 +6,8 @@ class TestS3 < Test::Unit::TestCase
   
   def setup
     @s3     = Rightscale::S3Interface.new(TestCredentials.aws_access_key_id, TestCredentials.aws_secret_access_key)
-    @bucket = 'right_s3_awesome_test_bucket_000A1'
-    @bucket2 = 'right_s3_awesome_test_bucket_000A2'
+    @bucket = 'right_s3_awesome_test_bucket_000B1'
+    @bucket2 = 'right_s3_awesome_test_bucket_000B2'
     @key1   = 'test/woohoo1/'
     @key2   = 'test1/key/woohoo2'
     @key3   = 'test2/A%B@C_D&E?F+G=H"I'
@@ -403,17 +403,19 @@ class TestS3 < Test::Unit::TestCase
     assert grantee.grant(['READ_ACP', 'WRITE'])
     
     assert bucket.enable_logging(:targetbucket => targetbucket, :targetprefix => "loggylogs/")
+    sleep 10
     
-    assert_equal(bucket.logging_info, {:enabled => true, :targetbucket => @bucket2, :targetprefix => "loggylogs/"})
+    assert_equal({:enabled => true, :targetbucket => @bucket2, :targetprefix => "loggylogs/"}, bucket.logging_info)
     
     assert bucket.disable_logging
     
       # check 'Drop' method
-    assert grantee.drop
-    
-      # Delete bucket
-    bucket.delete(true)
-    targetbucket.delete(true)
+    assert grantee.drop    
+  end
+
+  def test_40_delete_buckets
+    Rightscale::S3::Bucket.create(@s, @bucket,  false).delete(true)
+    Rightscale::S3::Bucket.create(@s, @bucket2, false).delete(true)
   end
 
 end

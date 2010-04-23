@@ -9,7 +9,7 @@ class TestAcf < Test::Unit::TestCase
   def setup
     @acf= Rightscale::AcfInterface.new(TestCredentials.aws_access_key_id, TestCredentials.aws_secret_access_key)
     @s3 = Rightscale::S3.new(TestCredentials.aws_access_key_id, TestCredentials.aws_secret_access_key)
-    @bucket_name   = "right-acf-awesome-test-bucket-0001"
+    @bucket_name   = "right-acf-awesome-test-bucket-xxx1"
     @bucket_domain = "#{@bucket_name}.s3.amazonaws.com"
   end
 
@@ -27,11 +27,16 @@ class TestAcf < Test::Unit::TestCase
       @acf.create_distribution("right-cloudfront-awesome-test-bucket-not-exist", "Mustn't to be born", true)
     end
     # a bucket is not a domain naming complied guy
-    bucket_name = 'right_cloudfront_awesome_test_bucket_BAD'
+    bucket_name = 'right_cloudfront_awesome_test_bucket_BAD_XXX'
     @s3.bucket(bucket_name, :create)
     assert_raise(Rightscale::AwsError) do
       @acf.create_distribution(bucket_name, "Mustn't to be born", true)
     end
+  end
+
+  def test_02_x_delete_bad_bucket
+    bucket_name = 'right_cloudfront_awesome_test_bucket_BAD_XXX'
+    @s3.bucket(bucket_name, false).delete
   end
 
   def test_03_create
@@ -69,8 +74,8 @@ class TestAcf < Test::Unit::TestCase
     end
     # change a config
     config[:enabled] = false
-    config[:cnames] << 'x1.myawesomesite.com'
-    config[:cnames] << 'x2.myawesomesite.com'
+    config[:cnames] << 'xxx1.myawesomesite.com'
+    config[:cnames] << 'xxx2.myawesomesite.com'
     # set config
     set_config_result = nil
     assert_nothing_raised do
@@ -83,26 +88,13 @@ class TestAcf < Test::Unit::TestCase
       new_config = @acf.get_distribution_config(old[:aws_id])
     end
     assert           !new_config[:enabled]
-    assert_equal     new_config[:cnames].sort, ['x1.myawesomesite.com', 'x2.myawesomesite.com']
+    assert_equal     new_config[:cnames].sort, ['xxx1.myawesomesite.com', 'xxx2.myawesomesite.com']
     assert_not_equal config[:e_tag], new_config[:e_tag]
 
     # try to update the old config again (must fail because ETAG has changed)
     assert_raise(Rightscale::AwsError) do
       @acf.set_distribution_config(old[:aws_id], config)
     end
-  end
-
-  def test_07_caching
-    # enable caching
-    @acf.params[:cache] = true
-    # list distributions
-    @acf.list_distributions
-    # list the distributions again - cache should hit
-    assert_raise(Rightscale::AwsNoChange) do
-      @acf.list_distributions
-    end
-    # disable caching
-    @acf.params[:cache] = true
   end
 
   def test_08_delete_distribution

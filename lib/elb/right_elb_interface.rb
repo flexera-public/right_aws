@@ -62,7 +62,7 @@ module RightAws
     include RightAwsBaseInterface
 
     # Amazon ELB API version being used
-    API_VERSION       = "2009-05-15"
+    API_VERSION       = "2009-11-25"
     DEFAULT_HOST      = "elasticloadbalancing.amazonaws.com"
     DEFAULT_PATH      = '/'
     DEFAULT_PROTOCOL  = 'https'
@@ -128,9 +128,39 @@ module RightAws
     #        :listeners =>
     #         [ { :protocol => "HTTP", :load_balancer_port => "80",  :instance_port => "80" },
     #           { :protocol => "TCP",  :load_balancer_port => "443", :instance_port => "443" } ],
-    #        :created_time => Wed May 27 11:59:11 UTC 2009,
+    #        :created_time => "2009-05-27T11:59:11.000Z",
     #        :dns_name => "test-kd1-1519253964.us-east-1.elb.amazonaws.com",
     #        :instances => [] } ]
+    #
+    #  elb.describe_load_balancers("test-kd1") #=>
+    #    [{:load_balancer_name=>"test-kd1",
+    #      :instances=>["i-9fc056f4", "i-b3debfd8"],
+    #      :health_check=>
+    #       {:interval=>30,
+    #        :healthy_threshold=>10,
+    #        :target=>"TCP:80",
+    #        :unhealthy_threshold=>2,
+    #        :timeout=>5},
+    #      :dns_name=>"test-kd1-869291821.us-east-1.elb.amazonaws.com",
+    #      :listeners=>
+    #       [{:load_balancer_port=>"80",
+    #         :policy_names=>["my-policy-1"],
+    #         :instance_port=>"80",
+    #         :protocol=>"HTTP"},
+    #        {:load_balancer_port=>"8080",
+    #         :policy_names=>["my-policy-lb-1"],
+    #         :instance_port=>"8080",
+    #         :protocol=>"HTTP"},
+    #        {:load_balancer_port=>"443",
+    #         :policy_names=>[],
+    #         :instance_port=>"443",
+    #         :protocol=>"TCP"}],
+    #      :created_time=>"2010-04-15T12:04:49.000Z",
+    #      :availability_zones=>["us-east-1a", "us-east-1b"],
+    #      :app_cookie_stickiness_policies=>
+    #       [{:policy_name=>"my-policy-1", :cookie_name=>"my-cookie-1"}],
+    #      :lb_cookie_stickiness_policies=>
+    #       [{:cookie_expiration_period=>60, :policy_name=>"my-policy-lb-1"}]}]
     #
     def describe_load_balancers(*load_balancers)
       load_balancers = load_balancers.flatten.compact
@@ -151,7 +181,7 @@ module RightAws
     def create_load_balancer(load_balancer_name, availability_zones=[], listeners=[])
       request_hash = { 'LoadBalancerName' => load_balancer_name }
       # merge zones
-      request_hash.merge!( amazonize_list("AvailabilityZones.member", availability_zones.to_a) )
+      request_hash.merge!( amazonize_list("AvailabilityZones.member", availability_zones) )
       # merge listeners
       if listeners.blank?
         listeners = { :protocol           => :http,
@@ -278,27 +308,75 @@ module RightAws
     end
 
     #-----------------------------------------------------------------
+    #      Cookies
+    #-----------------------------------------------------------------
+
+    # Generates a stickiness policy with sticky session lifetimes that follow
+    # that of an application-generated cookie.
+    # This policy can only be associated with HTTP listeners.
+    #
+    #  elb.create_app_cookie_stickiness_policy('my-load-balancer', 'MyLoadBalancerPolicy', 'MyCookie') #=> true
+    #
+    def create_app_cookie_stickiness_policy(load_balancer_name, policy_name, cookie_name)
+      request_hash = { 'LoadBalancerName' => load_balancer_name,
+                       'PolicyName'       => policy_name,
+                       'CookieName'       => cookie_name }
+      link = generate_request("CreateAppCookieStickinessPolicy", request_hash)
+      request_info(link, RightHttp2xxParser.new(:logger => @logger))
+    end
+
+    # Generates a stickiness policy with sticky session lifetimes controlled by the
+    # lifetime of the browser (user-agent) or a specified expiration period.
+    # This policy can only be associated only with HTTP listeners.
+    #
+    #  elb.create_lb_cookie_stickiness_policy('my-load-balancer', 'MyLoadBalancerPolicy', 60) #=> true
+    #
+    def create_lb_cookie_stickiness_policy(load_balancer_name, policy_name, cookie_expiration_period)
+      request_hash = { 'LoadBalancerName'        => load_balancer_name,
+                       'PolicyName'              => policy_name,
+                       'CookieExpirationPeriod'  => cookie_expiration_period }
+      link = generate_request("CreateLBCookieStickinessPolicy", request_hash)
+      request_info(link, RightHttp2xxParser.new(:logger => @logger))
+    end
+
+    # Associates, updates, or disables a policy with a listener on the load balancer.
+    # Only zero(0) or one(1) policy can be associated with a listener.
+    #
+    #  elb.set_load_balancer_policies_of_listener('my-load-balancer', 80, 'MyLoadBalancerPolicy') #=> true
+    #
+    def set_load_balancer_policies_of_listener(load_balancer_name, load_balancer_port, *policy_names)
+      policy_names.flatten!
+      request_hash = { 'LoadBalancerName' => load_balancer_name,
+                       'LoadBalancerPort' => load_balancer_port }
+      request_hash.merge!(amazonize_list('PolicyNames.member', policy_names))
+      link = generate_request("SetLoadBalancerPoliciesOfListener", request_hash)
+      request_info(link, RightHttp2xxParser.new(:logger => @logger))
+    end
+
+    #-----------------------------------------------------------------
     #      PARSERS: Load Balancers
     #-----------------------------------------------------------------
  
     class DescribeLoadBalancersParser < RightAWSParser #:nodoc:
       def tagstart(name, attributes)
-        case name
-        when 'member'
-          case @xmlpath
-            when @p then @item = { :availability_zones => [],
-                                    :health_check       => {},
-                                    :listeners          => [],
-                                    :instances          => [] }
-            when "#@p/member/Listeners" then @listener = {}
-          end
+        case full_tag_name
+        when %r{LoadBalancerDescriptions/member$}
+          @item = { :availability_zones => [],
+                    :health_check       => {},
+                    :listeners          => [],
+                    :instances          => [],
+                    :app_cookie_stickiness_policies => [],
+                    :lb_cookie_stickiness_policies  => []}
+        when %r{ListenerDescriptions/member$}        then @listener = {:policy_names => []}
+        when %r{AppCookieStickinessPolicies/member$} then @app_cookie_stickiness_policy = {}
+        when %r{LBCookieStickinessPolicies/member$}  then @lb_cookie_stickiness_policy = {}
         end
       end
       def tagend(name)
         case name
         when 'LoadBalancerName'   then @item[:load_balancer_name]   = @text
         when 'DNSName'            then @item[:dns_name]             = @text
-        when 'CreatedTime'        then @item[:created_time]         = Time::parse(@text)
+        when 'CreatedTime'        then @item[:created_time]         = @text
         when 'Interval'           then @item[:health_check][:interval]            = @text.to_i
         when 'Target'             then @item[:health_check][:target]              = @text
         when 'HealthyThreshold'   then @item[:health_check][:healthy_threshold]   = @text.to_i
@@ -307,20 +385,31 @@ module RightAws
         when 'Protocol'           then @listener[:protocol]           = @text
         when 'LoadBalancerPort'   then @listener[:load_balancer_port] = @text
         when 'InstancePort'       then @listener[:instance_port]      = @text
-        when 'member'
-          case @xmlpath
-          when @p then
-            @item[:availability_zones].sort!
-            @item[:instances].sort!
-            @result << @item
-          when "#@p/member/AvailabilityZones" then @item[:availability_zones] << @text
-          when "#@p/member/Instances"         then @item[:instances]          << @text
-          when "#@p/member/Listeners"         then @item[:listeners]          << @listener
+        end
+        case full_tag_name
+        when %r{AvailabilityZones/member$}    then @item[:availability_zones] << @text
+        when %r{Instances/member/InstanceId$} then @item[:instances]          << @text
+        when %r{ListenerDescriptions/member$} then @item[:listeners]          << @listener
+        when %r{ListenerDescriptions/member/PolicyNames/member$} then @listener[:policy_names] << @text
+        when %r{AppCookieStickinessPolicies/member}
+          case name
+          when 'PolicyName' then @app_cookie_stickiness_policy[:policy_name] = @text
+          when 'CookieName' then @app_cookie_stickiness_policy[:cookie_name] = @text
+          when 'member'     then @item[:app_cookie_stickiness_policies] << @app_cookie_stickiness_policy
           end
+        when %r{LBCookieStickinessPolicies/member}
+          case name
+          when 'PolicyName'             then @lb_cookie_stickiness_policy[:policy_name] = @text
+          when 'CookieExpirationPeriod' then @lb_cookie_stickiness_policy[:cookie_expiration_period] = @text.to_i
+          when 'member'                 then @item[:lb_cookie_stickiness_policies] << @lb_cookie_stickiness_policy
+          end
+        when %r{LoadBalancerDescriptions/member$}
+          @item[:availability_zones].sort!
+          @item[:instances].sort!
+          @result << @item
         end
       end
       def reset
-        @p      = 'DescribeLoadBalancersResponse/DescribeLoadBalancersResult/LoadBalancerDescriptions'
         @result = []
       end
     end

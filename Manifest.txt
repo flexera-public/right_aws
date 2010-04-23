@@ -8,6 +8,8 @@ lib/awsbase/support.rb
 lib/ec2/right_ec2.rb
 lib/ec2/right_ec2_images.rb
 lib/ec2/right_ec2_instances.rb
+lib/ec2/right_ec2_security_groups.rb
+lib/ec2/right_ec2_spot_instances.rb
 lib/ec2/right_ec2_ebs.rb
 lib/ec2/right_ec2_reserved_instances.rb
 lib/ec2/right_ec2_vpc.rb
@@ -25,6 +27,8 @@ lib/sqs/right_sqs_gen2.rb
 lib/sqs/right_sqs_gen2_interface.rb
 lib/sqs/right_sqs_interface.rb
 lib/acf/right_acf_interface.rb
+lib/acf/right_acf_streaming_interface.rb
+lib/acf/right_acf_origin_access_identities.rb
 lib/rds/right_rds_interface.rb
 test/ec2/test_helper.rb
 test/ec2/test_right_ec2.rb

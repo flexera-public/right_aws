@@ -237,3 +237,48 @@ the source key.
   - VPC support added
   - Latest EC2 API 2009-10-31 support added
   - Some of bugs fixed
+
+=== 2.0.0
+
+  Release Notes:
+  - Added:
+    - Ruby 1.9 support
+    - Ec2:
+      - SpotInstances support
+      - m2.xlarge instances
+      - GetPasswordData API call (see get_password_data_v2)
+      - SecurityGroups support for Eucalyptus clouds
+    - EBS:
+      - :delete_on_termination field for volumes
+    - SimpleDB:
+      - BatchPutAttributes support
+    - ActiveSDB:
+      - Dynamic attribute accessors
+      - "Columns" support
+      - Simple Type Casting support
+    - ELB:
+      - API '2009-11-25' support (stickiness policies)
+    - ACF:
+      - API '2010-03-01' support (origin access policy and streaming distributions)
+  - Bunch of small issues were fixed
+  - Time objects were replaced by Strings (as Amazon returns them) to make the gem more consistent:
+    - :last_modified_time in:
+        RightAws::AcfInterface#incrementally_list_distributions,
+        RightAws::AcfInterface#create_distribution_by_config,
+        RightAws::AcfInterface#get_distribution,
+        RightAws::AcfInterface#get_distribution_config
+    - :timestamp in:
+        RightAws::AcwInterface#get_metric_statistics
+    - :aws_created_at in:
+        RightAws::Ec2#create_volume,
+        RightAws::Ec2#describe_volumes
+    - :aws_attached_at in:
+        RightAws::Ec2#attach_volume,
+        RightAws::Ec2#detach_volume,
+        RightAws::Ec2#describe_volumes
+    - :aws_started_at in:
+        RightAws::Ec2#describe_snapshots,
+        RightAws::Ec2#create_snapshot,
+        RightAws::Ec2#try_create_snapshot
+    - :created_time in:
+        RightAws::ElbInterface#describe_load_balancers

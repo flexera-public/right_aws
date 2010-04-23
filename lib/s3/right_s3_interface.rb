@@ -93,7 +93,11 @@ module RightAws
       s3_headers = {}
       headers.each do |key, value|
         key = key.downcase
-        s3_headers[key] = value.to_s.strip if key[/^#{AMAZON_HEADER_PREFIX}|^content-md5$|^content-type$|^date$/o]
+        value = case
+                when value.is_a?(Array) then value.join('')
+                else                         value.to_s
+                end
+        s3_headers[key] = value.strip if key[/^#{AMAZON_HEADER_PREFIX}|^content-md5$|^content-type$|^date$/o]
       end
       s3_headers['content-type'] ||= ''
       s3_headers['content-md5']  ||= ''
@@ -740,7 +744,7 @@ module RightAws
         else
           result[:grantees][key] = 
             { :display_name => grantee[:display_name] || grantee[:uri].to_s[/[^\/]*$/],
-              :permissions  => grantee[:permissions].to_a,
+              :permissions  => Array(grantee[:permissions]),
               :attributes   => grantee[:attributes] }
         end
       end

@@ -23,7 +23,8 @@
 
 # Test
 module RightAws
-  require 'md5'
+#  require 'md5'
+  require 'digest/md5'
   require 'pp'
   
   class AwsUtils #:nodoc:
@@ -31,6 +32,13 @@ module RightAws
     @@digest256 = nil
     if OpenSSL::OPENSSL_VERSION_NUMBER > 0x00908000
       @@digest256 = OpenSSL::Digest::Digest.new("sha256") rescue nil # Some installation may not support sha256
+    end
+
+    def self.utc_iso8601(time)
+      if    time.is_a?(Fixnum) then time = Time::at(time)
+      elsif time.is_a?(String) then time = Time::parse(time)
+      end
+      time.utc.strftime("%Y-%m-%dT%H:%M:%S.000Z")
     end
     
     def self.sign(aws_secret_access_key, auth_string)
@@ -47,7 +55,7 @@ module RightAws
 
     # Set a timestamp and a signature version
     def self.fix_service_params(service_hash, signature)
-      service_hash["Timestamp"] ||= Time.now.utc.strftime("%Y-%m-%dT%H:%M:%S.000Z") unless service_hash["Expires"]
+      service_hash["Timestamp"] ||= utc_iso8601(Time.now) unless service_hash["Expires"]
       service_hash["SignatureVersion"] = signature
       service_hash
     end
@@ -124,7 +132,7 @@ module RightAws
     end
 
     def self.split_items_and_params(array)
-      items  = array.to_a.flatten.compact
+      items  = Array(array).flatten.compact
       params = items.last.kind_of?(Hash) ? items.pop : {}
       [items, params]
     end
@@ -341,7 +349,7 @@ module RightAws
       when 'POST'
         request      = Net::HTTP::Post.new(@params[:service])
         request.body = service_params
-        request['Content-Type'] = 'application/x-www-form-urlencoded'
+        request['Content-Type'] = 'application/x-www-form-urlencoded; charset=utf-8'
       else
         raise "Unsupported HTTP verb #{verb.inspect}!"
       end
@@ -498,11 +506,11 @@ module RightAws
     #     "Filter.2.Value.2"=>"bb"}
     def amazonize_list(masks, list) #:nodoc:
       groups = {}
-      list.to_a.each_with_index do |list_item, i|
-        masks.to_a.each_with_index do |mask, mask_idx|
+      Array(list).each_with_index do |list_item, i|
+        Array(masks).each_with_index do |mask, mask_idx|
           key = mask[/\?/] ? mask.dup : mask.dup + '.?'
           key.sub!('?', (i+1).to_s)
-          value = list_item.to_a[mask_idx]
+          value = Array(list_item)[mask_idx]
           if value.is_a?(Array)
             groups.merge!(amazonize_list(key, value))
           else
@@ -512,6 +520,32 @@ module RightAws
       end
       groups
     end
+
+    BLOCK_DEVICE_KEY_MAPPING = {                                                           # :nodoc:
+      :device_name               => 'DeviceName',
+      :virtual_name              => 'VirtualName',
+      :no_device                 => 'NoDevice',
+      :ebs_snapshot_id           => 'Ebs.SnapshotId',
+      :ebs_volume_size           => 'Ebs.VolumeSize',
+      :ebs_delete_on_termination => 'Ebs.DeleteOnTermination' }
+
+    def amazonize_block_device_mappings(block_device_mappings, key = 'BlockDeviceMapping') # :nodoc:
+      result = {}
+      unless block_device_mappings.blank?
+        block_device_mappings = [block_device_mappings] unless block_device_mappings.is_a?(Array)
+        block_device_mappings.each_with_index do |b, idx|
+          BLOCK_DEVICE_KEY_MAPPING.each do |local_name, remote_name|
+            value = b[local_name]
+            case local_name
+            when :no_device then value = value ? '' : nil   # allow to pass :no_device as boolean
+            end
+            result["#{key}.#{idx+1}.#{remote_name}"] = value unless value.nil?
+          end
+        end
+      end
+      result
+    end
+
   end
 
 
@@ -847,8 +881,13 @@ module RightAws
         # Parse the xml text
       case @xml_lib
       when 'libxml'  
-        xml        = XML::SaxParser.new 
-        xml.string = xml_text 
+        if XML::Parser::VERSION >= '0.9.9'
+          # avoid warning on every usage
+          xml        = XML::SaxParser.string(xml_text)
+        else
+          xml        = XML::SaxParser.new 
+          xml.string = xml_text 
+        end
         # check libxml-ruby version 
         if XML::Parser::VERSION >= '0.5.1.0'
           xml.callbacks = RightSaxParserCallback.new(self) 
@@ -926,6 +965,12 @@ module RightAws
   class RightHttp2xxParser < RightAWSParser # :nodoc:
     def parse(response)
       @result = response.is_a?(Net::HTTPSuccess)
+    end
+  end
+
+  class RightBoolResponseParser < RightAWSParser #:nodoc:
+    def tagend(name)
+      @result = (@text=='true') if name == 'return'
     end
   end
 
