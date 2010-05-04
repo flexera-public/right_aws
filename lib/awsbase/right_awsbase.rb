@@ -243,6 +243,9 @@ module RightAws
         @params[:service]  ||= service_info[:default_service]
         @params[:protocol] ||= service_info[:default_protocol]
       end
+      # a set of options to be passed to RightHttpConnection object
+      @params[:connection_options] = {} unless @params[:connection_options].is_a?(Hash) 
+      @with_connection_options = {}
 #      @params[:multi_thread] ||= defined?(AWS_DAEMON)
       @params[:connections] ||= :shared # || :dedicated
       @params[:max_connections] ||= 10
@@ -354,10 +357,13 @@ module RightAws
         raise "Unsupported HTTP verb #{verb.inspect}!"
       end
       # prepare output hash
-      { :request  => request,
-        :server   => @params[:server],
-        :port     => @params[:port],
-        :protocol => @params[:protocol] }
+      request_hash = { :request  => request,
+                       :server   => @params[:server],
+                       :port     => @params[:port],
+                       :protocol => @params[:protocol] }
+      request_hash.merge!(@params[:connection_options])
+      request_hash.merge!(@with_connection_options)
+      request_hash
     end
 
     def get_connection(aws_service, request) #:nodoc
@@ -546,6 +552,37 @@ module RightAws
       result
     end
 
+    # Execute a block of code with custom set of settings for right_http_connection.
+    # Accepts next options:
+    #  :raise_on_timeout
+    #  :http_connection_retry_count
+    #  :http_connection_open_timeout
+    #  :http_connection_read_timeout
+    #  :http_connection_retry_delay
+    #  :user_agent
+    #  :exception
+    #
+    #  # Try to create a snapshot but stop with exception if timeout is received
+    #  # to avoid having a duplicate API calls that create duplicate snapshots.
+    #  ec2 = RightAws::Ec2.new(aws_access_key_id, aws_secret_access_key)
+    #  ec2.with_connection_options(:raise_on_timeout => true) do
+    #    ec2.create_snapshot('vol-898a6fe0', 'KD: WooHoo!!')
+    #  end
+    #
+    #  # Opposite case when the setting is global:
+    #  @ec2 = RightAws::Ec2.new(aws_access_key_id, aws_secret_access_key,
+    #                           :connection_options => { :raise_on_timeout => true })
+    #  # Create an SSHKey but do tries on timeout
+    #  ec2.with_connection_options(:raise_on_timeout => false) do
+    #    new_key = ec2.create_key_pair('my_test_key')
+    #  end
+    #
+    def with_connection_options(options, &block)
+      @with_connection_options = options
+      block.call self
+    ensure
+      @with_connection_options = {}
+    end
   end
 
 
