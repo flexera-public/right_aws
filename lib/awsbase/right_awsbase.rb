@@ -553,7 +553,7 @@ module RightAws
     end
 
     # Execute a block of code with custom set of settings for right_http_connection.
-    # Accepts next options:
+    # Accepts next options (see Rightscale::HttpConnection for explanation):
     #  :raise_on_timeout
     #  :http_connection_retry_count
     #  :http_connection_open_timeout
@@ -562,19 +562,46 @@ module RightAws
     #  :user_agent
     #  :exception
     #
+    #  Example #1:
+    #
     #  # Try to create a snapshot but stop with exception if timeout is received
     #  # to avoid having a duplicate API calls that create duplicate snapshots.
-    #  ec2 = RightAws::Ec2.new(aws_access_key_id, aws_secret_access_key)
+    #  ec2 = Rightscale::Ec2::new(aws_access_key_id, aws_secret_access_key)
     #  ec2.with_connection_options(:raise_on_timeout => true) do
     #    ec2.create_snapshot('vol-898a6fe0', 'KD: WooHoo!!')
     #  end
     #
+    #  Example #2:
+    #
     #  # Opposite case when the setting is global:
-    #  @ec2 = RightAws::Ec2.new(aws_access_key_id, aws_secret_access_key,
+    #  @ec2 = Rightscale::Ec2::new(aws_access_key_id, aws_secret_access_key,
     #                           :connection_options => { :raise_on_timeout => true })
     #  # Create an SSHKey but do tries on timeout
     #  ec2.with_connection_options(:raise_on_timeout => false) do
     #    new_key = ec2.create_key_pair('my_test_key')
+    #  end
+    #
+    #  Example #3:
+    #
+    #  # Global settings (HttpConnection level):
+    #  Rightscale::HttpConnection::params[:http_connection_open_timeout] = 5
+    #  Rightscale::HttpConnection::params[:http_connection_read_timeout] = 250
+    #  Rightscale::HttpConnection::params[:http_connection_retry_count]  = 2
+    #
+    #  # Local setings (RightAws level)
+    #  ec2 = Rightscale::Ec2::new(AWS_ID, AWS_KEY,
+    #    :region => 'us-east-1',
+    #    :connection_options => {
+    #      :http_connection_read_timeout => 2,
+    #      :http_connection_retry_count  => 5,
+    #      :user_agent => 'Mozilla 4.0'
+    #    })
+    #
+    #  # Custom settings (API call level)
+    #  ec2.with_connection_options(:raise_on_timeout => true,
+    #                              :http_connection_read_timeout => 10,
+    #                              :user_agent => '') do
+    #    pp ec2.describe_images
     #  end
     #
     def with_connection_options(options, &block)
