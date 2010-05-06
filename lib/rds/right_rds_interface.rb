@@ -206,7 +206,7 @@ module RightAws
       request_hash['PreferredBackupWindow']      = params[:preferred_backup_window]      unless params[:preferred_backup_window].blank?
       request_hash.merge!(amazonize_list('DBSecurityGroups.member',  params[:db_security_groups]))
 #      request_hash.merge!(amazonize_list('DBParameterGroups.member', params[:db_parameter_groups]))
-      request_hash['DBParameterGroup']           = params[:db_parameter_group]           unless params[:db_parameter_group].blank?
+      request_hash['DBParameterGroupName']       = params[:db_parameter_group]           unless params[:db_parameter_group].blank?
       link = generate_request('CreateDBInstance', request_hash)
       request_info(link, DescribeDbInstancesParser.new(:logger => @logger))[:db_instances].first
     end
