@@ -124,9 +124,9 @@ module RightAws
            aws_secret_access_key|| ENV['AWS_SECRET_ACCESS_KEY'],
            params)
       # Eucalyptus supports some yummy features but Amazon does not
-      if @params[:eucalyptus]
-        @params[:port_based_group_ingress] = true unless @params.has_key?(:port_based_group_ingress)
-      end
+      #if @params[:eucalyptus]
+      #  @params[:port_based_group_ingress] = true unless @params.has_key?(:port_based_group_ingress)
+      #end
     end
 
     def generate_request(action, params={}) #:nodoc:
