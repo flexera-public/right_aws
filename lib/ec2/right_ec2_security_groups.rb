@@ -105,12 +105,12 @@ module RightAws
               perm = result_perm.dup
               perm[:group] = group[:group_name]
               perm[:owner] = group[:user_id]
-              # AWS does not support Port Based Group Permissions but Eucalyptus does
-              unless @params[:port_based_group_ingress]
-                perm.delete(:from_port)
-                perm.delete(:to_port)
-                perm.delete(:protocol)
-              end
+#              # AWS does not support Port Based Group Permissions but Eucalyptus does
+#              unless @params[:port_based_group_ingress]
+#                perm.delete(:from_port)
+#                perm.delete(:to_port)
+#                perm.delete(:protocol)
+#              end
               aws_perms << perm
             end
           end
@@ -150,13 +150,14 @@ module RightAws
       on_exception
     end
 
-    # Edit group permissions.
+    # Edit AWS/Eucaliptus security group permissions.
     #
-    #    action     - :authorize (or :grant) | :revoke (or :remove)
-    #    group_name - security group name
-    #    params     - a combination of options below:
-    #      :source_group_owner => grantee id
-    #      :source_group       => grantee group name
+    #  Options:
+    #    action      - :authorize (or :grant) | :revoke (or :remove)
+    #    group_name  - security group name
+    #    permissions - a combination of options below:
+    #      :source_group_owner => UserId
+    #      :source_group       => GroupName
     #      :from_port          => from port
     #      :to_port            => to port
     #      :port               => set both :from_port and to_port with the same value
@@ -171,7 +172,8 @@ module RightAws
     #                           :port               => '80',
     #                           :cidr_ip            => '127.0.0.1/32') #=> true
     #
-    # P.S. setting both group based and port based ingresses is not supported by Amazon but by Eucalyptus.
+    # P.S. This method is deprecated for AWS and but still good for Eucaliptus clouds.
+    # Use +modify_security_group_ingress+ method for AWS clouds.
     #
     def edit_security_group(action, group_name, params)
       hash = {}
@@ -191,6 +193,124 @@ module RightAws
       hash['FromPort']   = params[:from_port] unless params[:from_port].blank?
       hash['ToPort']     = params[:to_port]   unless params[:to_port].blank?
       hash['CidrIp']     = params[:cidr_ip]   unless params[:cidr_ip].blank?
+      #
+      link = generate_request(action, hash)
+      request_info(link, RightBoolResponseParser.new(:logger => @logger))
+    rescue Exception
+      on_exception
+    end
+
+    # Modify AWS security group permissions.
+    #
+    #  Options:
+    #    action      - :authorize (or :grant) | :revoke (or :remove)
+    #    group_name  - security group name
+    #    permissions - a combination of options below:
+    #      # Ports:
+    #      :from_port          => from port
+    #      :to_port            => to port
+    #      :port               => set both :from_port and to_port with the same value
+    #      # Protocol
+    #      :protocol           => :tcp | :udp | :icmp
+    #      # Group(s)
+    #      :source_group_owner => UserId
+    #      :source_group       => GroupName
+    #      # or
+    #      :source_groups      => { UserId1 => GroupName1, UserName2 => GroupName2 }
+    #      :source_groups      => [ [ UserId1, GroupName1 ], [ UserName2 => GroupName2 ] ]
+    #      # CidrIp(s)
+    #      :cidr_ip            => '0.0.0.0/0'
+    #      :cidr_ips           => ['1.1.1.1/1', '2.2.2.2/2']
+    #
+    #  # CidrIP based permissions:
+    #
+    #  ec2.modify_security_group_ingress(:authorize, 'my_cool_group',
+    #                                    :cidr_ip  =>  "127.0.0.0/31",
+    #                                    :port     => 811,
+    #                                    :protocol => 'tcp' ) #=> true
+    #
+    #  ec2.modify_security_group_ingress(:revoke, 'my_cool_group',
+    #                                    :cidr_ips =>  ["127.0.0.1/32", "127.0.0.2/32"],
+    #                                    :port     => 812,
+    #                                    :protocol => 'tcp' ) #=> true
+    #
+    #  # Group based permissions:
+    #
+    #  ec2.modify_security_group_ingress(:authorize, 'my_cool_group',
+    #                                    :source_group_owner => "586789340000",
+    #                                    :source_group =>  "sketchy-us",
+    #                                    :port         => 800,
+    #                                    :protocol     => 'tcp' ) #=> true
+    #
+    #  ec2.modify_security_group_ingress(:authorize, 'my_cool_group',
+    #                                    :source_groups => { "586789340000" => "sketchy-us",
+    #                                                        "635201710000" => "sketchy" },
+    #                                    :port          => 801,
+    #                                    :protocol      => 'tcp' ) #=> true
+    #
+    #  ec2.modify_security_group_ingress(:revoke, 'my_cool_group',
+    #                                    :source_groups => [[ "586789340000", "sketchy-us" ],
+    #                                                       [ "586789340000", "default" ]],
+    #                                    :port          => 809,
+    #                                    :protocol      => 'tcp' ) #=> true
+    #
+    #  # +Permissions+ can be an array of permission hashes:
+    #
+    #  ec2.modify_security_group_ingress(:authorize, 'my_cool_group',
+    #                                    [{ :source_groups => { "586789340000" => "sketchy-us",
+    #                                                           "635201710000" => "sketchy" },
+    #                                       :port          => 803,
+    #                                       :protocol      => 'tcp'},
+    #                                     { :cidr_ips      =>  ["127.0.0.1/32", "127.0.0.2/32"],
+    #                                       :port          => 812,
+    #                                       :protocol      => 'tcp' }]) #=> true
+    #
+    def modify_security_group_ingress(action, group_name, permissions)
+      hash = {}
+      case action
+      when :authorize, :grant then action = "AuthorizeSecurityGroupIngress"
+      when :revoke, :remove   then action = "RevokeSecurityGroupIngress"
+      else                         raise "Unknown action #{action.inspect}!"
+      end
+      # Group Name
+      hash["GroupName"] = group_name
+      #
+      permissions = [permissions] unless permissions.is_a?(Array)
+      permissions.each_with_index do |permission, idx|
+        pid = idx+1
+        # Protocol
+        hash["IpPermissions.#{pid}.IpProtocol"] = permission[:protocol]
+        # Port
+        unless permission[:port].blank?
+          hash["IpPermissions.#{pid}.FromPort"] = permission[:port]
+          hash["IpPermissions.#{pid}.ToPort"]   = permission[:port]
+        else
+          hash["IpPermissions.#{pid}.FromPort"] = permission[:from_port]
+          hash["IpPermissions.#{pid}.ToPort"]   = permission[:to_port]
+        end
+        # Source Group(s)
+        # Old way (if it is used):
+        # :source_group_owner => UserId, :source_group => GroupName 
+        if !permission[:source_group].blank? && !permission[:source_group_owner].blank?
+          permission[:source_groups] = { permission[:source_group_owner] => permission[:source_group]} 
+        end
+#        # Fix UserId(s): '0000-0000-0000' => '000000000000'
+#        permission[:source_groups] = Array(permission[:source_groups])
+#        permission[:source_groups].each do |item|
+#          item[0] = item[0].to_s.gsub(/-/,'')
+#        end
+        # New way:
+        #  :source_groups => {UserId1 => GroupName1, ... UserIdN => GroupNameN}
+        #  or (this allows using same UserId multiple times )
+        #  :source_groups => [[UserId1, GroupName1], ... [UserIdN, GroupNameN]]  
+        hash.merge!(amazonize_list( ["IpPermissions.#{pid}.Groups.?.UserId",
+                                     "IpPermissions.#{pid}.Groups.?.GroupName"],
+                                      permission[:source_groups] ))
+        # CidrIp(s)
+        cidr_ips   = permission[:cidr_ips] unless permission[:cidr_ips].blank?
+        cidr_ips ||= permission[:cidr_ip]  unless permission[:cidr_ip].blank?
+        hash.merge!(amazonize_list("IpPermissions.1.IpRanges.?.CidrIp", cidr_ips))
+      end
       #
       link = generate_request(action, hash)
       request_info(link, RightBoolResponseParser.new(:logger => @logger))
