@@ -97,10 +97,7 @@ module RightAws
             # IP permissions
             Array(permission[:ip_ranges]).each do |ip_range|
               perm = result_perm.dup
-              # Mhhh... For Eucalyptus we somehow get used to use ":cidr_ip" instead of ":cidr_ips"...
-              if @params[:eucalyptus] then  perm[:cidr_ip]  = ip_range
-              else                          perm[:cidr_ips] = ip_range
-              end
+              perm[:cidr_ips] = ip_range
               aws_perms << perm
             end
             # Group permissions
