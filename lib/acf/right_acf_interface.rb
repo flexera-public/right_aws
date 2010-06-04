@@ -75,7 +75,7 @@ module RightAws
     
     include RightAwsBaseInterface
 
-    API_VERSION      = "2010-03-01"
+    API_VERSION      = "2010-05-01"
     DEFAULT_HOST     = 'cloudfront.amazonaws.com'
     DEFAULT_PORT     = 443
     DEFAULT_PROTOCOL = 'https'
