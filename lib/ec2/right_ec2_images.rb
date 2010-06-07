@@ -111,7 +111,8 @@ module RightAws
 
 
     # Register new image at Amazon.
-    # Options: :image_location, :name, :description, :architecture, :kernel_id, :ramdisk_id, :root_device_name, :block_device_mappings.
+    # Options: :image_location, :name, :description, :architecture, :kernel_id, :ramdisk_id,
+    #          :root_device_name, :block_device_mappings, :virtualizationt_type(hvm|paravirtual)
     #
     # Returns new image id.
     #
@@ -148,6 +149,7 @@ module RightAws
       params['KernelId']       = options[:kernel_id]        if options[:kernel_id]
       params['RamdiskId']      = options[:ramdisk_id]       if options[:ramdisk_id]
       params['RootDeviceName'] = options[:root_device_name] if options[:root_device_name]
+      params['VirtualizationType'] = options[:virtualization_type] if options[:virtualization_type] 
 #      params['SnapshotId']     = options[:snapshot_id]      if options[:snapshot_id]
       params.merge!(amazonize_block_device_mappings(options[:block_device_mappings]))
       link = generate_request("RegisterImage", params)
@@ -308,6 +310,7 @@ module RightAws
         when 'rootDeviceType'  then @item[:root_device_type]  = @text
         when 'rootDeviceName'  then @item[:root_device_name]  = @text
         when 'imageClass'      then @item[:image_class]       = @text
+        when 'virtualizationType' then @item[:virtualization_type] = @text 
         else
           case full_tag_name
           when %r{/stateReason/code$}    then @item[:state_reason_code]    = @text.to_i
