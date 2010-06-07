@@ -14,6 +14,7 @@ lib/ec2/right_ec2_ebs.rb
 lib/ec2/right_ec2_reserved_instances.rb
 lib/ec2/right_ec2_vpc.rb
 lib/ec2/right_ec2_monitoring.rb
+lib/ec2/right_ec2_placement_groups.rb
 lib/right_aws.rb
 lib/s3/right_s3.rb
 lib/acw/right_acw_interface.rb

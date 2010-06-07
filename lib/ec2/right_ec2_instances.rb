@@ -131,29 +131,31 @@ module RightAws
                       addressing_type = nil, instance_type = nil,
                       kernel_id = nil, ramdisk_id = nil, availability_zone = nil,
                       monitoring_enabled = nil, subnet_id = nil, disable_api_termination = nil,
-                      instance_initiated_shutdown_behavior = nil, block_device_mappings = nil)
+                      instance_initiated_shutdown_behavior = nil, block_device_mappings = nil,
+                      placement_group_name = nil)
  	    launch_instances(image_id, { :min_count                            => min_count,
  	                                 :max_count                            => max_count,
  	                                 :user_data                            => user_data,
-                                   :group_ids                            => group_ids,
-                                   :key_name                             => key_name,
-                                   :instance_type                        => instance_type,
-                                   :addressing_type                      => addressing_type,
-                                   :kernel_id                            => kernel_id,
-                                   :ramdisk_id                           => ramdisk_id,
-                                   :availability_zone                    => availability_zone,
-                                   :monitoring_enabled                   => monitoring_enabled,
-                                   :subnet_id                            => subnet_id,
-                                   :disable_api_termination              => disable_api_termination,
-                                   :instance_initiated_shutdown_behavior => instance_initiated_shutdown_behavior,
-                                   :block_device_mappings                =>  block_device_mappings
+                                     :group_ids                            => group_ids,
+                                     :key_name                             => key_name,
+                                     :instance_type                        => instance_type,
+                                     :addressing_type                      => addressing_type,
+                                     :kernel_id                            => kernel_id,
+                                     :ramdisk_id                           => ramdisk_id,
+                                     :availability_zone                    => availability_zone,
+                                     :monitoring_enabled                   => monitoring_enabled,
+                                     :subnet_id                            => subnet_id,
+                                     :disable_api_termination              => disable_api_termination,
+                                     :instance_initiated_shutdown_behavior => instance_initiated_shutdown_behavior,
+                                     :block_device_mappings                => block_device_mappings,
+                                     :placement_group_name                 => placement_group_name
                                  })
     end
 
     # Launch new EC2 instances.
     # Options: :image_id, :addressing_type, :min_count, max_count, :key_name, :kernel_id, :ramdisk_id,
     # :availability_zone, :monitoring_enabled, :subnet_id, :disable_api_termination, :instance_initiated_shutdown_behavior,
-    # :block_device_mappings
+    # :block_device_mappings, placement_group_name
     # 
     # Returns a list of launched instances or an exception.
     #
@@ -220,6 +222,7 @@ module RightAws
       params['AdditionalInfo']                    = options[:additional_info]                      unless options[:additional_info].right_blank?
       params['DisableApiTermination']             = options[:disable_api_termination].to_s         unless options[:disable_api_termination].nil?
       params['InstanceInitiatedShutdownBehavior'] = options[:instance_initiated_shutdown_behavior] unless options[:instance_initiated_shutdown_behavior].right_blank?
+      params['Placement.GroupName']               = options[:placement_group_name]                 unless options[:placement_group_name].right_blank?
 #     params['VolumeId']                          = options[:volume_id]                            unless options[:volume_id].right_blank?
 #     params['RootDeviceName']                    = options[:root_device_name]                     unless options[:root_device_name].right_blank?
 #     params['RootDeviceType']                    = options[:root_device_type]                     unless options[:root_device_type].right_blank?
@@ -581,6 +584,8 @@ module RightAws
         when 'instanceLifecycle'     then @item[:instance_lifecycle]       = @text
         when 'spotInstanceRequestId' then @item[:spot_instance_request_id] = @text
         when 'requesterId'           then @item[:requester_id]             = @text
+        when 'groupName'             then @item[:placement_group_name]     = @text 
+        when 'virtualizationType'    then @item[:virtualization_type]      = @text
         else
           case full_tag_name
           when %r{/stateReason/code$}    then @item[:state_reason_code]    = @text
