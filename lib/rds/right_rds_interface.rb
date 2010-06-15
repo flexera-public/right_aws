@@ -27,7 +27,7 @@ module RightAws
     
     include RightAwsBaseInterface
 
-    API_VERSION      = "2009-10-16"
+    API_VERSION      = "2010-01-01"
     DEFAULT_HOST     = 'rds.amazonaws.com'
     DEFAULT_PORT     = 443
     DEFAULT_PROTOCOL = 'https'
@@ -170,7 +170,7 @@ module RightAws
     # Mandatory arguments: +aws_id+, +master_username+, +master_user_password+
     # Optional params: +:allocated_storage+ (25 by def), +:instance_class+, +:engine+ ('MySQL5.1' by def),
     # +:endpoint_port+, +:db_name+, +:db_security_groups+, +:db_parameter_group+,  +:availability_zone+, +:preferred_maintenance_window+
-    # +:backup_retention_period+, +:preferred_backup_window+
+    # +:backup_retention_period+, +:preferred_backup_window+, +:multi_az+
     #
     #  ds.create_db_instance('my-awesome-db', 'username', 'password') #=>
     #    {:instance_class=>"Medium",
@@ -201,6 +201,7 @@ module RightAws
       request_hash['EndpointPort']               = params[:endpoint_port]                unless params[:endpoint_port].blank?
       request_hash['DBName']                     = params[:db_name]                      unless params[:db_name].blank?
       request_hash['AvailabilityZone']           = params[:availability_zone]            unless params[:availability_zone].blank?
+      request_hash['MultiAZ']                    = params[:multi_az].to_s                unless params[:multi_az].nil?  
       request_hash['PreferredMaintenanceWindow'] = params[:preferred_maintenance_window] unless params[:preferred_maintenance_window].blank?
       request_hash['BackupRetentionPeriod']      = params[:backup_retention_period]      unless params[:backup_retention_period].blank?
       request_hash['PreferredBackupWindow']      = params[:preferred_backup_window]      unless params[:preferred_backup_window].blank?
@@ -216,7 +217,7 @@ module RightAws
     # Mandatory arguments: +aws_id+. 
     # Optional params: +:master_user_password+, +:instance_class+, +:db_security_groups+,
     # +:db_parameter_group+, +:preferred_maintenance_window+, +:allocated_storage+, +:apply_immediately+,
-    # +:backup_retention_period+, +:preferred_backup_window+
+    # +:backup_retention_period+, +:preferred_backup_window+, +:multi_az+
     #
     def modify_db_instance(aws_id, params={})
       request_hash = {}
@@ -229,6 +230,7 @@ module RightAws
       request_hash['BackupRetentionPeriod']      = params[:backup_retention_period]        unless params[:backup_retention_period].blank?
       request_hash['PreferredBackupWindow']      = params[:preferred_backup_window]        unless params[:preferred_backup_window].blank?
       request_hash['AllocatedStorage']           = params[:allocated_storage]              unless params[:allocated_storage].blank?
+      request_hash['MultiAZ']                    = params[:multi_az].to_s                  unless params[:multi_az].nil?  
       request_hash['ApplyImmediately']           = params[:apply_immediately].to_s         unless params[:apply_immediately].blank?
       request_hash.merge!(amazonize_list('DBSecurityGroups.member',  params[:db_security_groups]))
 #      request_hash.merge!(amazonize_list('DBParameterGroups.member', params[:db_parameter_groups]))
@@ -814,6 +816,7 @@ module RightAws
         when 'Address'                    then @db_instance[:endpoint_address]     = @text
         when 'MasterUsername'             then @db_instance[:master_username]      = @text
         when 'AvailabilityZone'           then @db_instance[:availability_zone]    = @text
+        when 'MultiAZ'                    then @db_instance[:multi_az]             = (@text == 'true')      
         when 'PreferredMaintenanceWindow' then @db_instance[:preferred_maintenance_window] = @text
         when 'BackupRetentionPeriod'      then @db_instance[:backup_retention_period] = @text
         when 'PreferredBackupWindow'      then @db_instance[:preferred_backup_window] = @text
