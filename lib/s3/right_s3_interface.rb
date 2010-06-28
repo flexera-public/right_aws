@@ -214,7 +214,7 @@ module RightAws
                  else                headers[:location].to_s
                  end
       
-      unless location.blank?
+      unless location.right_blank?
         data = "<CreateBucketConfiguration><LocationConstraint>#{location}</LocationConstraint></CreateBucketConfiguration>"
       end
       req_hash = generate_rest_request('PUT', headers.merge(:url=>bucket, :data => data))
@@ -300,7 +300,7 @@ module RightAws
       #                  'max-keys'     => "5"}, ..., {...}]
       #
     def list_bucket(bucket, options={}, headers={})
-      bucket  += '?'+options.map{|k, v| "#{k.to_s}=#{CGI::escape v.to_s}"}.join('&') unless options.blank?
+      bucket  += '?'+options.map{|k, v| "#{k.to_s}=#{CGI::escape v.to_s}"}.join('&') unless options.right_blank?
       req_hash = generate_rest_request('GET', headers.merge(:url=>bucket))
       request_info(req_hash, S3ListBucketParser.new(:logger => @logger))
     rescue
@@ -335,10 +335,10 @@ module RightAws
     #     ]
     #   }
     def incrementally_list_bucket(bucket, options={}, headers={}, &block)
-      internal_options = options.symbolize_keys
+      internal_options = options.right_symbolize_keys
       begin 
         internal_bucket = bucket.dup
-        internal_bucket  += '?'+internal_options.map{|k, v| "#{k.to_s}=#{CGI::escape v.to_s}"}.join('&') unless internal_options.blank?
+        internal_bucket  += '?'+internal_options.map{|k, v| "#{k.to_s}=#{CGI::escape v.to_s}"}.join('&') unless internal_options.right_blank?
         req_hash = generate_rest_request('GET', headers.merge(:url=>internal_bucket))
         response = request_info(req_hash, S3ImprovedListBucketParser.new(:logger => @logger))
         there_are_more_keys = response[:is_truncated]
@@ -701,7 +701,7 @@ module RightAws
       #                  <Permission>FULL_CONTROL</Permission></Grant></AccessControlList></AccessControlPolicy>" }
       #
     def get_acl(bucket, key='', headers={})
-      key = key.blank? ? '' : "/#{CGI::escape key}"
+      key = key.right_blank? ? '' : "/#{CGI::escape key}"
       req_hash = generate_rest_request('GET', headers.merge(:url=>"#{bucket}#{key}?acl"))
       request_info(req_hash, S3HttpResponseBodyParser.new) 
     rescue
@@ -731,7 +731,7 @@ module RightAws
       #       :display_name=>"root"}}
       #
     def get_acl_parse(bucket, key='', headers={})
-      key = key.blank? ? '' : "/#{CGI::escape key}"
+      key = key.right_blank? ? '' : "/#{CGI::escape key}"
       req_hash = generate_rest_request('GET', headers.merge(:url=>"#{bucket}#{key}?acl"))
       acl = request_info(req_hash, S3AclParser.new(:logger => @logger))
       result = {}
@@ -755,7 +755,7 @@ module RightAws
     
       # Sets the ACL on a bucket or object.
     def put_acl(bucket, key, acl_xml_doc, headers={})
-      key = key.blank? ? '' : "/#{CGI::escape key}"
+      key = key.right_blank? ? '' : "/#{CGI::escape key}"
       req_hash = generate_rest_request('PUT', headers.merge(:url=>"#{bucket}#{key}?acl", :data=>acl_xml_doc))
       request_info(req_hash, S3HttpResponseBodyParser.new)
     rescue
@@ -889,7 +889,7 @@ module RightAws
       #  s3.list_bucket_link('my_awesome_bucket') #=> url string
       #
     def list_bucket_link(bucket, options=nil, expires=nil, headers={})
-      bucket += '?' + options.map{|k, v| "#{k.to_s}=#{CGI::escape v.to_s}"}.join('&') unless options.blank?
+      bucket += '?' + options.map{|k, v| "#{k.to_s}=#{CGI::escape v.to_s}"}.join('&') unless options.right_blank?
       generate_link('GET', headers.merge(:url=>bucket), expires)
     rescue
       on_exception

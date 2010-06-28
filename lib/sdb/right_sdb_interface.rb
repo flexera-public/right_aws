@@ -170,7 +170,7 @@ module RightAws
     # (similar to ActiveRecord::Base#find using :conditions => ['query', param1, .., paramN])
     #
     def query_expression_from_array(params) #:nodoc:
-      return '' if params.blank?
+      return '' if params.right_blank?
       query = params.shift.to_s
       query.gsub(/(\\)?(\?)/) do
         if $1 # if escaped '\?' is found - replace it by '?' without backslash
@@ -182,7 +182,7 @@ module RightAws
     end
 
     def query_expression_from_hash(hash)
-      return '' if hash.blank?
+      return '' if hash.right_blank?
       expression = []
       hash.each do |key, value|
         expression << "#{key}=#{escape(value)}"

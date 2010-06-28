@@ -291,4 +291,5 @@ the source key.
     - RDS: API '2010-01-01' (MultiAZ support)
   - Fixed:
     - RDS: DB Parameter group name on instance launch
-    
+  - ActiveSupport dependency removal
+   

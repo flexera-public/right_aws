@@ -136,7 +136,7 @@ module RightAws
       auto_scaling_group_names = auto_scaling_group_names.flatten.compact
       request_hash = amazonize_list('AutoScalingGroupNames.member', auto_scaling_group_names)
       link = generate_request("DescribeAutoScalingGroups", request_hash)
-      request_cache_or_info(:describe_auto_scaling_groups, link,  DescribeAutoScalingGroupsParser, @@bench, auto_scaling_group_names.blank?)
+      request_cache_or_info(:describe_auto_scaling_groups, link,  DescribeAutoScalingGroupsParser, @@bench, auto_scaling_group_names.right_blank?)
     end
 
     # Creates a new auto scaling group with the specified name.
@@ -302,7 +302,7 @@ module RightAws
         link = generate_request("DescribeScalingActivities", request_hash)
         last_response = request_info( link,  DescribeScalingActivitiesParser.new(:logger => @logger))
         request_hash['NextToken'] = last_response[:next_token]
-        break unless block && block.call(last_response) && !last_response[:next_token].blank?
+        break unless block && block.call(last_response) && !last_response[:next_token].right_blank?
       end
       last_response
     end
@@ -355,10 +355,10 @@ module RightAws
       request_hash = { 'LaunchConfigurationName' => launch_configuration_name,
                        'ImageId'                 => image_id,
                        'InstanceType'            => instance_type }
-      request_hash.merge!(amazonize_list('SecurityGroups.member',      options[:security_groups]))       unless options[:security_groups].blank?
+      request_hash.merge!(amazonize_list('SecurityGroups.member',      options[:security_groups]))       unless options[:security_groups].right_blank?
       request_hash.merge!(amazonize_block_device_mappings(options[:block_device_mappings], 'BlockDeviceMappings.member'))
       request_hash['KeyName']   = options[:key_name]   if options[:key_name]
-      request_hash['UserData']  = Base64.encode64(options[:user_data]).delete("\n") unless options[:user_data].blank? if options[:user_data]
+      request_hash['UserData']  = Base64.encode64(options[:user_data]).delete("\n") unless options[:user_data].right_blank? if options[:user_data]
       request_hash['KernelId']  = options[:kernel_id]  if options[:kernel_id]
       request_hash['RamdiskId'] = options[:ramdisk_id] if options[:ramdisk_id]
       link = generate_request("CreateLaunchConfiguration", request_hash)
@@ -428,7 +428,7 @@ module RightAws
         link = generate_request("DescribeLaunchConfigurations", request_hash)
         last_response = request_info( link, DescribeLaunchConfigurationsParser.new(:logger => @logger) )
         request_hash['NextToken'] = last_response[:next_token]
-        break unless block && block.call(last_response) && !last_response[:next_token].blank?
+        break unless block && block.call(last_response) && !last_response[:next_token].right_blank?
       end
       last_response
     end

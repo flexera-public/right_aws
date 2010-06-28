@@ -166,7 +166,7 @@ module RightAws
       load_balancers = load_balancers.flatten.compact
       request_hash = amazonize_list("LoadBalancerNames.member", load_balancers)
       link = generate_request("DescribeLoadBalancers", request_hash)
-      request_cache_or_info(:describe_load_balancers, link,  DescribeLoadBalancersParser, @@bench, load_balancers.blank?)
+      request_cache_or_info(:describe_load_balancers, link,  DescribeLoadBalancersParser, @@bench, load_balancers.right_blank?)
     end
 
     # Create new load balancer.
@@ -183,7 +183,7 @@ module RightAws
       # merge zones
       request_hash.merge!( amazonize_list("AvailabilityZones.member", availability_zones) )
       # merge listeners
-      if listeners.blank?
+      if listeners.right_blank?
         listeners = { :protocol           => :http,
                       :load_balancer_port => 80,
                       :instance_port      => 80 }
@@ -251,7 +251,7 @@ module RightAws
     #
     def configure_health_check(load_balancer_name, health_check)
       request_hash = { 'LoadBalancerName' => load_balancer_name }
-      health_check.each{ |key, value| request_hash["HealthCheck.#{key.to_s.camelize}"] = value }
+      health_check.each{ |key, value| request_hash["HealthCheck.#{key.to_s.right_camelize}"] = value }
       link = generate_request("ConfigureHealthCheck", request_hash)
       request_info(link, HealthCheckParser.new(:logger => @logger))
     end

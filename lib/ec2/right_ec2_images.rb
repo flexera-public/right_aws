@@ -269,8 +269,8 @@ module RightAws
     #
     def create_image(instance_aws_id, options={})
       params = { 'InstanceId' => instance_aws_id }
-      params['Name']        = options[:name]            unless options[:name].blank?
-      params['Description'] = options[:description]     unless options[:description].blank?
+      params['Name']        = options[:name]            unless options[:name].right_blank?
+      params['Description'] = options[:description]     unless options[:description].right_blank?
       params['NoReboot']    = options[:no_reboot].to_s  unless options[:no_reboot].nil?
       link = generate_request("CreateImage", params)
       request_info(link, QEc2RegisterImageParser.new(:logger => @logger))

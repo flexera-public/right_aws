@@ -87,7 +87,7 @@ module RightAws
     def describe_instances(*instances)
       instances = instances.flatten
       link = generate_request("DescribeInstances", amazonize_list('InstanceId', instances))
-      request_cache_or_info(:describe_instances, link,  QEc2DescribeInstancesParser, @@bench, instances.blank?) do |parser|
+      request_cache_or_info(:describe_instances, link,  QEc2DescribeInstancesParser, @@bench, instances.right_blank?) do |parser|
         get_desc_instances(parser.result)
       end
     rescue Exception
@@ -207,30 +207,30 @@ module RightAws
     def prepare_instance_launch_params(options={}) # :nodoc:
       params = amazonize_list('SecurityGroup', Array(options[:group_ids]))
       params['InstanceType']                      = options[:instance_type] || DEFAULT_INSTANCE_TYPE
-      params['ImageId']                           = options[:image_id]                             unless options[:image_id].blank?
-      params['AddressingType']                    = options[:addressing_type]                      unless options[:addressing_type].blank?
-      params['MinCount']                          = options[:min_count]                            unless options[:min_count].blank?
-      params['MaxCount']                          = options[:max_count]                            unless options[:max_count].blank?
-      params['KeyName']                           = options[:key_name]                             unless options[:key_name].blank?
-      params['KernelId']                          = options[:kernel_id]                            unless options[:kernel_id].blank?
-      params['RamdiskId']                         = options[:ramdisk_id]                           unless options[:ramdisk_id].blank?
-      params['Placement.AvailabilityZone']        = options[:availability_zone]                    unless options[:availability_zone].blank?
+      params['ImageId']                           = options[:image_id]                             unless options[:image_id].right_blank?
+      params['AddressingType']                    = options[:addressing_type]                      unless options[:addressing_type].right_blank?
+      params['MinCount']                          = options[:min_count]                            unless options[:min_count].right_blank?
+      params['MaxCount']                          = options[:max_count]                            unless options[:max_count].right_blank?
+      params['KeyName']                           = options[:key_name]                             unless options[:key_name].right_blank?
+      params['KernelId']                          = options[:kernel_id]                            unless options[:kernel_id].right_blank?
+      params['RamdiskId']                         = options[:ramdisk_id]                           unless options[:ramdisk_id].right_blank?
+      params['Placement.AvailabilityZone']        = options[:availability_zone]                    unless options[:availability_zone].right_blank?
       params['Monitoring.Enabled']                = options[:monitoring_enabled].to_s              if     options[:monitoring_enabled]
-      params['SubnetId']                          = options[:subnet_id]                            unless options[:subnet_id].blank?
-      params['AdditionalInfo']                    = options[:additional_info]                      unless options[:additional_info].blank?
+      params['SubnetId']                          = options[:subnet_id]                            unless options[:subnet_id].right_blank?
+      params['AdditionalInfo']                    = options[:additional_info]                      unless options[:additional_info].right_blank?
       params['DisableApiTermination']             = options[:disable_api_termination].to_s         unless options[:disable_api_termination].nil?
-      params['InstanceInitiatedShutdownBehavior'] = options[:instance_initiated_shutdown_behavior] unless options[:instance_initiated_shutdown_behavior].blank?
-#     params['VolumeId']                          = options[:volume_id]                            unless options[:volume_id].blank?
-#     params['RootDeviceName']                    = options[:root_device_name]                     unless options[:root_device_name].blank?
-#     params['RootDeviceType']                    = options[:root_device_type]                     unless options[:root_device_type].blank?
+      params['InstanceInitiatedShutdownBehavior'] = options[:instance_initiated_shutdown_behavior] unless options[:instance_initiated_shutdown_behavior].right_blank?
+#     params['VolumeId']                          = options[:volume_id]                            unless options[:volume_id].right_blank?
+#     params['RootDeviceName']                    = options[:root_device_name]                     unless options[:root_device_name].right_blank?
+#     params['RootDeviceType']                    = options[:root_device_type]                     unless options[:root_device_type].right_blank?
       params.merge!(amazonize_block_device_mappings(options[:block_device_mappings]))
-      unless options[:user_data].blank?
+      unless options[:user_data].right_blank?
         options[:user_data].strip!
           # Do not use CGI::escape(encode64(...)) as it is done in Amazons EC2 library.
           # Amazon 169.254.169.254 does not like escaped symbols!
           # And it doesn't like "\n" inside of encoded string! Grrr....
           # Otherwise, some of UserData symbols will be lost...
-        params['UserData'] = Base64.encode64(options[:user_data]).delete("\n") unless options[:user_data].blank?
+        params['UserData'] = Base64.encode64(options[:user_data]).delete("\n") unless options[:user_data].right_blank?
       end
       params
     end
@@ -429,7 +429,7 @@ module RightAws
       link = generate_request('GetPasswordData',
                               'InstanceId' => instance_id )
       response = request_info(link, QEc2GetPasswordDataParser.new(:logger => @logger))
-      if response[:password_data].blank?
+      if response[:password_data].right_blank?
         raise AwsError.new("Initial password is not yet created for #{instance_id}")
       else
         OpenSSL::PKey::RSA.new(private_key).private_decrypt(Base64.decode64(response[:password_data]))

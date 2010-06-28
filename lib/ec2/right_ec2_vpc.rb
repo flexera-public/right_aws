@@ -128,7 +128,7 @@ module RightAws
     def create_subnet(vpc_id, cidr_block, availability_zone = nil)
       request_hash = { 'VpcId'     => vpc_id,
                        'CidrBlock' => cidr_block }
-      request_hash['AvailabilityZone'] = availability_zone unless availability_zone.blank?
+      request_hash['AvailabilityZone'] = availability_zone unless availability_zone.right_blank?
       link = generate_request("CreateSubnet", request_hash)
       request_info(link, QEc2DescribeSubnetsParser.new(:logger => @logger)).first
     rescue Exception
@@ -301,7 +301,7 @@ module RightAws
     #
     def create_vpn_gateway(type, availability_zone=nil)
       request_hash = { 'Type' => type }
-      request_hash['AvailabilityZone'] = availability_zone unless availability_zone.blank?
+      request_hash['AvailabilityZone'] = availability_zone unless availability_zone.right_blank?
       link = generate_request("CreateVpnGateway", request_hash )
       request_info(link, QEc2DescribeVpnGatewaysParser.new(:logger => @logger)).first
     rescue Exception
@@ -520,7 +520,7 @@ module RightAws
           @attachment[:state] = @text
         when "#{@p1}/attachments/item",
              "#{@p2}/attachments/item"
-          @item[:attachments] << @attachment unless @attachment.blank?
+          @item[:attachments] << @attachment unless @attachment.right_blank?
         when @p1, @p2
           @result << @item
         end

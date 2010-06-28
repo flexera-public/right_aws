@@ -271,7 +271,7 @@ module RightAws
           grantees << Grantee.new(self, grantee_email_address, key, value[:name], value[:perms])
         end
         if grantee_email_address
-          grantees.blank? ? nil : grantees.shift
+          grantees.right_blank? ? nil : grantees.shift
         else
           grantees
         end

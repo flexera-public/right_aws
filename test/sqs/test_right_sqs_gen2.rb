@@ -94,7 +94,7 @@ class TestSqsGen2 < Test::Unit::TestCase
   def test_06_test_permissions
     queue_url = @sqs.queue_url_by_name(@queue_name)
     permissions = @sqs.get_queue_attributes(queue_url, 'Policy')
-    assert !permissions.blank?
+    assert !permissions.right_blank?
   end
 
   def test_07_revoke_permissions

@@ -94,7 +94,7 @@ module RightAws
         link = generate_request(action, params)
         last_response = request_info( link,  parser_class.new(:logger => @logger))
         params['Marker'] = last_response[:marker]
-        break unless block && block.call(last_response) && !last_response[:marker].blank?
+        break unless block && block.call(last_response) && !last_response[:marker].right_blank?
       end
       last_response
     end
@@ -194,20 +194,20 @@ module RightAws
       request_hash['MasterUsername']       = master_username
       request_hash['MasterUserPassword']   = master_user_password
       # Mandatory with default values
-      request_hash['DBInstanceClass']  = params[:instance_class].blank?    ? DEFAULT_INSTANCE_CLASS : params[:instance_class].to_s
-      request_hash['AllocatedStorage'] = params[:allocated_storage].blank? ? 25            : params[:allocated_storage]
-      request_hash['Engine']           = params[:engine].blank?            ? 'MySQL5.1'    : params[:engine]
+      request_hash['DBInstanceClass']  = params[:instance_class].right_blank?    ? DEFAULT_INSTANCE_CLASS : params[:instance_class].to_s
+      request_hash['AllocatedStorage'] = params[:allocated_storage].right_blank? ? 25            : params[:allocated_storage]
+      request_hash['Engine']           = params[:engine].right_blank?            ? 'MySQL5.1'    : params[:engine]
       # Optional
-      request_hash['EndpointPort']               = params[:endpoint_port]                unless params[:endpoint_port].blank?
-      request_hash['DBName']                     = params[:db_name]                      unless params[:db_name].blank?
-      request_hash['AvailabilityZone']           = params[:availability_zone]            unless params[:availability_zone].blank?
+      request_hash['EndpointPort']               = params[:endpoint_port]                unless params[:endpoint_port].right_blank?
+      request_hash['DBName']                     = params[:db_name]                      unless params[:db_name].right_blank?
+      request_hash['AvailabilityZone']           = params[:availability_zone]            unless params[:availability_zone].right_blank?
       request_hash['MultiAZ']                    = params[:multi_az].to_s                unless params[:multi_az].nil?  
-      request_hash['PreferredMaintenanceWindow'] = params[:preferred_maintenance_window] unless params[:preferred_maintenance_window].blank?
-      request_hash['BackupRetentionPeriod']      = params[:backup_retention_period]      unless params[:backup_retention_period].blank?
-      request_hash['PreferredBackupWindow']      = params[:preferred_backup_window]      unless params[:preferred_backup_window].blank?
+      request_hash['PreferredMaintenanceWindow'] = params[:preferred_maintenance_window] unless params[:preferred_maintenance_window].right_blank?
+      request_hash['BackupRetentionPeriod']      = params[:backup_retention_period]      unless params[:backup_retention_period].right_blank?
+      request_hash['PreferredBackupWindow']      = params[:preferred_backup_window]      unless params[:preferred_backup_window].right_blank?
       request_hash.merge!(amazonize_list('DBSecurityGroups.member',  params[:db_security_groups]))
 #      request_hash.merge!(amazonize_list('DBParameterGroups.member', params[:db_parameter_groups]))
-      request_hash['DBParameterGroupName']       = params[:db_parameter_group]           unless params[:db_parameter_group].blank?
+      request_hash['DBParameterGroupName']       = params[:db_parameter_group]           unless params[:db_parameter_group].right_blank?
       link = generate_request('CreateDBInstance', request_hash)
       request_info(link, DescribeDbInstancesParser.new(:logger => @logger))[:db_instances].first
     end
@@ -224,17 +224,17 @@ module RightAws
       # Mandatory
       request_hash['DBInstanceIdentifier'] = aws_id
       # Optional
-      request_hash['MasterUserPassword']         = params[:master_user_password]           unless params[:master_user_password].blank?
-      request_hash['DBInstanceClass']            = params[:instance_class].to_s.capitalize unless params[:instance_class].blank?
-      request_hash['PreferredMaintenanceWindow'] = params[:preferred_maintenance_window]   unless params[:preferred_maintenance_window].blank?
-      request_hash['BackupRetentionPeriod']      = params[:backup_retention_period]        unless params[:backup_retention_period].blank?
-      request_hash['PreferredBackupWindow']      = params[:preferred_backup_window]        unless params[:preferred_backup_window].blank?
-      request_hash['AllocatedStorage']           = params[:allocated_storage]              unless params[:allocated_storage].blank?
+      request_hash['MasterUserPassword']         = params[:master_user_password]           unless params[:master_user_password].right_blank?
+      request_hash['DBInstanceClass']            = params[:instance_class].to_s.capitalize unless params[:instance_class].right_blank?
+      request_hash['PreferredMaintenanceWindow'] = params[:preferred_maintenance_window]   unless params[:preferred_maintenance_window].right_blank?
+      request_hash['BackupRetentionPeriod']      = params[:backup_retention_period]        unless params[:backup_retention_period].right_blank?
+      request_hash['PreferredBackupWindow']      = params[:preferred_backup_window]        unless params[:preferred_backup_window].right_blank?
+      request_hash['AllocatedStorage']           = params[:allocated_storage]              unless params[:allocated_storage].right_blank?
       request_hash['MultiAZ']                    = params[:multi_az].to_s                  unless params[:multi_az].nil?  
-      request_hash['ApplyImmediately']           = params[:apply_immediately].to_s         unless params[:apply_immediately].blank?
+      request_hash['ApplyImmediately']           = params[:apply_immediately].to_s         unless params[:apply_immediately].right_blank?
       request_hash.merge!(amazonize_list('DBSecurityGroups.member',  params[:db_security_groups]))
 #      request_hash.merge!(amazonize_list('DBParameterGroups.member', params[:db_parameter_groups]))
-      request_hash['DBParameterGroupName']       = params[:db_parameter_group]             unless params[:db_parameter_group].blank?
+      request_hash['DBParameterGroupName']       = params[:db_parameter_group]             unless params[:db_parameter_group].right_blank?
       link = generate_request('ModifyDBInstance', request_hash)
       request_info(link, DescribeDbInstancesParser.new(:logger => @logger))[:db_instances].first
     end
@@ -273,11 +273,11 @@ module RightAws
       request_hash = {}
       request_hash['DBInstanceIdentifier'] = aws_id
       request_hash['SkipFinalSnapshot']    = params.has_key?(:skip_final_snapshot) ? params[:skip_final_snapshot].to_s : 'false'
-      if request_hash['SkipFinalSnapshot'] == 'false' && params[:snapshot_aws_id].blank?
+      if request_hash['SkipFinalSnapshot'] == 'false' && params[:snapshot_aws_id].right_blank?
         params = params.dup
         params[:snapshot_aws_id] = "#{aws_id}-final-snapshot-#{Time.now.utc.strftime('%Y%m%d%H%M%S')}"
       end
-      request_hash['FinalDBSnapshotIdentifier'] = params[:snapshot_aws_id] unless params[:snapshot_aws_id].blank?
+      request_hash['FinalDBSnapshotIdentifier'] = params[:snapshot_aws_id] unless params[:snapshot_aws_id].right_blank?
       link = generate_request('DeleteDBInstance', request_hash)
       request_info(link, DescribeDbInstancesParser.new(:logger => @logger))[:db_instances].first
     end
@@ -319,7 +319,7 @@ module RightAws
     #
     def describe_db_security_groups(*db_security_group_name, &block)
       items, params = AwsUtils::split_items_and_params(db_security_group_name)
-      params['DBSecurityGroupName'] = items.first unless items.blank?
+      params['DBSecurityGroupName'] = items.first unless items.right_blank?
       result = []
       incrementally_list_items('DescribeDBSecurityGroups', DescribeDbSecurityGroupsParser, params) do |response|
         result += response[:db_security_groups]
@@ -346,9 +346,9 @@ module RightAws
 
     def modify_db_security_group_ingress(action, db_security_group_name, params={}) # :nodoc:
       request_hash = { 'DBSecurityGroupName' => db_security_group_name}
-      request_hash['CIDRIP']                  = params[:cidrip]                   unless params[:cidrip].blank?
-      request_hash['EC2SecurityGroupName']    = params[:ec2_security_group_name]  unless params[:ec2_security_group_name].blank?
-      request_hash['EC2SecurityGroupOwnerId'] = params[:ec2_security_group_owner] unless params[:ec2_security_group_owner].blank?
+      request_hash['CIDRIP']                  = params[:cidrip]                   unless params[:cidrip].right_blank?
+      request_hash['EC2SecurityGroupName']    = params[:ec2_security_group_name]  unless params[:ec2_security_group_name].right_blank?
+      request_hash['EC2SecurityGroupOwnerId'] = params[:ec2_security_group_owner] unless params[:ec2_security_group_owner].right_blank?
       link = generate_request(action, request_hash)
       request_info(link, DescribeDbSecurityGroupsParser.new(:logger => @logger))[:db_security_groups].first
     end
@@ -436,7 +436,7 @@ module RightAws
     #
     def describe_db_parameter_groups(*db_parameter_group_name, &block)
       items, params = AwsUtils::split_items_and_params(db_parameter_group_name)
-      params['DBParameterGroupName'] = items.first unless items.blank?
+      params['DBParameterGroupName'] = items.first unless items.right_blank?
       result = []
       incrementally_list_items('DescribeDBParameterGroups', DescribeDbParameterGroupsParser, params) do |response|
         result += response[:db_parameter_groups]
@@ -472,7 +472,7 @@ module RightAws
       params.each do |key, value|
         method = 'pending-reboot'
         if value.is_a?(Hash)
-          method = value[:method] unless value[:method].blank?
+          method = value[:method] unless value[:method].right_blank?
           value  = value[:value]
         end
         parameters << [key, value, method]
@@ -578,7 +578,7 @@ module RightAws
     #      :data_type=>"integer"}, ... ]
     #
     def describe_engine_default_parameters(*engine, &block)
-      engine = ['MySQL5.1'] if engine.blank?
+      engine = ['MySQL5.1'] if engine.right_blank?
       item, params = AwsUtils::split_items_and_params(engine)
       params['Engine'] = item if item
       result = []
@@ -638,7 +638,7 @@ module RightAws
     def describe_db_snapshots(params={}, &block)
       item, params = AwsUtils::split_items_and_params(params)
       params['DBSnapshotIdentifier'] = item if item
-      params['DBInstanceIdentifier'] = params.delete(:instance_aws_id) unless params[:instance_aws_id].blank?
+      params['DBInstanceIdentifier'] = params.delete(:instance_aws_id) unless params[:instance_aws_id].right_blank?
       result = []
       incrementally_list_items('DescribeDBSnapshots', DescribeDbSnapshotsParser, params) do |response|
         result += response[:db_snapshots]
@@ -687,9 +687,9 @@ module RightAws
     def restore_db_instance_from_db_snapshot(snapshot_aws_id, instance_aws_id, params={})
       request_hash = { 'DBSnapshotIdentifier' => snapshot_aws_id,
                        'DBInstanceIdentifier' => instance_aws_id }
-      request_hash['DBInstanceClass']  = params[:instance_class]    unless params[:instance_class].blank?
-      request_hash['EndpointPort']     = params[:endpoint_port]     unless params[:endpoint_port].blank?
-      request_hash['AvailabilityZone'] = params[:availability_zone] unless params[:availability_zone].blank?
+      request_hash['DBInstanceClass']  = params[:instance_class]    unless params[:instance_class].right_blank?
+      request_hash['EndpointPort']     = params[:endpoint_port]     unless params[:endpoint_port].right_blank?
+      request_hash['AvailabilityZone'] = params[:availability_zone] unless params[:availability_zone].right_blank?
       link = generate_request('RestoreDBInstanceFromDBSnapshot', request_hash)
       request_info(link, DescribeDbInstancesParser.new(:logger => @logger))[:db_instances].first
     end
@@ -756,11 +756,11 @@ module RightAws
     #
     def describe_events(params={}, &block)
       params = params.dup
-      params['SourceIdentifier'] = params.delete(:aws_id)                unless params[:aws_id].blank?
-      params['SourceType']       = params.delete(:source_type)           unless params[:source_type].blank?
-      params['Duration']         = params.delete(:duration)              unless params[:duration].blank?
-      params['StartDate']        = fix_date(params.delete(:start_date))  unless params[:start_date].blank?
-      params['EndDate']          = fix_date(params.delete(:end_date))    unless params[:end_date].blank?
+      params['SourceIdentifier'] = params.delete(:aws_id)                unless params[:aws_id].right_blank?
+      params['SourceType']       = params.delete(:source_type)           unless params[:source_type].right_blank?
+      params['Duration']         = params.delete(:duration)              unless params[:duration].right_blank?
+      params['StartDate']        = fix_date(params.delete(:start_date))  unless params[:start_date].right_blank?
+      params['EndDate']          = fix_date(params.delete(:end_date))    unless params[:end_date].right_blank?
       result = []
       incrementally_list_items('DescribeEvents', DescribeEventsParser, params) do |response|
         result += response[:events]

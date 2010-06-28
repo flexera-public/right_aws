@@ -52,7 +52,7 @@ module RightAws
     def describe_volumes(*volumes)
       volumes = volumes.flatten
       link = generate_request("DescribeVolumes", amazonize_list('VolumeId', volumes))
-      request_cache_or_info :describe_volumes, link,  QEc2DescribeVolumesParser, @@bench, volumes.blank?
+      request_cache_or_info :describe_volumes, link,  QEc2DescribeVolumesParser, @@bench, volumes.right_blank?
     rescue Exception
       on_exception
     end
@@ -72,7 +72,7 @@ module RightAws
       hash = { "Size"              => size.to_s,
                "AvailabilityZone"  => zone.to_s }
       # Get rig of empty snapshot: e8s guys do not like it
-      hash["SnapshotId"] = snapshot_id.to_s unless snapshot_id.blank?
+      hash["SnapshotId"] = snapshot_id.to_s unless snapshot_id.right_blank?
       link = generate_request("CreateVolume", hash )
       request_info(link, QEc2CreateVolumeParser.new(:logger => @logger))
     rescue Exception
@@ -123,8 +123,8 @@ module RightAws
     #
     def detach_volume(volume_id, instance_id=nil, device=nil, force=nil)
       hash = { "VolumeId" => volume_id.to_s }
-      hash["InstanceId"] = instance_id.to_s unless instance_id.blank?
-      hash["Device"]     = device.to_s      unless device.blank?
+      hash["InstanceId"] = instance_id.to_s unless instance_id.right_blank?
+      hash["Device"]     = device.to_s      unless device.right_blank?
       hash["Force"]      = 'true'           if     force
       #
       link = generate_request("DetachVolume", hash)
@@ -161,7 +161,7 @@ module RightAws
     def describe_snapshots(*snapshots)
       snapshots = snapshots.flatten
       link = generate_request("DescribeSnapshots", amazonize_list('SnapshotId', snapshots))
-      request_cache_or_info :describe_snapshots, link,  QEc2DescribeSnapshotsParser, @@bench, snapshots.blank?
+      request_cache_or_info :describe_snapshots, link,  QEc2DescribeSnapshotsParser, @@bench, snapshots.right_blank?
     rescue Exception
       on_exception
     end
@@ -300,7 +300,7 @@ module RightAws
     #
     def modify_snapshot_attribute_create_volume_permission_add_groups(snapshot_id, *user_group)
       user_group.flatten!
-      user_group = ['all'] if user_group.blank?
+      user_group = ['all'] if user_group.right_blank?
       modify_snapshot_attribute(snapshot_id, 'createVolumePermission', 'add', :user_group => user_group )
     end
 
@@ -310,7 +310,7 @@ module RightAws
     #
     def modify_snapshot_attribute_create_volume_permission_remove_groups(snapshot_id, *user_group)
       user_group.flatten!
-      user_group = ['all'] if user_group.blank?
+      user_group = ['all'] if user_group.right_blank?
       modify_snapshot_attribute(snapshot_id, 'createVolumePermission', 'remove', :user_group => user_group )
     end
 
@@ -337,7 +337,7 @@ module RightAws
         when 'status'           then @result[:aws_status]     = @text
         when 'createTime'       then @result[:aws_created_at] = @text
         when 'size'             then @result[:aws_size]       = @text.to_i ###
-        when 'snapshotId'       then @result[:snapshot_id]    = @text.blank? ? nil : @text ###
+        when 'snapshotId'       then @result[:snapshot_id]    = @text.right_blank? ? nil : @text ###
         when 'availabilityZone' then @result[:zone]           = @text ###
         end
       end
@@ -386,7 +386,7 @@ module RightAws
         when 'instanceId'       then @volume[:aws_instance_id] = @text
         when 'device'           then @volume[:aws_device]      = @text
         when 'attachTime'       then @volume[:aws_attached_at] = @text
-        when 'snapshotId'       then @volume[:snapshot_id]     = @text.blank? ? nil : @text
+        when 'snapshotId'       then @volume[:snapshot_id]     = @text.right_blank? ? nil : @text
         when 'availabilityZone' then @volume[:zone]            = @text
         when 'deleteOnTermination' then @volume[:delete_on_termination] = (@text == 'true')
         when 'item'

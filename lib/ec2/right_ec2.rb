@@ -154,7 +154,7 @@ module RightAws
     def describe_key_pairs(*key_pairs)
       key_pairs = key_pairs.flatten
       link = generate_request("DescribeKeyPairs", amazonize_list('KeyName', key_pairs))
-      request_cache_or_info :describe_key_pairs, link,  QEc2DescribeKeyPairParser, @@bench, key_pairs.blank?
+      request_cache_or_info :describe_key_pairs, link,  QEc2DescribeKeyPairParser, @@bench, key_pairs.right_blank?
     rescue Exception
       on_exception
     end
@@ -227,7 +227,7 @@ module RightAws
     def describe_addresses(*addresses)
       addresses = addresses.flatten
       link = generate_request("DescribeAddresses", amazonize_list('PublicIp', addresses))
-      request_cache_or_info :describe_addresses, link,  QEc2DescribeAddressesParser, @@bench, addresses.blank?
+      request_cache_or_info :describe_addresses, link,  QEc2DescribeAddressesParser, @@bench, addresses.right_blank?
     rescue Exception
       on_exception
     end
@@ -276,7 +276,7 @@ module RightAws
     def describe_availability_zones(*availability_zones)
       availability_zones = availability_zones.flatten
       link = generate_request("DescribeAvailabilityZones", amazonize_list('ZoneName', availability_zones))
-      request_cache_or_info :describe_availability_zones, link,  QEc2DescribeAvailabilityZonesParser, @@bench, availability_zones.blank?
+      request_cache_or_info :describe_availability_zones, link,  QEc2DescribeAvailabilityZonesParser, @@bench, availability_zones.right_blank?
     rescue Exception
       on_exception
     end
@@ -292,7 +292,7 @@ module RightAws
     def describe_regions(*regions)
       regions = regions.flatten
       link = generate_request("DescribeRegions", amazonize_list('RegionName', regions))
-      request_cache_or_info :describe_regions, link,  QEc2DescribeRegionsParser, @@bench, regions.blank?
+      request_cache_or_info :describe_regions, link,  QEc2DescribeRegionsParser, @@bench, regions.right_blank?
     rescue Exception
       on_exception
     end
@@ -346,7 +346,7 @@ module RightAws
       end
       def tagend(name)
         case name
-        when 'instanceId' then @address[:instance_id] = @text.blank? ? nil : @text 
+        when 'instanceId' then @address[:instance_id] = @text.right_blank? ? nil : @text
         when 'publicIp'   then @address[:public_ip]   = @text
         when 'item'       then @result << @address
         end

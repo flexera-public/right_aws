@@ -66,10 +66,10 @@ module RightAws
     def describe_spot_price_history(options={})
       options = options.dup
       request_hash = {}
-      request_hash['StartTime']          = AwsUtils::utc_iso8601(options[:start_time])     unless options[:start_time].blank?
-      request_hash['EndTime']            = AwsUtils::utc_iso8601(options[:end_time])       unless options[:end_time].blank?
-      request_hash['ProductDescription'] = options[:product_description]                   unless options[:product_description].blank?
-      request_hash.merge!(amazonize_list('InstanceType', Array(options[:instance_types]))) unless options[:instance_types].blank?
+      request_hash['StartTime']          = AwsUtils::utc_iso8601(options[:start_time])     unless options[:start_time].right_blank?
+      request_hash['EndTime']            = AwsUtils::utc_iso8601(options[:end_time])       unless options[:end_time].right_blank?
+      request_hash['ProductDescription'] = options[:product_description]                   unless options[:product_description].right_blank?
+      request_hash.merge!(amazonize_list('InstanceType', Array(options[:instance_types]))) unless options[:instance_types].right_blank?
       link = generate_request("DescribeSpotPriceHistory", request_hash)
       request_info(link, QEc2DescribeSpotPriceHistoryParser.new)
     rescue Exception
@@ -205,25 +205,25 @@ module RightAws
       request_hash = { 'SpotPrice'                        => options[:spot_price],
                        'LaunchSpecification.ImageId'      => options[:image_id],
                        'LaunchSpecification.InstanceType' => options[:instance_type]}
-      request_hash['ValidFrom']                      = AwsUtils::utc_iso8601(options[:valid_from])  unless options[:valid_from].blank?
-      request_hash['ValidUntil']                     = AwsUtils::utc_iso8601(options[:valid_until]) unless options[:valid_until].blank?
-      request_hash['InstanceCount']                      = options[:instance_count]                 unless options[:instance_count].blank?
-      request_hash['Type']                               = options[:type]                           unless options[:type].blank?
-      request_hash['LaunchGroup']                        = options[:launch_group]                   unless options[:launch_group].blank?
-      request_hash['AvailabilityZoneGroup']              = options[:availability_zone_group]        unless options[:availability_zone_group].blank?
-      request_hash['LaunchSpecification.KeyName']        = options[:key_name]                       unless options[:key_name].blank?
-      request_hash['LaunchSpecification.AddressingType'] = options[:addressing_type]                unless options[:addressing_type].blank?
-      request_hash['LaunchSpecification.KernelId']       = options[:kernel_id]                      unless options[:kernel_id].blank?
-      request_hash['LaunchSpecification.RamdiskId']      = options[:ramdisk_id]                     unless options[:ramdisk_id].blank?
-      request_hash['LaunchSpecification.SubnetId']       = options[:subnet_id]                      unless options[:subnet_id].blank?
-      request_hash['LaunchSpecification.Placement.AvailabilityZone'] = options[:availability_zone]  unless options[:availability_zone].blank?
-      request_hash['LaunchSpecification.Monitoring.Enabled']         = options[:monitoring_enabled] unless options[:monitoring_enabled].blank?
-      request_hash.merge!(amazonize_list('LaunchSpecification.SecurityGroup', options[:groups]))    unless options[:groups].blank?
+      request_hash['ValidFrom']                      = AwsUtils::utc_iso8601(options[:valid_from])  unless options[:valid_from].right_blank?
+      request_hash['ValidUntil']                     = AwsUtils::utc_iso8601(options[:valid_until]) unless options[:valid_until].right_blank?
+      request_hash['InstanceCount']                      = options[:instance_count]                 unless options[:instance_count].right_blank?
+      request_hash['Type']                               = options[:type]                           unless options[:type].right_blank?
+      request_hash['LaunchGroup']                        = options[:launch_group]                   unless options[:launch_group].right_blank?
+      request_hash['AvailabilityZoneGroup']              = options[:availability_zone_group]        unless options[:availability_zone_group].right_blank?
+      request_hash['LaunchSpecification.KeyName']        = options[:key_name]                       unless options[:key_name].right_blank?
+      request_hash['LaunchSpecification.AddressingType'] = options[:addressing_type]                unless options[:addressing_type].right_blank?
+      request_hash['LaunchSpecification.KernelId']       = options[:kernel_id]                      unless options[:kernel_id].right_blank?
+      request_hash['LaunchSpecification.RamdiskId']      = options[:ramdisk_id]                     unless options[:ramdisk_id].right_blank?
+      request_hash['LaunchSpecification.SubnetId']       = options[:subnet_id]                      unless options[:subnet_id].right_blank?
+      request_hash['LaunchSpecification.Placement.AvailabilityZone'] = options[:availability_zone]  unless options[:availability_zone].right_blank?
+      request_hash['LaunchSpecification.Monitoring.Enabled']         = options[:monitoring_enabled] unless options[:monitoring_enabled].right_blank?
+      request_hash.merge!(amazonize_list('LaunchSpecification.SecurityGroup', options[:groups]))    unless options[:groups].right_blank?
       request_hash.merge!(amazonize_block_device_mappings(options[:block_device_mappings], 'LaunchSpecification.BlockDeviceMapping'))
-      unless options[:user_data].blank?
+      unless options[:user_data].right_blank?
         # See RightAws::Ec2#run_instances
         options[:user_data].strip!
-        request_hash['LaunchSpecification.UserData'] = Base64.encode64(options[:user_data]).delete("\n") unless options[:user_data].blank?
+        request_hash['LaunchSpecification.UserData'] = Base64.encode64(options[:user_data]).delete("\n") unless options[:user_data].right_blank?
       end
       link = generate_request("RequestSpotInstances", request_hash)
       request_info(link, QEc2DescribeSpotInstanceParser.new(:logger => @logger))
@@ -253,7 +253,7 @@ module RightAws
     #
     def create_spot_datafeed_subscription(bucket, prefix=nil)
       request_hash = { 'Bucket' => bucket }
-      request_hash['Prefix'] = prefix unless prefix.blank?
+      request_hash['Prefix'] = prefix unless prefix.right_blank?
       link = generate_request("CreateSpotDatafeedSubscription", request_hash)
       request_info(link, QEc2DescribeSpotDatafeedSubscriptionParser.new(:logger => @logger))
     end

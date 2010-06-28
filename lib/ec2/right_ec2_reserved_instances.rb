@@ -47,7 +47,7 @@ module RightAws
     def describe_reserved_instances(*reserved_instances)
       reserved_instances = reserved_instances.flatten
       link = generate_request("DescribeReservedInstances", amazonize_list('ReservedInstancesId', reserved_instances))
-      request_cache_or_info(:describe_reserved_instances, link,  QEc2DescribeReservedInstancesParser, @@bench, reserved_instances.blank?)
+      request_cache_or_info(:describe_reserved_instances, link,  QEc2DescribeReservedInstancesParser, @@bench, reserved_instances.right_blank?)
     rescue Exception
       on_exception
     end
@@ -82,12 +82,12 @@ module RightAws
       # backward compartibility with the old way
       list ||= Array(params[:aws_ids])
       rparams = {}
-      rparams.update(amazonize_list('ReservedInstancesOfferingId', list)) unless list.blank?
+      rparams.update(amazonize_list('ReservedInstancesOfferingId', list)) unless list.right_blank?
       rparams['InstanceType']       = params[:aws_instance_type]       if params[:aws_instance_type]
       rparams['AvailabilityZone']   = params[:aws_availability_zone]   if params[:aws_availability_zone]
       rparams['ProductDescription'] = params[:aws_product_description] if params[:aws_product_description]
       link = generate_request("DescribeReservedInstancesOfferings", rparams)
-      request_cache_or_info(:describe_reserved_instances_offerings, link,  QEc2DescribeReservedInstancesOfferingsParser, @@bench, list.blank?)
+      request_cache_or_info(:describe_reserved_instances_offerings, link,  QEc2DescribeReservedInstancesOfferingsParser, @@bench, list.right_blank?)
     rescue Exception
       on_exception
     end
