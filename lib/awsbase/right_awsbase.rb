@@ -222,9 +222,9 @@ module RightAws
       @params = params
       # If one defines EC2_URL he may forget to use a single slash as an "empty service" path.
       # Amazon does not like this therefore add this bad boy if he is missing...
-      service_info[:default_service] = '/' if service_info[:default_service].blank?
+      service_info[:default_service] = '/' if service_info[:default_service].right_blank?
       raise AwsError.new("AWS access keys are required to operate on #{service_info[:name]}") \
-        if aws_access_key_id.blank? || aws_secret_access_key.blank?
+        if aws_access_key_id.right_blank? || aws_secret_access_key.right_blank?
       @aws_access_key_id     = aws_access_key_id
       @aws_secret_access_key = aws_secret_access_key
       # if the endpoint was explicitly defined - then use it
@@ -233,7 +233,7 @@ module RightAws
         @params[:port]     = URI.parse(@params[:endpoint_url]).port
         @params[:service]  = URI.parse(@params[:endpoint_url]).path
         # make sure the 'service' path is not empty
-        @params[:service]  = service_info[:default_service] if @params[:service].blank?
+        @params[:service]  = service_info[:default_service] if @params[:service].right_blank?
         @params[:protocol] = URI.parse(@params[:endpoint_url]).scheme
         @params[:region]   = nil
       else
@@ -537,7 +537,7 @@ module RightAws
 
     def amazonize_block_device_mappings(block_device_mappings, key = 'BlockDeviceMapping') # :nodoc:
       result = {}
-      unless block_device_mappings.blank?
+      unless block_device_mappings.right_blank?
         block_device_mappings = [block_device_mappings] unless block_device_mappings.is_a?(Array)
         block_device_mappings.each_with_index do |b, idx|
           BLOCK_DEVICE_KEY_MAPPING.each do |local_name, remote_name|

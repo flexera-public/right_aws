@@ -249,7 +249,7 @@ module RightAws
         #  key.head
         #
       def key(key_name, head=false)
-        raise 'Key name can not be empty.' if key_name.blank?
+        raise 'Key name can not be empty.' if key_name.right_blank?
         key_instance = nil
           # if this key exists - find it ....
         keys({'prefix'=>key_name}, head).each do |key|
@@ -650,7 +650,7 @@ module RightAws
         #  key.delete #=> true
         #
       def delete
-        raise 'Key name must be specified.' if @name.blank?
+        raise 'Key name must be specified.' if @name.right_blank?
         @bucket.s3.interface.delete(@bucket, @name) 
       end
       
@@ -1086,7 +1086,7 @@ module RightAws
         @bucket       = bucket
         @name         = name.to_s
         @meta_headers = meta_headers
-        raise 'Key name can not be empty.' if @name.blank?
+        raise 'Key name can not be empty.' if @name.right_blank?
       end
       
         # Generate link to PUT key data. 

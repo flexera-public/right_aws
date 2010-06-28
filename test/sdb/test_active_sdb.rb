@@ -77,7 +77,7 @@ class TestSdb < Test::Unit::TestCase
   def test_02_create_items
     # check that DB is empty
     clients = Client.find(:all)
-    assert clients.blank?
+    assert clients.right_blank?
     # put some clients there
     @clients.each do |client|
       Client.create client

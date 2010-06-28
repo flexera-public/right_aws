@@ -121,8 +121,8 @@ module RightAws
     # Generates request hash for REST API.
     def generate_request(method, path, params={}, body=nil, headers={})  # :nodoc:
       # Params
-      params.delete_if{ |key, val| val.blank? }
-      unless params.blank?
+      params.delete_if{ |key, val| val.right_blank? }
+      unless params.right_blank?
         path += "?" + params.to_a.collect{ |key,val| "#{AwsUtils::amz_escape(key)}=#{AwsUtils::amz_escape(val.to_s)}" }.join("&")
       end
       # Headers
@@ -133,7 +133,7 @@ module RightAws
       headers['Authorization'] = "AWS #{@aws_access_key_id}:#{signature}"
       # Request
       path    = "#{@params[:service]}#{@params[:api_version]}/#{path}"
-      request = "Net::HTTP::#{method.capitalize}".constantize.new(path)
+      request = "Net::HTTP::#{method.capitalize}".right_constantize.new(path)
       request.body = body if body
       # Set request headers
       headers.each { |key, value| request[key.to_s] = value }
@@ -180,18 +180,18 @@ module RightAws
       origin_access_identity = ''
       trusted_signers = ''
       # CNAMES
-      unless config[:cnames].blank?
+      unless config[:cnames].right_blank?
         Array(config[:cnames]).each { |cname| cnames += "  <CNAME>#{cname}</CNAME>\n" }
       end
       # Logging
-      unless config[:logging].blank?
+      unless config[:logging].right_blank?
         logging = "  <Logging>\n" +
                   "    <Bucket>#{config[:logging][:bucket]}</Bucket>\n" +
                   "    <Prefix>#{config[:logging][:prefix]}</Prefix>\n" +
                   "  </Logging>\n"
       end
       # Origin Access Identity
-      unless config[:origin_access_identity].blank?
+      unless config[:origin_access_identity].right_blank?
         origin_access_identity = config[:origin_access_identity]
         unless origin_access_identity[%r{^origin-access-identity}]
           origin_access_identity = "origin-access-identity/cloudfront/#{origin_access_identity}"
@@ -199,7 +199,7 @@ module RightAws
         origin_access_identity = "  <OriginAccessIdentity>#{origin_access_identity}</OriginAccessIdentity>\n"
       end
       # Trusted Signers
-      unless config[:trusted_signers].blank?
+      unless config[:trusted_signers].right_blank?
         trusted_signers = "  <TrustedSigners>\n"
         Array(config[:trusted_signers]).each do |trusted_signer|
           trusted_signers += if trusted_signer.to_s[/self/i]
@@ -288,7 +288,7 @@ module RightAws
         link = generate_request('GET', 'distribution', opts)
         last_response = request_info(link,  AcfDistributionListParser.new(:logger => @logger))
         opts['Marker'] = last_response[:next_marker]
-        break unless block && block.call(last_response) && !last_response[:next_marker].blank?
+        break unless block && block.call(last_response) && !last_response[:next_marker].right_blank?
       end 
       last_response 
     end
@@ -317,7 +317,7 @@ module RightAws
                  :enabled => enabled,
                  :cnames  => Array(cnames),
                  :caller_reference => caller_reference }
-      config[:logging] = logging unless logging.blank?
+      config[:logging] = logging unless logging.right_blank?
       create_distribution_by_config(config)
     end
 

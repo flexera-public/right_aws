@@ -145,7 +145,7 @@ module RightAws
       period = (options[:period] && options[:period].to_i) || 60
       # Statistics ('Average' by default)
       statistics = Array(options[:statistics]).flatten
-      statistics = statistics.blank? ? ['Average'] : statistics.map{|statistic| statistic.to_s.capitalize }
+      statistics = statistics.right_blank? ? ['Average'] : statistics.map{|statistic| statistic.to_s.capitalize }
       # Times (5.min.ago up to now by default)
       start_time = options[:start_time] || (Time.now.utc - 5*60)
       start_time = start_time.utc.strftime("%Y-%m-%dT%H:%M:%S+00:00") if start_time.is_a?(Time)

@@ -463,7 +463,7 @@ module RightAws
           # user defined :conditions to string (if it was defined)
           options[:conditions] = build_conditions(options[:conditions])
           # join ids condition and user defined conditions
-          options[:conditions] = options[:conditions].blank? ? ids_cond : "(#{options[:conditions]}) AND #{ids_cond}"
+          options[:conditions] = options[:conditions].right_blank? ? ids_cond : "(#{options[:conditions]}) AND #{ids_cond}"
           result = sql_select(options)
           # if one record was requested then return it
           unless bunch_of_records_requested
@@ -552,7 +552,7 @@ module RightAws
             query_expression = query_expression.to_s
             # quote from Amazon:
             # The sort attribute must be present in at least one of the predicates of the query expression.
-            if query_expression.blank?
+            if query_expression.right_blank?
               query_expression = sort_query_expression
             elsif !query_attributes(query_expression).include?(sort_by)
               query_expression += " intersection #{sort_query_expression}"
@@ -605,7 +605,7 @@ module RightAws
           # user defined :conditions to string (if it was defined)
           options[:conditions] = build_conditions(options[:conditions])
           # join ids condition and user defined conditions
-          options[:conditions] = options[:conditions].blank? ? ids_cond : "#{options[:conditions]} intersection #{ids_cond}"
+          options[:conditions] = options[:conditions].right_blank? ? ids_cond : "#{options[:conditions]} intersection #{ids_cond}"
           result = find_every(options)
           # if one record was requested then return it
           unless bunch_of_records_requested
@@ -656,9 +656,9 @@ module RightAws
           order      = options[:order]      ? " ORDER BY #{options[:order]}"                     : ''
           limit      = options[:limit]      ? " LIMIT #{options[:limit]}"                        : ''
           # mix sort by argument (it must present in response)
-          unless order.blank?
+          unless order.right_blank?
             sort_by, sort_order = sort_options(options[:order])
-            conditions << (conditions.blank? ? " WHERE " : " AND ") << "(#{sort_by} IS NOT NULL)"
+            conditions << (conditions.right_blank? ? " WHERE " : " AND ") << "(#{sort_by} IS NOT NULL)"
           end
           "SELECT #{select} FROM #{from}#{conditions}#{order}#{limit}"
         end
@@ -745,7 +745,7 @@ module RightAws
       def attributes=(attrs)
         old_id = @attributes['id']
         @attributes = uniq_values(attrs)
-        @attributes['id'] = old_id if @attributes['id'].blank? && !old_id.blank?
+        @attributes['id'] = old_id if @attributes['id'].right_blank? && !old_id.right_blank?
         self.attributes
       end
 
@@ -799,7 +799,7 @@ module RightAws
         old_id = id
         attrs = connection.get_attributes(domain, id)[:attributes]
         @attributes = {}
-        unless attrs.blank?
+        unless attrs.right_blank?
           attrs.each { |attribute, values| @attributes[attribute] = values }
           @attributes['id'] = old_id
         end
@@ -825,7 +825,7 @@ module RightAws
         attrs_list.flatten.uniq.each do |attribute|
           attribute = attribute.to_s
           values = connection.get_attributes(domain, id, attribute)[:attributes][attribute]
-          unless values.blank?
+          unless values.right_blank?
             @attributes[attribute] = result[attribute] = values
           else
             @attributes.delete(attribute)
@@ -855,7 +855,7 @@ module RightAws
         prepare_for_update
         attrs = @attributes.dup
         attrs.delete('id')
-        connection.put_attributes(domain, id, attrs) unless attrs.blank?
+        connection.put_attributes(domain, id, attrs) unless attrs.right_blank?
         connection.put_attributes(domain, id, { 'id' => id }, :replace)
         mark_as_old
         @attributes
@@ -871,10 +871,10 @@ module RightAws
         prepare_for_update
         # if 'id' is present in attrs hash:
         # replace internal 'id' attribute and remove it from the attributes to be sent
-        @attributes['id'] = attrs['id'] unless attrs['id'].blank?
+        @attributes['id'] = attrs['id'] unless attrs['id'].right_blank?
         attrs.delete('id')
         # add new values to all attributes from list
-        connection.put_attributes(domain, id, attrs) unless attrs.blank?
+        connection.put_attributes(domain, id, attrs) unless attrs.right_blank?
         connection.put_attributes(domain, id, { 'id' => id }, :replace)
         attrs.each do |attribute, values|
           @attributes[attribute] ||= []
@@ -918,12 +918,12 @@ module RightAws
         prepare_for_update
         attrs = uniq_values(attrs)
         # if 'id' is present in attrs hash then replace internal 'id' attribute
-        unless attrs['id'].blank?
+        unless attrs['id'].right_blank?
           @attributes['id'] = attrs['id']
         else
           attrs['id'] = id
         end
-        connection.put_attributes(domain, id, attrs, :replace) unless attrs.blank?
+        connection.put_attributes(domain, id, attrs, :replace) unless attrs.right_blank?
         attrs.each { |attribute, values| attrs[attribute] = values }
         mark_as_old
         attrs
@@ -942,7 +942,7 @@ module RightAws
         raise_on_id_absence
         attrs = uniq_values(attrs)
         attrs.delete('id')
-        unless attrs.blank?
+        unless attrs.right_blank?
           connection.delete_attributes(domain, id, attrs)
           attrs.each do |attribute, values|
             # remove the values from the attribute
@@ -971,7 +971,7 @@ module RightAws
         raise_on_id_absence
         attrs_list = attrs_list.flatten.map{ |attribute| attribute.to_s }
         attrs_list.delete('id')
-        unless attrs_list.blank?
+        unless attrs_list.right_blank?
           connection.delete_attributes(domain, id, attrs_list)
           attrs_list.each { |attribute| @attributes.delete(attribute) }
         end
@@ -1026,7 +1026,7 @@ module RightAws
       end
       
       def prepare_for_update
-        @attributes['id'] = self.class.generate_id if @attributes['id'].blank?
+        @attributes['id'] = self.class.generate_id if @attributes['id'].right_blank?
         columns.all.each do |col_name|
           self[col_name] ||= columns.default(col_name)
         end
@@ -1044,7 +1044,7 @@ module RightAws
           else
             Array(values).uniq
           end
-          attrs.delete(attribute) if values.blank?
+          attrs.delete(attribute) if values.right_blank?
         end
         attrs
       end

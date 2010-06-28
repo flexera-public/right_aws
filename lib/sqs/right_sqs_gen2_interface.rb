@@ -201,7 +201,7 @@ module RightAws
       # http://docs.amazonwebservices.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/index.html?Query_QueryGetQueueAttributes.html
     def get_queue_attributes(queue_url, *attributes)
       attributes.flatten!
-      attributes << 'All' if attributes.blank?
+      attributes << 'All' if attributes.right_blank?
       params = amazonize_list('AttributeName', attributes)
       params.merge!(:queue_url  => queue_url)
       req_hash = generate_request('GetQueueAttributes', params)
@@ -282,7 +282,7 @@ module RightAws
     def receive_message(queue_url, max_number_of_messages=1, visibility_timeout=nil, attributes=nil)
       return [] if max_number_of_messages == 0
       params = {}
-      params.merge!(amazonize_list('AttributeName', Array(attributes))) unless attributes.blank?
+      params.merge!(amazonize_list('AttributeName', Array(attributes))) unless attributes.right_blank?
       params.merge!('MaxNumberOfMessages' => max_number_of_messages,
                     'VisibilityTimeout'   => visibility_timeout,
                     :queue_url            => queue_url )
@@ -429,7 +429,7 @@ module RightAws
       #
     def pop_message(queue_url, attributes=nil)
       messages = pop_messages(queue_url, 1, attributes)
-      messages.blank? ? nil : messages[0]
+      messages.right_blank? ? nil : messages[0]
     rescue
       on_exception
     end

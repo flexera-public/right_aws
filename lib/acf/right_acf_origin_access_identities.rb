@@ -85,7 +85,7 @@ module RightAws
         link = generate_request('GET', 'origin-access-identity/cloudfront', opts)
         last_response = request_info(link,  AcfOriginAccesIdentitiesListParser.new(:logger => @logger))
         opts['Marker'] = last_response[:next_marker]
-        break unless block && block.call(last_response) && !last_response[:next_marker].blank?
+        break unless block && block.call(last_response) && !last_response[:next_marker].right_blank?
       end
       last_response
     end

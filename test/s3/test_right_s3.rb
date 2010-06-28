@@ -264,7 +264,7 @@ class TestS3 < Test::Unit::TestCase
     # create a key
     key = bucket.key('test/copy/30')
     key.put(RIGHT_OBJECT_TEXT)
-    assert key.meta_headers.blank?
+    assert key.meta_headers.right_blank?
     # store some meta keys
     meta = {'family' => 'oops','race' => 'troll'}
     assert_equal meta, key.save_meta(meta)
