@@ -105,7 +105,7 @@ module RightAws
         # created request
       param_to_str = param.to_a.collect{|key,val| key.to_s + "=" + CGI::escape(val.to_s) }.join("&")
       param_to_str = "?#{param_to_str}" unless param_to_str.right_blank?
-      request = "Net::HTTP::#{method.capitalize}".constantize.new("#{queue_uri}#{param_to_str}")
+      request = "Net::HTTP::#{method.capitalize}".right_constantize.new("#{queue_uri}#{param_to_str}")
       request.body = message if message
         # set main headers
       request['content-md5']  = ''

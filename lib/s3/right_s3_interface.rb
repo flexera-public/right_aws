@@ -162,7 +162,7 @@ module RightAws
       headers['content-type'] ||= ''
       headers['date']           = Time.now.httpdate
         # create request
-      request      = "Net::HTTP::#{method.capitalize}".constantize.new(path)
+      request      = "Net::HTTP::#{method.capitalize}".right_constantize.new(path)
       request.body = data if data
         # set request headers and meta headers
       headers.each      { |key, value| request[key.to_s] = value }
