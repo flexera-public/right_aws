@@ -292,4 +292,4 @@ the source key.
   - Fixed:
     - RDS: DB Parameter group name on instance launch
   - ActiveSupport dependency removal
-   
+  - this gem requires right_http_connection 0bc3343232133bdb38c237d8285525d74495d3f5 or later   
