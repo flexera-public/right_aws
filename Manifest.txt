@@ -4,7 +4,6 @@ README.txt
 Rakefile
 lib/awsbase/benchmark_fix.rb
 lib/awsbase/right_awsbase.rb
-lib/awsbase/support.rb
 lib/ec2/right_ec2.rb
 lib/ec2/right_ec2_images.rb
 lib/ec2/right_ec2_instances.rb
