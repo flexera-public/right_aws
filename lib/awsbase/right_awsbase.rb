@@ -919,21 +919,15 @@ module RightAws
 
   #-----------------------------------------------------------------
 
-  class RightSaxParserCallback #:nodoc:
+  class RightSaxParserCallbackTemplate #:nodoc:
     def self.include_callback 
       include XML::SaxParser::Callbacks       
     end 
     def initialize(right_aws_parser) 
       @right_aws_parser = right_aws_parser 
     end 
-    def on_start_element(name, attr_hash) 
-      @right_aws_parser.tag_start(name, attr_hash) 
-    end   
     def on_characters(chars) 
       @right_aws_parser.text(chars)
-    end 
-    def on_end_element(name) 
-      @right_aws_parser.tag_end(name) 
     end 
     def on_start_document; end 
     def on_comment(msg); end 
@@ -941,7 +935,25 @@ module RightAws
     def on_cdata_block(cdata); end 
     def on_end_document; end 
   end 
- 
+
+  class RightSaxParserCallback < RightSaxParserCallbackTemplate
+    def on_start_element(name, attr_hash)
+      @right_aws_parser.tag_start(name, attr_hash)
+    end
+    def on_end_element(name)
+      @right_aws_parser.tag_end(name)
+    end
+  end
+
+  class RightSaxParserCallback14 < RightSaxParserCallbackTemplate
+    def on_start_element_ns(name, attr_hash, prefix, uri, namespaces)
+      @right_aws_parser.tag_start(name, attr_hash)
+    end
+    def on_end_element_ns(name, prefix, uri)
+      @right_aws_parser.tag_end(name)
+    end
+  end
+
   class RightAWSParser  #:nodoc:
       # default parsing library 
     DEFAULT_XML_LIBRARY = 'rexml' 
@@ -1003,8 +1015,10 @@ module RightAws
         begin
           require 'xml/libxml'
           # is it new ? - Setup SaxParserCallback 
-          if XML::Parser::VERSION >= '0.5.1.0'
-            RightSaxParserCallback.include_callback 
+          if    XML::Parser::VERSION >= '1.4'
+            RightSaxParserCallback14.include_callback
+          elsif XML::Parser::VERSION >= '0.5.1.0'
+            RightSaxParserCallback.include_callback
           end           
         rescue LoadError => e
           @@supported_xml_libs.delete(@xml_lib) 
@@ -1018,7 +1032,7 @@ module RightAws
       end
         # Parse the xml text
       case @xml_lib
-      when 'libxml'  
+      when 'libxml'
         if XML::Parser::VERSION >= '0.9.9'
           # avoid warning on every usage
           xml        = XML::SaxParser.string(xml_text)
@@ -1027,7 +1041,9 @@ module RightAws
           xml.string = xml_text 
         end
         # check libxml-ruby version 
-        if XML::Parser::VERSION >= '0.5.1.0'
+        if    XML::Parser::VERSION >= '1.4'
+          xml.callbacks = RightSaxParserCallback14.new(self)
+        elsif XML::Parser::VERSION >= '0.5.1.0'
           xml.callbacks = RightSaxParserCallback.new(self) 
         else 
           xml.on_start_element{|name, attr_hash| self.tag_start(name, attr_hash)} 
