@@ -190,6 +190,13 @@ module RightAws
                   "    <Prefix>#{config[:logging][:prefix]}</Prefix>\n" +
                   "  </Logging>\n"
       end
+      if !config[:required_protocols].blank?
+        required_protocols = "  <RequiredProtocols>\n" +
+                               "    <Protocol>" +
+                               "#{config[:required_protocols]}" +
+                               "</Protocol>\n" +
+                             "  </RequiredProtocols>\n"
+      end
       # Origin Access Identity
       unless config[:origin_access_identity].right_blank?
         origin_access_identity = config[:origin_access_identity]
@@ -220,6 +227,7 @@ module RightAws
       "  <Enabled>#{config[:enabled]}</Enabled>\n" +
       cnames  +
       logging +
+      required_protocols +
       origin_access_identity +
       trusted_signers +
       "</#{xml_wrapper}>"
@@ -466,6 +474,7 @@ module RightAws
           when 'Bucket'           then (@distribution[:logging] ||= {})[:bucket] = @text
           when 'Prefix'           then (@distribution[:logging] ||= {})[:prefix] = @text
           when 'OriginAccessIdentity' then @distribution[:origin_access_identity] = @text
+          when 'Protocol'         then (@distribution[:required_protocols] ||= {})[:protocol] = @text
         end
         case full_tag_name
         when %r{/TrustedSigners/Self$}             then (@distribution[:trusted_signers] ||= []) << 'self'
