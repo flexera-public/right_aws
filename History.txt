@@ -289,6 +289,7 @@ the source key.
     - ACF: API '2010-05-01'
     - EC2: Port based group permissions support 
     - RDS: API '2010-01-01' (MultiAZ support)
+    - 301 Redirect support added
   - Fixed:
     - RDS: DB Parameter group name on instance launch
   - ActiveSupport dependency removal

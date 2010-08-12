@@ -773,10 +773,17 @@ module RightAws
       # Ok, it is a redirect, find the new destination location
       if redirect_detected
         location = response['location']
+        # As for 301 ( Moved Permanently) Amazon does not return a 'Location' header but
+        # it is possible to extract a new endpoint from the response body
+        if location.right_blank? && response.code=='301' && response.body
+          new_endpoint = response.body[/<Endpoint>(.*?)<\/Endpoint>/] && $1
+          location     = "#{request[:protocol]}://#{new_endpoint}:#{request[:port]}#{request[:request].path}"
+        end
         # ... log information and ...
         @aws.logger.info("##### #{@aws.class.name} redirect requested: #{response.code} #{response.message} #####")
         @aws.logger.info("      Old location: #{request_text_data}")
         @aws.logger.info("      New location: #{location}")
+        @aws.logger.info("      Request Verb: #{request[:request].class.name}")
         # ... fix the connection data
         request[:server]   = URI.parse(location).host
         request[:protocol] = URI.parse(location).scheme
