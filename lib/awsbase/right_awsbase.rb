@@ -371,7 +371,8 @@ module RightAws
       #
       conn = @connections_storage[server_url] ||= {}
       # Expire the connection if it has expired.
-      if conn[:last_used_at] < Time.now - @params[:connection_lifetime]
+      last_used = conn[:last_used_at]
+      if last_used && (last_used < Time.now - @params[:connection_lifetime])
         conn[:connection].finish('out-of-date') rescue nil
         conn.delete :connection
       end
