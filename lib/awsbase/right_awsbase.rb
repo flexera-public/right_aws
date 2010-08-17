@@ -358,7 +358,58 @@ module RightAws
       raise if $!.is_a?(AwsNoChange)
       AwsError::on_aws_exception(self, options)
     end
-    
+
+    #----------------------------
+    # HTTP Connections handling
+    #----------------------------
+
+    def get_server_url(request) # :nodoc:
+      "#{request[:protocol]}://#{request[:server]}:#{request[:port]}"
+    end
+
+    def get_connections_storage(aws_service) # :nodoc:
+      case @params[:connections].to_s
+      when 'dedicated' then @connections_storage        ||= {}
+      else                  Thread.current[aws_service] ||= {}
+      end
+    end
+
+    def destroy_connection(request, reason) # :nodoc:
+      connections = get_connections_storage(request[:aws_service])
+      server_url  = get_server_url(request)
+      if connections[server_url]
+        connections[server_url][:connection].finish(reason)
+        connections.delete(server_url)
+      end
+    end
+
+    # Expire the connection if it has expired.
+    def get_connection(request) # :nodoc:
+      server_url         = get_server_url(request)
+      connection_storage = get_connections_storage(request[:aws_service])
+      life_time_scratch  = Time.now-@params[:connection_lifetime]
+      # Delete out-of-dated connections
+      connections_in_list = 0
+      connection_storage.to_a.sort{|conn1, conn2| conn2[1][:last_used_at] <=> conn1[1][:last_used_at]}.each do |serv_url, conn_opts|
+        if    @params[:max_connections] <= connections_in_list
+          conn_opts[:connection].finish('out-of-limit')
+          connection_storage.delete(server_url)
+        elsif conn_opts[:last_used_at] < life_time_scratch
+          conn_opts[:connection].finish('out-of-date')
+          connection_storage.delete(server_url)
+        else
+          connections_in_list += 1
+        end
+      end
+      connection = (connection_storage[server_url] ||= {})
+      connection[:last_used_at] = Time.now
+      connection[:connection] ||= Rightscale::HttpConnection.new(:exception => RightAws::AwsError, :logger => @logger)
+    end
+
+    #----------------------------
+    # HTTP Requests handling
+    #----------------------------
+
     # ACF, AMS, EC2, LBS and SDB uses this guy
     # SQS and S3 use their own methods
     def generate_request_impl(verb, action, options={}) #:nodoc:
@@ -409,37 +460,10 @@ module RightAws
       request_hash
     end
 
-    def get_connection(aws_service, request) #:nodoc
-      server_url = "#{request[:protocol]}://#{request[:server]}:#{request[:port]}}"
-      #
-      case @params[:connections].to_s
-      when 'dedicated'
-        @connections_storage ||= {}
-      else # 'dedicated'
-        @connections_storage = (Thread.current[aws_service] ||= {})
-      end
-      #
-      @connections_storage[server_url] ||= {}
-      @connections_storage[server_url][:last_used_at] = Time.now
-      @connections_storage[server_url][:connection] ||= Rightscale::HttpConnection.new(:exception => RightAws::AwsError, :logger => @logger)
-      # keep X most recent connections (but were used not far than Y minutes ago)
-      connections = 0
-      @connections_storage.to_a.sort{|i1, i2| i2[1][:last_used_at] <=> i1[1][:last_used_at]}.to_a.each do |i|
-        if i[0] != server_url && (@params[:max_connections] <= connections  || i[1][:last_used_at] < Time.now - @params[:connection_lifetime])
-          # delete the connection from the list
-          @connections_storage.delete(i[0])
-          # then finish it
-          i[1][:connection].finish((@params[:max_connections] <= connections) ? "out-of-limit" : "out-of-date") rescue nil
-        else
-          connections += 1
-        end
-      end
-      @connections_storage[server_url][:connection]
-    end
-
     # All services uses this guy.
     def request_info_impl(aws_service, benchblock, request, parser, &block) #:nodoc:
-      @connection    = get_connection(aws_service, request)
+      request[:aws_service] = aws_service
+      @connection    = get_connection(request)
       @last_request  = request[:request]
       @last_response = nil
       response = nil
@@ -454,25 +478,31 @@ module RightAws
         # Exceptions can originate from code directly in the block, or from user
         # code called in the other block which is passed to response.read_body.
         benchblock.service.add! do
-          responsehdr = @connection.request(request) do |response|
-          #########
-            begin
-              @last_response = response
-              if response.is_a?(Net::HTTPSuccess)
-                @error_handler = nil
-                response.read_body(&block)
-              else
-                @error_handler = AWSErrorHandler.new(self, parser, :errors_list => self.class.amazon_problems) unless @error_handler
-                check_result   = @error_handler.check(request)
-                if check_result
+          begin
+            responsehdr = @connection.request(request) do |response|
+            #########
+              begin
+                @last_response = response
+                if response.is_a?(Net::HTTPSuccess)
                   @error_handler = nil
-                  return check_result 
+                  response.read_body(&block)
+                else
+                  @error_handler = AWSErrorHandler.new(self, parser, :errors_list => self.class.amazon_problems) unless @error_handler
+                  check_result   = @error_handler.check(request)
+                  if check_result
+                    @error_handler = nil
+                    return check_result
+                  end
+                  raise AwsError.new(@last_errors, @last_response.code, @last_request_id)
                 end
-                raise AwsError.new(@last_errors, @last_response.code, @last_request_id)
+              rescue Exception => e
+                blockexception = e
               end
-            rescue Exception => e
-              blockexception = e
             end
+          rescue Exception => e
+            # Kill a connection if we run into a low level connection error
+            destroy_connection(request, "error: #{e.message}")
+            raise e
           end
           #########
 
@@ -486,7 +516,15 @@ module RightAws
           return parser.result
         end
       else
-        benchblock.service.add!{ response = @connection.request(request) }
+        benchblock.service.add! do
+          begin
+            response = @connection.request(request)
+          rescue Exception => e
+            # Kill a connection if we run into a low level connection error
+            destroy_connection(request, "error: #{e.message}")
+            raise e
+          end
+        end
           # check response for errors...
         @last_response = response
         if response.is_a?(Net::HTTPSuccess)
@@ -798,7 +836,7 @@ module RightAws
       @reiteration_delay = @@reiteration_start_delay
       @retries       = 0
       # close current HTTP(S) connection on 5xx, errors from list and 4xx errors 
-      @close_on_error           = params[:close_on_error].nil? ? @@close_on_error : params[:close_on_error] 
+      @close_on_error           = params[:close_on_error].nil? ? @@close_on_error : params[:close_on_error]
       @close_on_4xx_probability = params[:close_on_4xx_probability] || @@close_on_4xx_probability       
     end
     
@@ -874,7 +912,7 @@ module RightAws
         # It may have a chance that one server is a semi-down and reconnection 
         # will help us to connect to the other server 
         if !redirect_detected && @close_on_error
-          @aws.connection.finish "#{self.class.name}: error match to pattern '#{error_match}'" 
+          @aws.destroy_connection(request, "#{self.class.name}: error match to pattern '#{error_match}'")
         end 
                  
         if (Time.now < @stop_at)
@@ -903,13 +941,13 @@ module RightAws
         end 
       # aha, this is unhandled error: 
       elsif @close_on_error 
-        # Is this a 5xx error ? 
-        if @aws.last_response.code.to_s[/^5\d\d$/] 
-          @aws.connection.finish "#{self.class.name}: code: #{@aws.last_response.code}: '#{@aws.last_response.message}'" 
+        # On 5xx(Server errors), 403(RequestTimeTooSkewed) and 408(Request Timeout) a conection has to be closed
+        if @aws.last_response.code.to_s[/^(5\d\d|403|408)$/]
+          @aws.destroy_connection(request, "#{self.class.name}: code: #{@aws.last_response.code}: '#{@aws.last_response.message}'")
         # Is this a 4xx error ? 
         elsif @aws.last_response.code.to_s[/^4\d\d$/] && @close_on_4xx_probability > rand(100) 
-          @aws.connection.finish "#{self.class.name}: code: #{@aws.last_response.code}: '#{@aws.last_response.message}', " + 
-                                 "probability: #{@close_on_4xx_probability}%"           
+          @aws.destroy_connection(request, "#{self.class.name}: code: #{@aws.last_response.code}: '#{@aws.last_response.message}', " +
+                                           "probability: #{@close_on_4xx_probability}%")
         end
       end
       result
