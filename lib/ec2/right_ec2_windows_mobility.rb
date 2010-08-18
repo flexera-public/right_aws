@@ -66,7 +66,7 @@ module RightAws
         when 'capacity'         then @capacity_item[:capacity]          = @text.to_i
         when 'instanceCapacity' then @capacity_item[:instance_capacity] = @text.to_i
         when 'state'            then @capacity_item[:state]             = @text
-        when 'earliestAllowedDeactivationTime' then @item[:earliest_allowed_deactivation_time] = @text
+        when 'earliestAllowedDeactivationTime' then @capacity_item[:earliest_allowed_deactivation_time] = @text
         else
           case full_tag_name
           when %r{/capacitySet/item$} then @item[:capacities] << @capacity_item
