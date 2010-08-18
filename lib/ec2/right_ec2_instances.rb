@@ -155,7 +155,7 @@ module RightAws
     # Launch new EC2 instances.
     # Options: :image_id, :addressing_type, :min_count, max_count, :key_name, :kernel_id, :ramdisk_id,
     # :availability_zone, :monitoring_enabled, :subnet_id, :disable_api_termination, :instance_initiated_shutdown_behavior,
-    # :block_device_mappings, placement_group_name
+    # :block_device_mappings, :placement_group_name, :license_pool
     # 
     # Returns a list of launched instances or an exception.
     #
@@ -223,6 +223,7 @@ module RightAws
       params['DisableApiTermination']             = options[:disable_api_termination].to_s         unless options[:disable_api_termination].nil?
       params['InstanceInitiatedShutdownBehavior'] = options[:instance_initiated_shutdown_behavior] unless options[:instance_initiated_shutdown_behavior].right_blank?
       params['Placement.GroupName']               = options[:placement_group_name]                 unless options[:placement_group_name].right_blank?
+      params['License.Pool']                      = options[:license_pool]                         unless options[:license_pool].right_blank?
 #     params['VolumeId']                          = options[:volume_id]                            unless options[:volume_id].right_blank?
 #     params['RootDeviceName']                    = options[:root_device_name]                     unless options[:root_device_name].right_blank?
 #     params['RootDeviceType']                    = options[:root_device_type]                     unless options[:root_device_type].right_blank?
@@ -593,6 +594,7 @@ module RightAws
           when %r{/instanceState/code$}  then @item[:aws_state_code]       = @text.to_i
           when %r{/instanceState/name$}  then @item[:aws_state]            = @text
           when %r{/monitoring/state$}    then @item[:monitoring_state]     = @text
+          when %r{/license/pool$}        then @item[:license_pool]         = @text
           when %r{/blockDeviceMapping/item} # no trailing $
             case name
             when 'deviceName'          then @block_device_mapping[:device_name]                = @text
