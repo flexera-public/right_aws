@@ -196,6 +196,7 @@ module RightAws
                                "#{config[:required_protocols]}" +
                                "</Protocol>\n" +
                              "  </RequiredProtocols>\n"
+      else required_protocols = ""
       end
       # Origin Access Identity
       unless config[:origin_access_identity].right_blank?
