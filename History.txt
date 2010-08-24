@@ -287,10 +287,13 @@ the source key.
   Release Notes:
   - Added:
     - ACF: API '2010-05-01'
-    - EC2: Port based group permissions support 
+    - EC2: 
+      - Port based group permissions support
+      - HPC Support
     - RDS: API '2010-01-01' (MultiAZ support)
     - 301 Redirect support added
   - Fixed:
     - RDS: DB Parameter group name on instance launch
   - ActiveSupport dependency removal
-  - this gem requires right_http_connection 0bc3343232133bdb38c237d8285525d74495d3f5 or later   
+  - this gem requires right_http_connection 0bc3343232133bdb38c237d8285525d74495d3f5 or later
+  - "Raise On Timeout On Action" feature added to avoid duplicate resources creation if a timeout error occures and a retry is performed

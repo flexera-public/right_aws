@@ -181,7 +181,31 @@ module RightAws
     def self.amazon_problems=(problems_list)
       @@amazon_problems = problems_list
     end
-    
+
+    # Raise an exception if a timeout occures while an API call is in progress.
+    # This helps to avoid a duplicate resources creation when Amazon hangs for some time and
+    # RightHttpConnection is forced to use retries to get a response from it.
+    #
+    # If an API call action is in the list then no attempts to retry are performed.
+    #
+    RAISE_ON_TIMEOUT_ON_ACTIONS = %w{ 
+      AllocateAddress
+      CreateSnapshot
+      CreateVolume
+      PurchaseReservedInstancesOffering
+      RequestSpotInstances
+      RunInstances
+    }
+    @@raise_on_timeout_on_actions = RAISE_ON_TIMEOUT_ON_ACTIONS.dup
+
+    def self.raise_on_timeout_on_actions
+      @@raise_on_timeout_on_actions
+    end
+
+    def self.raise_on_timeout_on_actions=(actions_list)
+      @@raise_on_timeout_on_actions = actions_list
+    end
+
   end
 
   module RightAwsBaseInterface
@@ -363,6 +387,13 @@ module RightAws
                        :protocol => @params[:protocol] }
       request_hash.merge!(@params[:connection_options])
       request_hash.merge!(@with_connection_options)
+      
+      # If an action is marked as "non-retryable" and there was no :raise_on_timeout option set
+      # explicitly then do set that option
+      if Array(RightAwsBase::raise_on_timeout_on_actions).include?(action) && !request_hash.has_key?(:raise_on_timeout)
+        request_hash.merge!(:raise_on_timeout => true)
+      end
+
       request_hash
     end
 
