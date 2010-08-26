@@ -353,6 +353,17 @@ module RightAws
       request_info(link, RightHttp2xxParser.new(:logger => @logger))
     end
 
+    # Deletes a policy from the load balancer. The specified policy must not be enabled for any listeners.
+    #
+    #  elb.delete_load_balancer_policy('my-load-balancer', 'MyLoadBalancerPolicy') #=> true
+    #
+    def delete_load_balancer_policy(load_balancer_name, policy_name)
+      request_hash = { 'LoadBalancerName'        => load_balancer_name,
+                       'PolicyName'              => policy_name }
+      link = generate_request("DeleteLoadBalancerPolicy", request_hash)
+      request_info(link, RightHttp2xxParser.new(:logger => @logger))
+    end
+
     #-----------------------------------------------------------------
     #      PARSERS: Load Balancers
     #-----------------------------------------------------------------
