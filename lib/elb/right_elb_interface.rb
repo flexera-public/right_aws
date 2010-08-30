@@ -348,7 +348,11 @@ module RightAws
       policy_names.flatten!
       request_hash = { 'LoadBalancerName' => load_balancer_name,
                        'LoadBalancerPort' => load_balancer_port }
-      request_hash.merge!(amazonize_list('PolicyNames.member', policy_names))
+      if policy_names.right_blank?
+        request_hash['PolicyNames'] = ''
+      else
+        request_hash.merge!(amazonize_list('PolicyNames.member', policy_names))
+      end
       link = generate_request("SetLoadBalancerPoliciesOfListener", request_hash)
       request_info(link, RightHttp2xxParser.new(:logger => @logger))
     end
