@@ -154,7 +154,7 @@ module RightAws
       options[:max_size] ||= 20
       options[:cooldown] ||= 0
       request_hash = amazonize_list('AvailabilityZones.member', availability_zones)
-      request_hash.merge!( amazonize_list('LoadBalancerNames', options[:load_balancer_names]) )
+      request_hash.merge!( amazonize_list('LoadBalancerNames.member', options[:load_balancer_names]) )
       request_hash.merge!( 'AutoScalingGroupName'    => auto_scaling_group_name,
                            'LaunchConfigurationName' => launch_configuration_name,
                            'MinSize'                 => options[:min_size],
