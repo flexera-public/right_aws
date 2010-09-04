@@ -1,7 +1,7 @@
 # If ActiveSupport is loaded, then great - use it.  But we don't 
 # want a dependency on it, so if it's not present, define the few
 # extensions that we want to use...
-unless defined? ActiveSupport::CoreExtensions
+unless defined?(ActiveSupport::CoreExtensions) || defined?(ActiveSupport::Inflector)
   # These are ActiveSupport-;like extensions to do a few handy things in the gems
   # Derived from ActiveSupport, so the AS copyright notice applies:
   #
