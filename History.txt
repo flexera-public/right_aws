@@ -287,9 +287,11 @@ the source key.
   Release Notes:
   - Added:
     - ACF: API '2010-05-01'
-    - EC2: 
+    - EC2:
+      - API '2010-08-31'
       - Port based group permissions support
       - HPC Support
+      - Tags Suport
     - RDS: API '2010-01-01' (MultiAZ support)
     - 301 Redirect support added
   - Fixed:
