@@ -15,6 +15,7 @@ lib/ec2/right_ec2_vpc.rb
 lib/ec2/right_ec2_monitoring.rb
 lib/ec2/right_ec2_placement_groups.rb
 lib/ec2/right_ec2_windows_mobility.rb
+lib/ec2/right_ec2_tags.rb
 lib/right_aws.rb
 lib/s3/right_s3.rb
 lib/acw/right_acw_interface.rb
