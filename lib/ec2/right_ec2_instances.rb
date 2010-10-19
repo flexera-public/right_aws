@@ -132,23 +132,24 @@ module RightAws
                       kernel_id = nil, ramdisk_id = nil, availability_zone = nil,
                       monitoring_enabled = nil, subnet_id = nil, disable_api_termination = nil,
                       instance_initiated_shutdown_behavior = nil, block_device_mappings = nil,
-                      placement_group_name = nil)
+                      placement_group_name = nil, client_token = nil)
  	    launch_instances(image_id, { :min_count                            => min_count,
  	                                 :max_count                            => max_count,
  	                                 :user_data                            => user_data,
-                                     :group_ids                            => group_ids,
-                                     :key_name                             => key_name,
-                                     :instance_type                        => instance_type,
-                                     :addressing_type                      => addressing_type,
-                                     :kernel_id                            => kernel_id,
-                                     :ramdisk_id                           => ramdisk_id,
-                                     :availability_zone                    => availability_zone,
-                                     :monitoring_enabled                   => monitoring_enabled,
-                                     :subnet_id                            => subnet_id,
-                                     :disable_api_termination              => disable_api_termination,
-                                     :instance_initiated_shutdown_behavior => instance_initiated_shutdown_behavior,
-                                     :block_device_mappings                => block_device_mappings,
-                                     :placement_group_name                 => placement_group_name
+                                   :group_ids                            => group_ids,
+                                   :key_name                             => key_name,
+                                   :instance_type                        => instance_type,
+                                   :addressing_type                      => addressing_type,
+                                   :kernel_id                            => kernel_id,
+                                   :ramdisk_id                           => ramdisk_id,
+                                   :availability_zone                    => availability_zone,
+                                   :monitoring_enabled                   => monitoring_enabled,
+                                   :subnet_id                            => subnet_id,
+                                   :disable_api_termination              => disable_api_termination,
+                                   :instance_initiated_shutdown_behavior => instance_initiated_shutdown_behavior,
+                                   :block_device_mappings                => block_device_mappings,
+                                   :placement_group_name                 => placement_group_name,
+                                   :client_token                         => client_token
                                  })
     end
 
@@ -193,12 +194,12 @@ module RightAws
     #      :aws_instance_id=>"i-8ce84ae4"}]
     #
     def launch_instances(image_id, options={})
-      @logger.info("Launching instance of image #{image_id} for #{@aws_access_key_id}, " +
-                   "key: #{options[:key_name]}, groups: #{Array(options[:group_ids]).join(',')}")
       options[:image_id]    = image_id
       options[:min_count] ||= 1
       options[:max_count] ||= options[:min_count]
       params = prepare_instance_launch_params(options)
+      # Log debug information
+      @logger.info("Launching instance of image #{image_id}. Options: #{params.inspect}")
       link = generate_request("RunInstances", params)
       instances = request_info(link, QEc2DescribeInstancesParser.new(:logger => @logger))
       get_desc_instances(instances)
@@ -224,6 +225,7 @@ module RightAws
       params['InstanceInitiatedShutdownBehavior'] = options[:instance_initiated_shutdown_behavior] unless options[:instance_initiated_shutdown_behavior].right_blank?
       params['Placement.GroupName']               = options[:placement_group_name]                 unless options[:placement_group_name].right_blank?
       params['License.Pool']                      = options[:license_pool]                         unless options[:license_pool].right_blank?
+      params['ClientToken']                       = options[:client_token] || AwsUtils::generate_unique_token
 #     params['VolumeId']                          = options[:volume_id]                            unless options[:volume_id].right_blank?
 #     params['RootDeviceName']                    = options[:root_device_name]                     unless options[:root_device_name].right_blank?
 #     params['RootDeviceType']                    = options[:root_device_type]                     unless options[:root_device_type].right_blank?
@@ -587,6 +589,7 @@ module RightAws
         when 'requesterId'           then @item[:requester_id]             = @text
         when 'groupName'             then @item[:placement_group_name]     = @text 
         when 'virtualizationType'    then @item[:virtualization_type]      = @text
+        when 'clientToken'           then @item[:client_token]     = @text
         else
           case full_tag_name
           when %r{/stateReason/code$}    then @item[:state_reason_code]    = @text
