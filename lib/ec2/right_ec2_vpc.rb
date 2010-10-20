@@ -25,23 +25,17 @@ module RightAws
 
   class Ec2
 
-  private
-
-    def vpc__split_list_and_filters(*params) # :nodoc:
-      params = params.flatten
-      filters = params.last.is_a?(Hash) ? params.pop : {}
-      # Make values to be arrays.
-      filters.each{|key, values| filters[key] = Array(values) }
-      [params, filters]
-    end
-
   public
 
     #-----------------
     # VPC
     #-----------------
 
-    # Describe VPCs
+    # Describe VPCs.
+    #
+    # Accepts a list of vpcs and/or a set of filters as the last parameter.
+    #
+    # Filters: cidr, dchp-options-id, state, tag-key, tag-value, tag:key, vpc-id
     #
     #  ec2.describe_vpcs #=>
     #    [{:vpc_id=>"vpc-890ce2e0",
@@ -51,16 +45,14 @@ module RightAws
     #
     #  ec2.describe_vpcs("vpc-890ce2e0")
     #
-    def describe_vpcs(*list_and_filters)
-      list, filters = vpc__split_list_and_filters(list_and_filters)
-      cache_for = (list.empty? && filters.empty?) ? :describe_vpcs : nil
-      request_hash = {}
-      request_hash.merge!(amazonize_list('VpcId', list))
-      request_hash.merge!(amazonize_list(['Filter.?.Key','Filter.?.Value.?'], filters))
-      link = generate_request("DescribeVpcs", request_hash)
-      request_cache_or_info cache_for, link,  QEc2DescribeVpcsParser, @@bench, cache_for
-    rescue Exception
-      on_exception
+    #  ec2.describe_vpcs( :filters => {'tag:MyTag' => 'MyValue'} )
+    #  
+    #  ec2.describe_vpcs( :filters => {'cidr' => "192.168.1.0/24"} )
+    #
+    # P.S. filters: http://docs.amazonwebservices.com/AmazonVPC/latest/APIReference/index.html?ApiReference-query-DescribeVpcs.html
+    #
+    def describe_vpcs(*list_and_options)
+      describe_resources_with_list_and_options('DescribeVpcs', 'VpcId', QEc2DescribeVpcsParser, list_and_options)
     end
 
     # Create VPC.
@@ -95,6 +87,10 @@ module RightAws
 
     # Describe Subnet.
     #
+    # Accepts a list of subnets and/or a set of filters as the last parameter.
+    #
+    # Filters: availability-zone, available-ip-address-count, cidr, state, subnet-id, tag-key, tag-value, tag:key, vpc-id
+    #
     #  ec2.describe_subnets #=>
     #    [{:available_ip_address_count=>"251",
     #      :vpc_id=>"vpc-890ce2e0",
@@ -103,16 +99,12 @@ module RightAws
     #      :cidr_block=>"10.0.1.0/24",
     #      :state=>"available"}]
     #
-    def describe_subnets(*list_and_filters)
-      list, filters = vpc__split_list_and_filters(list_and_filters)
-      cache_for = (list.empty? && filters.empty?) ? :describe_subnets : nil
-      request_hash = {}
-      request_hash.merge!(amazonize_list('SubnetId', list))
-      request_hash.merge!(amazonize_list(['Filter.?.Key','Filter.?.Value.?'], filters))
-      link = generate_request("DescribeSubnets", request_hash)
-      request_cache_or_info cache_for, link,  QEc2DescribeSubnetsParser, @@bench, cache_for
-    rescue Exception
-      on_exception
+    #  ec2.describe_subnets(:filters => {'cidr' => "192.168.1.128/25"})
+    #
+    # P.S. filters: http://docs.amazonwebservices.com/AmazonVPC/latest/APIReference/index.html?ApiReference-query-DescribeSubnets.html
+    #
+    def describe_subnets(*list_and_options)
+      describe_resources_with_list_and_options('DescribeSubnets', 'SubnetId', QEc2DescribeSubnetsParser, list_and_options)
     end
 
     # Create Subnet.
@@ -151,20 +143,22 @@ module RightAws
     #-----------------
 
     # Describe DHCP options.
+    #
+    # Accepts a list of DHCP options and/or a set of filters as the last parameter.
+    #
+    # Filters: dchp-options-id, key, value, tag-key, tag-value, tag:key
     # 
-    # ec2.describe_dhcp_options #=>
+    #  ec2.describe_dhcp_options #=>
     #    [{:dhcp_options_id=>"dopt-cb0de3a2",
     #    :dhcp_configuration_set=>
     #     {"netbios-node-type"=>["1"], "domain-name"=>["my.awesomesite.ru"]}}]
     #
-    def describe_dhcp_options(*list)
-      list = list.flatten
-      cache_for = list.empty? ? :describe_dhcp_options : nil
-      request_hash = amazonize_list('DhcpOptionsId', list)
-      link = generate_request("DescribeDhcpOptions", request_hash)
-      request_cache_or_info cache_for, link,  QEc2DescribeDhcpOptionsParser, @@bench, cache_for
-    rescue Exception
-      on_exception
+    #  ec2.describe_dhcp_options(:filters => {'tag:MyTag' => 'MyValue'})
+    #
+    # P.S. filters: http://docs.amazonwebservices.com/AmazonVPC/latest/APIReference/index.html?ApiReference-query-DescribeDhcpOptions.html
+    #
+    def describe_dhcp_options(*list_and_options)
+      describe_resources_with_list_and_options('DescribeDhcpOptions', 'DhcpOptionsId', QEc2DescribeDhcpOptionsParser, list_and_options)
     end
 
     # Create DHCP options.
@@ -218,24 +212,23 @@ module RightAws
 
     # Describe customer gateways.
     #
-    #  ec2.describe_customer_gateways
+    # Accepts a list of gateways and/or a set of filters as the last parameter.
     #
+    # Filters: bgp-asn, customer-gateway-id, state, type, tag-key, tag-value, tag:key
+    #
+    #  ec2.describe_customer_gateways #=>
     #    [{:type=>"ipsec.1",
     #      :ip_address=>"12.1.2.3",
     #      :bgp_asn=>"65534",
     #      :state=>"available",
     #      :customer_gateway_id=>"cgw-d5a643bc"}]
     #
-    def describe_customer_gateways(*list_and_filters)
-      list, filters = vpc__split_list_and_filters(list_and_filters)
-      cache_for = (list.empty? && filters.empty?) ? :describe_customer_gateways : nil
-      request_hash = {}
-      request_hash.merge!(amazonize_list('CustomerGatewayId', list))
-      request_hash.merge!(amazonize_list(['Filter.?.Key','Filter.?.Value.?'], filters))
-      link = generate_request("DescribeCustomerGateways", request_hash)
-      request_cache_or_info cache_for, link,  QEc2DescribeCustomerGatewaysParser, @@bench, cache_for
-    rescue Exception
-      on_exception
+    #  ec2.describe_customer_gateways(:filters => {'tag:MyTag' => 'MyValue'})
+    #
+    # P.S. filters: http://docs.amazonwebservices.com/AmazonVPC/latest/APIReference/index.html?ApiReference-query-DescribeCustomerGateways.html
+    #
+    def describe_customer_gateways(*list_and_options)
+      describe_resources_with_list_and_options('DescribeCustomerGateways', 'CustomerGatewayId', QEc2DescribeCustomerGatewaysParser, list_and_options)
     end
 
     # Create customer gateway.
@@ -273,22 +266,22 @@ module RightAws
 
     # Describe VPN gateways.
     #
+    # Accepts a list of VPN gateways and/or a set of filters as the last parameter.
+    #
+    # Filters: attachment.state, attachment.vpc-id, availability-zone, state, tag-key, tag-value, tag:key, type, vpn-gateway-id
+    #
     #  ec2.describe_vpn_gateways #=>
     #    [{:type=>"ipsec.1",
     #      :availability_zone=>"us-east-1a",
     #      :attachments=>[{:vpc_id=>"vpc-890ce2e0", :state=>"attached"}],
     #      :vpn_gateway_id=>"vgw-dfa144b6"}]
     #
-    def describe_vpn_gateways(*list_and_filters)
-      list, filters = vpc__split_list_and_filters(list_and_filters)
-      cache_for = (list.empty? && filters.empty?) ? :describe_vpn_gateways : nil
-      request_hash = {}
-      request_hash.merge!(amazonize_list('VpnGatewayId', list))
-      request_hash.merge!(amazonize_list(['Filter.?.Key','Filter.?.Value.?'], filters))
-      link = generate_request("DescribeVpnGateways", request_hash)
-      request_cache_or_info cache_for, link,  QEc2DescribeVpnGatewaysParser, @@bench, cache_for
-    rescue Exception
-      on_exception
+    #  ec2.describe_vpn_gateways(:filters => {'tag:MyTag' => 'MyValue'})
+    #      
+    # P.S. filters: http://docs.amazonwebservices.com/AmazonVPC/latest/APIReference/index.html?ApiReference-query-DescribeVpnGateways.html
+    #
+    def describe_vpn_gateways(*list_and_options)
+      describe_resources_with_list_and_options('DescribeVpnGateways', 'VpnGatewayId', QEc2DescribeVpnGatewaysParser, list_and_options)
     end
 
     # Create VPN gateway.
@@ -350,6 +343,11 @@ module RightAws
 
     # Describe VPN connections.
     #
+    # Accepts a list of VPN gateways and/or a set of filters as the last parameter.
+    #
+    # Filters: customer-gateway-configuration, customer-gateway-id, state, tag-key, tag-value, tag:key,
+    # type, vpn-connection-id, vpn-gateway-id
+    #
     #  ec2.describe_vpn_connections #=>
     #    [{:type=>"ipsec.1",
     #      :vpn_connection_id=>"vpn-a9a643c0",
@@ -359,16 +357,12 @@ module RightAws
     #      :vpn_gateway_id=>"vgw-dfa144b6",
     #      :customer_gateway_id=>"cgw-81a643e8"}]
     #
-    def describe_vpn_connections(*list_and_filters)
-      list, filters = vpc__split_list_and_filters(list_and_filters)
-      cache_for = (list.empty? && filters.empty?) ? :describe_vpn_connections : nil
-      request_hash = {}
-      request_hash.merge!(amazonize_list('VpnConnectionId', list))
-      request_hash.merge!(amazonize_list(['Filter.?.Key','Filter.?.Value.?'], filters))
-      link = generate_request("DescribeVpnConnections", request_hash)
-      request_cache_or_info cache_for, link,  QEc2DescribeVpnConnectionsParser, @@bench, cache_for
-    rescue Exception
-      on_exception
+    #  ec2.describe_vpn_gateways(:filters => {'tag:MyTag' => 'MyValue'})
+    #
+    # P.S. filters: http://docs.amazonwebservices.com/AmazonVPC/latest/APIReference/index.html?ApiReference-query-DescribeVpnConnections.html
+    #
+    def describe_vpn_connections(*list_and_options)
+      describe_resources_with_list_and_options('DescribeVpnConnections', 'VpnConnectionId', QEc2DescribeVpnConnectionsParser, list_and_options)
     end
 
     # Create VPN connection.
@@ -407,17 +401,24 @@ module RightAws
 
     class QEc2DescribeVpcsParser < RightAWSParser #:nodoc:
       def tagstart(name, attributes)
-        case name
-        when 'item', 'vpc' then @item = {}
+        case full_tag_name
+        when %r{/(vpcSet/item|subnet)$} then @item    = { :tags => {} }
+        when %r{/tagSet/item$}          then @aws_tag = {}
         end
       end
       def tagend(name)
         case name
-          when 'vpcId'         then @item[:vpc_id] = @text
-          when 'state'         then @item[:state] = @text
-          when 'dhcpOptionsId' then @item[:dhcp_options_id] = @text
-          when 'cidrBlock'     then @item[:cidr_block] = @text
-          when 'item', 'vpc'   then @result << @item
+        when 'vpcId'         then @item[:vpc_id]          = @text
+        when 'state'         then @item[:state]           = @text
+        when 'dhcpOptionsId' then @item[:dhcp_options_id] = @text
+        when 'cidrBlock'     then @item[:cidr_block]      = @text
+        else
+          case full_tag_name
+          when %r{/tagSet/item/key$}   then @aws_tag[:key]               = @text
+          when %r{/tagSet/item/value$} then @aws_tag[:value]             = @text
+          when %r{/tagSet/item$}       then @item[:tags][@aws_tag[:key]] = @aws_tag[:value]
+          when %r{(vpcSet/item|vpc)$}  then @result << @item
+          end
         end
       end
       def reset
@@ -427,19 +428,26 @@ module RightAws
 
     class QEc2DescribeSubnetsParser < RightAWSParser #:nodoc:
       def tagstart(name, attributes)
-        case name
-        when 'item', 'subnet' then @item = {}
+        case full_tag_name
+        when %r{/(subnetSet/item|subnet)$} then @item = { :tags => {} }
+        when %r{/tagSet/item$}   then @aws_tag = {}
         end
       end
       def tagend(name)
         case name
-          when 'subnetId'                then @item[:subnet_id] = @text
-          when 'state'                   then @item[:state] = @text
-          when 'vpcId'                   then @item[:vpc_id] = @text
-          when 'cidrBlock'               then @item[:cidr_block] = @text
-          when 'availabilityZone'        then @item[:availability_zone] = @text
-          when 'availableIpAddressCount' then @item[:available_ip_address_count] = @text
-          when 'item', 'subnet'          then @result << @item
+        when 'subnetId'                then @item[:subnet_id]                  = @text
+        when 'state'                   then @item[:state]                      = @text
+        when 'vpcId'                   then @item[:vpc_id]                     = @text
+        when 'cidrBlock'               then @item[:cidr_block]                 = @text
+        when 'availabilityZone'        then @item[:availability_zone]          = @text
+        when 'availableIpAddressCount' then @item[:available_ip_address_count] = @text
+        else
+          case full_tag_name
+          when %r{/tagSet/item/key$}   then @aws_tag[:key]               = @text
+          when %r{/tagSet/item/value$} then @aws_tag[:value]             = @text
+          when %r{/tagSet/item$}       then @item[:tags][@aws_tag[:key]] = @aws_tag[:value]
+          when %r{/(subnetSet/item|subnet)$} then @result << @item
+          end
         end
       end
       def reset
@@ -450,43 +458,47 @@ module RightAws
     class QEc2DescribeDhcpOptionsParser < RightAWSParser #:nodoc:
       def tagstart(name, attributes)
         case full_tag_name
-        when @p1, @p2
-          @item = { :dhcp_configuration_set => {} }
+        when %r{/(dhcpOptionsSet/item|dhcpOptions)$} then @item = { :tags => {}, :dhcp_configuration_set => {} }
+        when %r{/tagSet/item$}                       then @aws_tag = {}
         end
       end
       def tagend(name)
-        case name
-        when 'dhcpOptionsId' then @item[:dhcp_options_id] = @text
-        when 'key'           then @conf_item_key = @text
-        when 'value'         then (@item[:dhcp_configuration_set][@conf_item_key] ||= []) << @text
-        end
         case full_tag_name
-        when @p1, @p2
-          @result << @item
+        when %r{/tagSet/item/key$}       then @aws_tag[:key]               = @text
+        when %r{/tagSet/item/value$}     then @aws_tag[:value]             = @text
+        when %r{/tagSet/item$}           then @item[:tags][@aws_tag[:key]] = @aws_tag[:value]
+        when %r{/dhcpOptionsId$}         then @item[:dhcp_options_id]      = @text
+        when %r{/dhcpConfigurationSet/item/key$}                 then @conf_item_key = @text
+        when %r{/dhcpConfigurationSet/item/valueSet/item/value$} then (@item[:dhcp_configuration_set][@conf_item_key] ||= []) << @text
+        when %r{/(dhcpOptionsSet/item|dhcpOptions)$}             then @result << @item
         end
       end
       def reset
-        @p1 = 'DescribeDhcpOptionsResponse/dhcpOptionsSet/item'
-        @p2 = 'CreateDhcpOptionsResponse/dhcpOptions'
         @result = []
       end
     end
 
     class QEc2DescribeCustomerGatewaysParser < RightAWSParser #:nodoc:
       def tagstart(name, attributes)
-        case name
-        when 'item', 'customerGateway'
-          @item = {}
+        case full_tag_name
+        when %r{/(customerGatewaySet/item|customerGateway)$} then @item = { :tags => {} }
+        when %r{/tagSet/item$}                               then @aws_tag = {}
         end
       end
       def tagend(name)
         case name
         when 'customerGatewayId' then @item[:customer_gateway_id] = @text
-        when 'state'             then @item[:state] = @text
-        when 'type'              then @item[:type] = @text
-        when 'ipAddress'         then @item[:ip_address] = @text
-        when 'bgpAsn'            then @item[:bgp_asn] = @text
-        when 'item', 'customerGateway' then @result << @item
+        when 'state'             then @item[:state]               = @text
+        when 'type'              then @item[:type]                = @text
+        when 'ipAddress'         then @item[:ip_address]          = @text
+        when 'bgpAsn'            then @item[:bgp_asn]             = @text
+        else
+          case full_tag_name
+          when %r{/tagSet/item/key$}       then @aws_tag[:key]               = @text
+          when %r{/tagSet/item/value$}     then @aws_tag[:value]             = @text
+          when %r{/tagSet/item$}           then @item[:tags][@aws_tag[:key]] = @aws_tag[:value]
+          when %r{/(customerGatewaySet/item|customerGateway)$} then @result << @item
+          end
         end
       end
       def reset
@@ -497,37 +509,30 @@ module RightAws
     class QEc2DescribeVpnGatewaysParser < RightAWSParser #:nodoc:
       def tagstart(name, attributes)
         case full_tag_name
-        when @p1, @p2
-          @item = { :attachments => [] }
-        when "#{@p1}/attachments/item",
-             "#{@p2}/attachments/item"
-          @attachment = {}
+        when %r{/(vpnGatewaySet/item|vpnGateway)$} then @item = { :tags => {}, :attachments => [] }
+        when %r{/attachments/item$}                then @attachment = {}
+        when %r{/tagSet/item$}                     then @aws_tag    = {}
         end
       end
       def tagend(name)
         case name
-        when 'vpnGatewayId'     then @item[:vpn_gateway_id] = @text
+        when 'vpnGatewayId'     then @item[:vpn_gateway_id]    = @text
         when 'availabilityZone' then @item[:availability_zone] = @text
-        when 'type'             then @item[:type] = @text
-        when 'vpcId'            then @attachment[:vpc_id] = @text
-        end
-        case full_tag_name
-        when "#{@p1}/state",
-             "#{@p2}/state"
-          @item[:state] = @text
-        when "#{@p1}/attachments/item/state",
-             "#{@p2}/attachments/item/state"
-          @attachment[:state] = @text
-        when "#{@p1}/attachments/item",
-             "#{@p2}/attachments/item"
-          @item[:attachments] << @attachment unless @attachment.right_blank?
-        when @p1, @p2
-          @result << @item
+        when 'type'             then @item[:type]              = @text
+        when 'vpcId'            then @attachment[:vpc_id]      = @text
+        else
+          case full_tag_name
+          when %r{/vpnGatewaySet/item/state$} then @item[:state]       = @text
+          when %r{/attachments/item/state$}   then @attachment[:state] = @text
+          when %r{/attachments/item$}         then @item[:attachments] << @attachment unless @attachment.right_blank?
+          when %r{/tagSet/item/key$}          then @aws_tag[:key]               = @text
+          when %r{/tagSet/item/value$}        then @aws_tag[:value]             = @text
+          when %r{/tagSet/item$}              then @item[:tags][@aws_tag[:key]] = @aws_tag[:value]
+          when %r{/(vpnGatewaySet/item|vpnGateway)$} then @result << @item
+          end
         end
       end
       def reset
-        @p1 = 'DescribeVpnGatewaysResponse/vpnGatewaySet/item'
-        @p2 = 'CreateVpnGatewayResponse/vpnGateway'
         @result = []
       end
     end
@@ -547,19 +552,26 @@ module RightAws
 
     class QEc2DescribeVpnConnectionsParser < RightAWSParser #:nodoc:
       def tagstart(name, attributes)
-        case name
-        when 'item', 'vpnConnection' then @item = {}
+        case full_tag_name
+        when %r{/(vpnConnectionSet/item|vpnConnection)$} then @item    = { :tags => {} }
+        when %r{/tagSet/item$}                           then @aws_tag = {}
         end
       end
       def tagend(name)
         case name
-        when 'vpnConnectionId'   then @item[:vpn_connection_id] = @text
-        when 'state'             then @item[:state] = @text
-        when 'type'              then @item[:type] = @text
-        when 'vpnGatewayId'      then @item[:vpn_gateway_id] = @text
-        when 'customerGatewayId' then @item[:customer_gateway_id] = @text
+        when 'vpnConnectionId'              then @item[:vpn_connection_id]              = @text
+        when 'state'                        then @item[:state]                          = @text
+        when 'type'                         then @item[:type]                           = @text
+        when 'vpnGatewayId'                 then @item[:vpn_gateway_id]                 = @text
+        when 'customerGatewayId'            then @item[:customer_gateway_id]            = @text
         when 'customerGatewayConfiguration' then @item[:customer_gateway_configuration] = @text
-        when 'item','vpnConnection'         then @result << @item
+        else
+          case full_tag_name
+          when %r{/tagSet/item/key$}          then @aws_tag[:key]               = @text
+          when %r{/tagSet/item/value$}        then @aws_tag[:value]             = @text
+          when %r{/tagSet/item$}              then @item[:tags][@aws_tag[:key]] = @aws_tag[:value]
+          when %r{/(vpnConnectionSet/item|vpnConnection)$} then @result         << @item
+          end
         end
       end
       def reset

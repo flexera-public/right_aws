@@ -514,7 +514,7 @@ module RightAws
       raise
     end
 
-    def request_cache_or_info(method, link, parser_class, benchblock, use_cache=true) #:nodoc:
+    def request_cache_or_info(method, link, parser_class, benchblock, use_cache=true, &block) #:nodoc:
       # We do not want to break the logic of parsing hence will use a dummy parser to process all the standard
       # steps (errors checking etc). The dummy parser does nothig - just returns back the params it received.
       # If the caching is enabled and hit then throw  AwsNoChange.
@@ -524,7 +524,7 @@ module RightAws
       cache_hits?(method.to_sym, response.body) if use_cache
       parser = parser_class.new(:logger => @logger)
       benchblock.xml.add!{ parser.parse(response, params) }
-      result = block_given? ? yield(parser) : parser.result
+      result = block ? block.call(parser) : parser.result
       # update parsed data
       update_cache(method.to_sym, :parsed => result) if use_cache
       result
@@ -576,6 +576,10 @@ module RightAws
               next if options[:default] == :skip_nils
               value = options[:default]
             end
+            # Hack to avoid having unhandled '?' in keys : do replace them all with '1':
+            #  bad:  ec2.amazonize_list(['Filter.?.Key', 'Filter.?.Value.?'], { a: => :b }) => {"Filter.1.Key"=>:a, "Filter.1.Value.?"=>1}
+            #  good: ec2.amazonize_list(['Filter.?.Key', 'Filter.?.Value.?'], { a: => :b }) => {"Filter.1.Key"=>:a, "Filter.1.Value.1"=>1}
+            key.gsub!('?', '1')
             groups[key] = value
           end
         end

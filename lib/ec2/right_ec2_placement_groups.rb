@@ -31,6 +31,10 @@ module RightAws
 
     # Describe placement groups.
     #
+    # Accepts a list of placement groups and/or a set of filters as the last parameter.
+    #
+    # Filters: group-name, state, strategy
+    #
     # If you don’t specify a particular placement group, the response includes
     # information about all of them. The information includes the group name, the strategy,
     # and the group state (e.g., pending, available, etc.).
@@ -42,13 +46,10 @@ module RightAws
     #  ec2.describe_placement_groups('kd_second') #=>
     #    [{:strategy=>"cluster", :group_name=>"kd_second", :state=>"available"}]
     #
+    # P.S. filters: http://docs.amazonwebservices.com/AWSEC2/latest/APIReference/ApiReference_query_DescribePlacementGroups.html
     #
-    def describe_placement_groups(*placement_group_names)
-      placement_group_names = placement_group_names.flatten
-      link = generate_request('DescribePlacementGroups', amazonize_list('GroupName', placement_group_names))
-      request_cache_or_info(:describe_placement_groups, link,  QEc2DescribePlacementGroupsParser, @@bench, placement_group_names.right_blank?)
-    rescue Exception
-      on_exception
+    def describe_placement_groups(*list_and_options)
+      describe_resources_with_list_and_options('DescribePlacementGroups', 'GroupName', QEc2DescribePlacementGroupsParser, list_and_options)
     end
 
     # Create placement group creates a placement group (i.e. logical cluster group)

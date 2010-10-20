@@ -141,24 +141,43 @@ module RightAws
       request_info_impl(:ec2_connection, @@bench, request, parser)
     end
 
+    def describe_resources_with_list_and_options(remote_function_name, remote_item_name, parser_class, list_and_options, &block) # :nodoc:
+      # 'RemoteFunctionName' -> :remote_funtion_name
+      cache_name = remote_function_name.right_underscore.to_sym
+      list, options = AwsUtils::split_items_and_params(list_and_options)
+      request_hash  = amazonize_list(remote_item_name, list)
+      request_hash.merge!(amazonize_list(['Filter.?.Name', 'Filter.?.Value.?'], options[:filters])) unless options[:filters].right_blank?
+      cache_for     = (list.right_blank? && options[:filters].right_blank?) ? cache_name : nil
+      link = generate_request(remote_function_name, request_hash)
+      request_cache_or_info(cache_for, link,  parser_class, @@bench, cache_for, &block)
+    rescue Exception
+      on_exception
+    end
+
   #-----------------------------------------------------------------
   #      Keys
   #-----------------------------------------------------------------
   
-      # Retrieve a list of SSH keys. Returns an array of keys or an exception. Each key is
-      # represented as a two-element hash.
+      # Retrieve a list of SSH keys.
+      #
+      # Accepts a list of ssh keys and/or a set of filters as the last parameter.
+      #
+      # Filters: fingerprint, key-name
+      #
+      # Returns an array of keys or an exception. Each key is represented as a two-element hash.
       #
       #  ec2.describe_key_pairs #=>
       #    [{:aws_fingerprint=> "01:02:03:f4:25:e6:97:e8:9b:02:1a:26:32:4e:58:6b:7a:8c:9f:03", :aws_key_name=>"key-1"},
       #     {:aws_fingerprint=> "1e:29:30:47:58:6d:7b:8c:9f:08:11:20:3c:44:52:69:74:80:97:08", :aws_key_name=>"key-2"},
       #      ..., {...} ]
       #
-    def describe_key_pairs(*key_pairs)
-      key_pairs = key_pairs.flatten
-      link = generate_request("DescribeKeyPairs", amazonize_list('KeyName', key_pairs))
-      request_cache_or_info :describe_key_pairs, link,  QEc2DescribeKeyPairParser, @@bench, key_pairs.right_blank?
-    rescue Exception
-      on_exception
+      #  ec2.describe_key_pairs(:filters => {'fingerprint' => ["53:0b:73:c9:c8:18:98:6e:bc:98:9e:51:97:04:74:4b:07:f9:00:00",
+      #                                                        "9f:57:a5:bb:4b:e8:a7:f8:3c:fe:d6:db:41:f5:7e:97:b5:b2:00:00"]})
+      #
+      # P.S. filters: http://docs.amazonwebservices.com/AWSEC2/latest/APIReference/ApiReference-query-DescribeKeyPairs.html
+      #
+    def describe_key_pairs(*list_and_options)
+      describe_resources_with_list_and_options('DescribeKeyPairs', 'KeyName', QEc2DescribeKeyPairParser, list_and_options)
     end
       
       # Import new SSH key. Returns a hash of the key's data or an exception.
@@ -234,6 +253,11 @@ module RightAws
     end
 
     # List elastic IP addresses assigned to your account.
+    #
+    # Accepts a list of addresses and/or a set of filters as the last parameter.
+    #
+    # Filters: instance-id, public-ip
+    #
     # Returns an array of 2 keys (:instance_id and :public_ip) hashes:
     #
     #  ec2.describe_addresses  #=> [{:instance_id=>"i-d630cbbf", :public_ip=>"75.101.154.140"},
@@ -241,12 +265,12 @@ module RightAws
     #
     #  ec2.describe_addresses('75.101.154.140') #=> [{:instance_id=>"i-d630cbbf", :public_ip=>"75.101.154.140"}]
     #
-    def describe_addresses(*addresses)
-      addresses = addresses.flatten
-      link = generate_request("DescribeAddresses", amazonize_list('PublicIp', addresses))
-      request_cache_or_info :describe_addresses, link,  QEc2DescribeAddressesParser, @@bench, addresses.right_blank?
-    rescue Exception
-      on_exception
+    #  ec2.describe_addresses(:filters => { 'public-ip' => "75.101.154.140" })
+    #
+    # P.S. filters: http://docs.amazonwebservices.com/AWSEC2/latest/APIReference/index.html?ApiReference-query-DescribeAddresses.html
+    #
+    def describe_addresses(*list_and_options)
+      describe_resources_with_list_and_options('DescribeAddresses', 'PublicIp', QEc2DescribeAddressesParser, list_and_options)
     end
 
     # Disassociate the specified elastic IP address from the instance to which it is assigned.
@@ -280,6 +304,11 @@ module RightAws
   #-----------------------------------------------------------------
     
     # Describes availability zones that are currently available to the account and their states.
+    #
+    # Accepts a list of availability zones and/or a set of filters as the last parameter.
+    #
+    # Filters: message, region-name, state, zone-name
+    #
     # Returns an array of 2 keys (:zone_name and :zone_state) hashes:
     #
     #  ec2.describe_availability_zones  #=> [{:region_name=>"us-east-1",
@@ -290,12 +319,10 @@ module RightAws
     #                                                      :zone_state=>"available",
     #                                                      :zone_name=>"us-east-1c"}]
     #
-    def describe_availability_zones(*availability_zones)
-      availability_zones = availability_zones.flatten
-      link = generate_request("DescribeAvailabilityZones", amazonize_list('ZoneName', availability_zones))
-      request_cache_or_info :describe_availability_zones, link,  QEc2DescribeAvailabilityZonesParser, @@bench, availability_zones.right_blank?
-    rescue Exception
-      on_exception
+    # P.S. filters: http://docs.amazonwebservices.com/AWSEC2/latest/APIReference/index.html?ApiReference-query-DescribeAvailabilityZones.html
+    #
+    def describe_availability_zones(*list_and_options)
+      describe_resources_with_list_and_options('DescribeAvailabilityZones', 'ZoneName', QEc2DescribeAvailabilityZonesParser, list_and_options)
     end
 
   #-----------------------------------------------------------------
@@ -304,14 +331,16 @@ module RightAws
 
     # Describe regions.
     #
+    # Accepts a list of regions and/or a set of filters as the last parameter.
+    #
+    # Filters: endpoint, region-name
+    #
     #  ec2.describe_regions  #=> ["eu-west-1", "us-east-1"]
     #
-    def describe_regions(*regions)
-      regions = regions.flatten
-      link = generate_request("DescribeRegions", amazonize_list('RegionName', regions))
-      request_cache_or_info :describe_regions, link,  QEc2DescribeRegionsParser, @@bench, regions.right_blank?
-    rescue Exception
-      on_exception
+    # P.S. filters: http://docs.amazonwebservices.com/AWSEC2/latest/APIReference/ApiReference-query-DescribeRegions.html
+    #
+    def describe_regions(*list_and_options)
+      describe_resources_with_list_and_options('DescribeRegions', 'RegionName', QEc2DescribeRegionsParser, list_and_options)
     end
 
   #-----------------------------------------------------------------
@@ -391,14 +420,20 @@ module RightAws
 
     class QEc2DescribeAvailabilityZonesParser < RightAWSParser #:nodoc:
       def tagstart(name, attributes)
-        @zone = {} if name == 'item'
+        case full_tag_name
+        when %r{/availabilityZoneInfo/item$} then @item = {}
+        end
       end
       def tagend(name)
         case name
-        when 'regionName' then @zone[:region_name] = @text
-        when 'zoneName'   then @zone[:zone_name]   = @text
-        when 'zoneState'  then @zone[:zone_state]  = @text
-        when 'item'       then @result << @zone
+        when 'regionName' then @item[:region_name] = @text
+        when 'zoneName'   then @item[:zone_name]   = @text
+        when 'zoneState'  then @item[:zone_state]  = @text
+        else
+          case full_tag_name
+          when %r{/messageSet/item/message$}   then (@item[:messages] ||= []) << @text
+          when %r{/availabilityZoneInfo/item$} then @result << @item
+          end
         end
       end
       def reset

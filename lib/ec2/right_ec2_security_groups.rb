@@ -29,7 +29,12 @@ module RightAws
     #      Security groups
     #-----------------------------------------------------------------
 
-    # Retrieve Security Groups information. If +list+ is omitted the returns the whole list of groups.
+    # Retrieve Security Groups information.
+    #
+    # Accepts a list of security groups and/or a set of filters as the last parameter.
+    #
+    # Filters: description, group-name, ip-permission.cidr, ip-permission.from-port, ip-permission.group-name,
+    # ip-permission.protocol, ip-permission.to-port, ip-permission.user-id, owner-id
     #
     #  # Amazon cloud:
     #  ec2 = Rightscale::Ec2.new(AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY)
@@ -79,10 +84,12 @@ module RightAws
     #      :aws_description=>"default group",
     #      :aws_owner=>"826693181925"}]
     #
-    def describe_security_groups(list=[])
-      link = generate_request("DescribeSecurityGroups", amazonize_list('GroupName', list))
-
-      request_cache_or_info( :describe_security_groups, link,  QEc2DescribeSecurityGroupsParser, @@bench, list.right_blank?) do |parser|
+    #  ec2.describe_security_groups(:filters => {'ip-permission.from-port' => '22'})
+    #
+    # P.S. filters: http://docs.amazonwebservices.com/AWSEC2/latest/APIReference/ApiReference-query-DescribeSecurityGroups.html
+    #
+    def describe_security_groups(*list_and_options)
+      describe_resources_with_list_and_options('DescribeSecurityGroups', 'GroupName', QEc2DescribeSecurityGroupsParser, list_and_options) do |parser|
         result = []
         parser.result.each do |item|
           result_item = { :aws_owner       => item[:owner_id],
@@ -108,12 +115,6 @@ module RightAws
               perm = result_perm.dup
               perm[:group] = group[:group_name]
               perm[:owner] = group[:user_id]
-#              # AWS does not support Port Based Group Permissions but Eucalyptus does
-#              unless @params[:port_based_group_ingress]
-#                perm.delete(:from_port)
-#                perm.delete(:to_port)
-#                perm.delete(:protocol)
-#              end
               aws_perms << perm
             end
           end
@@ -122,8 +123,6 @@ module RightAws
         end
         result
       end
-    rescue Exception
-      on_exception
     end
 
     # Create new Security Group. Returns +true+ or an exception.

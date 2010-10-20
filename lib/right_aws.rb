@@ -35,6 +35,7 @@ require 'rubygems'
 require 'right_http_connection'
 
 $:.unshift(File.dirname(__FILE__))
+require 'awsbase/support'
 require 'awsbase/benchmark_fix'
 require 'awsbase/right_awsbase'
 require 'ec2/right_ec2'
