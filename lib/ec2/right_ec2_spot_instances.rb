@@ -30,7 +30,10 @@ module RightAws
     #-----------------------------------------------------------------
 
     # Describe Spot Price history.
+    #
     # Options: :start_time, :end_time, instance_types, product_description
+    # 
+    # Filters: instance-type, product-description, spot-price, timestamp
     #
     #  ec2.describe_spot_price_history #=>
     #    [{:spot_price=>0.054,
@@ -63,11 +66,19 @@ module RightAws
     #      :spot_price=>0.058,
     #      :instance_type=>"c1.medium"}, ... ]
     #
+    #  ec2.describe_spot_price_history(:filters => {'spot-price' => '0.2' })
+    #
+    #  ec2.describe_spot_price_history(:instance_types => ["c1.medium"], :filters => {'spot-price' => '0.2' })
+    #
+    #
+    # P.S. filters: http://docs.amazonwebservices.com/AWSEC2/latest/APIReference/index.html?ApiReference-query-DescribeSpotPriceHistory.html
+    #
     def describe_spot_price_history(options={})
       options = options.dup
       request_hash = {}
-      request_hash['StartTime']          = AwsUtils::utc_iso8601(options[:start_time])     unless options[:start_time].right_blank?
-      request_hash['EndTime']            = AwsUtils::utc_iso8601(options[:end_time])       unless options[:end_time].right_blank?
+      request_hash.merge!(amazonize_list(['Filter.?.Name', 'Filter.?.Value.?'], options[:filters])) unless options[:filters].right_blank?
+      request_hash['StartTime']          = AwsUtils::utc_iso8601(options[:start_time])      unless options[:start_time].right_blank?
+      request_hash['EndTime']            = AwsUtils::utc_iso8601(options[:end_time])        unless options[:end_time].right_blank?
       request_hash['ProductDescription'] = options[:product_description]                   unless options[:product_description].right_blank?
       request_hash.merge!(amazonize_list('InstanceType', Array(options[:instance_types]))) unless options[:instance_types].right_blank?
       link = generate_request("DescribeSpotPriceHistory", request_hash)
@@ -77,6 +88,14 @@ module RightAws
     end
 
     # Describe Spot Instance requests.
+    #
+    # Accepts a list of requests and/or a set of filters as the last parameter.
+    #
+    # Filters: availability-zone-group, create-time, fault-code, fault-message, instance-id, launch-group,
+    # launch.block-device-mapping.delete-on-termination, launch.block-device-mapping.device-name,
+    # launch.block-device-mapping.snapshot-id, launch.group-id, launch.image-id, launch.instance-type,
+    # launch.kernel-id, launch.key-name, launch.monitoring-enabled, launch.ramdisk-id, product-description,
+    # spot-instance-request-id, spot-price, state, tag-key, tag-value, tag:key, type, valid-from, valid-until
     #
     #  ec2.describe_spot_instance_requests #=>
     #    [{:type=>"one-time",
@@ -113,9 +132,12 @@ module RightAws
     #      :monitoring_enabled=>false,
     #      :key_name=>"tim"}]
     #
-    def describe_spot_instance_requests(*spot_instance_request_ids)
-      link = generate_request("DescribeSpotInstanceRequests", amazonize_list('SpotInstanceRequestId', spot_instance_request_ids.flatten))
-      request_info(link, QEc2DescribeSpotInstanceParser.new(:logger => @logger))
+    #  ec2.describe_spot_instance_requests(:filters => {'type'=>"one-time", 'state'=>"open"})
+    #  
+    # P.S. filters: http://docs.amazonwebservices.com/AWSEC2/latest/APIReference/index.html?ApiReference-query-DescribeSpotInstanceRequests.html
+    #
+    def describe_spot_instance_requests(*list_and_options)
+      describe_resources_with_list_and_options('DescribeSpotInstanceRequests', 'SpotInstanceRequestId', QEc2DescribeSpotInstanceParser, list_and_options)
     end
 
     # Create a Spot Instance request.
@@ -306,10 +328,12 @@ module RightAws
       def tagstart(name, attributes)
         case full_tag_name
         when %r{spotInstanceRequestSet/item$}
-          @item = {}
+          @item = { :tags => {} }
         when %r{/blockDeviceMapping/item$}
           @item[:block_device_mappings] ||= []
           @block_device_mapping = {}
+        when %r{/tagSet/item$}
+          @aws_tag = {}
         end
       end
       def tagend(name)
@@ -351,8 +375,10 @@ module RightAws
             when 'deleteOnTermination' then @block_device_mapping[:ebs_delete_on_termination]  = @text == 'true' ? true : false
             when 'item'                then @item[:block_device_mappings]                     << @block_device_mapping
             end
-          when %r{spotInstanceRequestSet/item$}
-            @result << @item
+          when %r{/tagSet/item/key$}   then @aws_tag[:key]               = @text
+          when %r{/tagSet/item/value$} then @aws_tag[:value]             = @text
+          when %r{/tagSet/item$}       then @item[:tags][@aws_tag[:key]] = @aws_tag[:value]
+          when %r{spotInstanceRequestSet/item$} then @result << @item
           end
         end
       end

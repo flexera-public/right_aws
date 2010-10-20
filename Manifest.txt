@@ -2,6 +2,7 @@ History.txt
 Manifest.txt
 README.txt
 Rakefile
+lib/awsbase/support.rb
 lib/awsbase/benchmark_fix.rb
 lib/awsbase/right_awsbase.rb
 lib/ec2/right_ec2.rb

@@ -29,7 +29,12 @@ module RightAws
     #      EBS: Volumes
     #-----------------------------------------------------------------
 
-    # Describe all EBS volumes.
+    # Describe EBS volumes.
+    #
+    # Accepts a list of volumes and/or a set of filters as the last parameter.
+    #
+    # Filters: attachement.attach-time, attachment.delete-on-termination, attachement.device, attachment.instance-id,
+    # attachment.status, availability-zone, create-time, size, snapshot-id, status, tag-key, tag-value, tag:key, volume-id
     #
     #  ec2.describe_volumes #=>
     #      [{:aws_size              => 94,
@@ -49,12 +54,12 @@ module RightAws
     #        :aws_id         => "vol-58957031",
     #        :aws_created_at => Wed Jun 18 08:19:21 UTC 2008,}, ... ]
     #
-    def describe_volumes(*volumes)
-      volumes = volumes.flatten
-      link = generate_request("DescribeVolumes", amazonize_list('VolumeId', volumes))
-      request_cache_or_info :describe_volumes, link,  QEc2DescribeVolumesParser, @@bench, volumes.right_blank?
-    rescue Exception
-      on_exception
+    #  ec2.describe_volumes(:filters => { 'availability-zone' => 'us-east-1a', 'size' => '10' })
+    #
+    #  P.S. filters: http://docs.amazonwebservices.com/AWSEC2/latest/APIReference/index.html?ApiReference-query-DescribeVolumes.html
+    #
+    def describe_volumes(*list_and_options)
+      describe_resources_with_list_and_options('DescribeVolumes', 'VolumeId', QEc2DescribeVolumesParser, list_and_options)
     end
 
     # Create new EBS volume based on previously created snapshot.
@@ -138,9 +143,14 @@ module RightAws
     #      EBS: Snapshots
     #-----------------------------------------------------------------
 
-    # Describe all EBS snapshots.
+    # Describe EBS snapshots.
     #
-    # ec2.describe_snapshots #=>
+    # Accepts a list of snapshots and/or a set of filters as the last parameter.
+    #
+    # Filters: description, owner-alias, owner-id, progress, snapshot-id, start-time, status, tag-key,
+    # tag-value, tag:key, volume-id, volume-size
+    #
+    #  ec2.describe_snapshots #=>
     #   [ {:aws_volume_id=>"vol-545fac3d",
     #      :aws_description=>"Wikipedia XML Backups (Linux)",
     #      :aws_progress=>"100%",
@@ -158,12 +168,12 @@ module RightAws
     #      :aws_volume_size=>180,
     #      :aws_status=>"completed"}, ...]
     #
-    def describe_snapshots(*snapshots)
-      snapshots = snapshots.flatten
-      link = generate_request("DescribeSnapshots", amazonize_list('SnapshotId', snapshots))
-      request_cache_or_info :describe_snapshots, link,  QEc2DescribeSnapshotsParser, @@bench, snapshots.right_blank?
-    rescue Exception
-      on_exception
+    #  ec2.describe_snapshots(:filters => {'tag:MyTag' => 'MyValue'))
+    #
+    # P.S. filters: http://docs.amazonwebservices.com/AWSEC2/latest/APIReference/index.html?ApiReference-query-DescribeSnapshots.html
+    #
+    def describe_snapshots(*list_and_options)
+      describe_resources_with_list_and_options('DescribeSnapshots', 'SnapshotId', QEc2DescribeSnapshotsParser, list_and_options)
     end
 
     # Create a snapshot of specified volume.
@@ -363,35 +373,30 @@ module RightAws
 
     class QEc2DescribeVolumesParser < RightAWSParser #:nodoc:
       def tagstart(name, attributes)
-        case name
-        when 'item'
-          case @xmlpath
-          when 'DescribeVolumesResponse/volumeSet' then @volume = {}
-          end
+        case full_tag_name
+        when %r{volumeSet/item$} then @item    = { :tags => {} }
+        when %r{/tagSet/item$}   then @aws_tag = {}
         end
       end
       def tagend(name)
         case name
-        when 'volumeId'
-          case @xmlpath
-          when 'DescribeVolumesResponse/volumeSet/item' then @volume[:aws_id] = @text
-          end
-        when 'status'
-          case @xmlpath
-          when 'DescribeVolumesResponse/volumeSet/item' then @volume[:aws_status] = @text
-          when 'DescribeVolumesResponse/volumeSet/item/attachmentSet/item' then @volume[:aws_attachment_status] = @text
-          end
-        when 'size'             then @volume[:aws_size]        = @text.to_i
-        when 'createTime'       then @volume[:aws_created_at]  = @text
-        when 'instanceId'       then @volume[:aws_instance_id] = @text
-        when 'device'           then @volume[:aws_device]      = @text
-        when 'attachTime'       then @volume[:aws_attached_at] = @text
-        when 'snapshotId'       then @volume[:snapshot_id]     = @text.right_blank? ? nil : @text
-        when 'availabilityZone' then @volume[:zone]            = @text
-        when 'deleteOnTermination' then @volume[:delete_on_termination] = (@text == 'true')
-        when 'item'
-          case @xmlpath
-          when 'DescribeVolumesResponse/volumeSet' then @result << @volume
+        when 'size'             then @item[:aws_size]        = @text.to_i
+        when 'createTime'       then @item[:aws_created_at]  = @text
+        when 'instanceId'       then @item[:aws_instance_id] = @text
+        when 'device'           then @item[:aws_device]      = @text
+        when 'attachTime'       then @item[:aws_attached_at] = @text
+        when 'snapshotId'       then @item[:snapshot_id]     = @text.right_blank? ? nil : @text
+        when 'availabilityZone' then @item[:zone]            = @text
+        when 'deleteOnTermination' then @item[:delete_on_termination] = (@text == 'true')
+        else
+          case full_tag_name
+          when %r{/volumeSet/item/volumeId$}   then @item[:aws_id]                = @text
+          when %r{/volumeSet/item/status$}     then @item[:aws_status]            = @text
+          when %r{/attachmentSet/item/status$} then @item[:aws_attachment_status] = @text
+          when %r{/tagSet/item/key$}           then @aws_tag[:key]                = @text
+          when %r{/tagSet/item/value$}         then @aws_tag[:value]              = @text
+          when %r{/tagSet/item$}               then @item[:tags][@aws_tag[:key]]  = @aws_tag[:value]
+          when %r{/volumeSet/item$}            then @result << @item
           end
         end
       end
@@ -406,25 +411,33 @@ module RightAws
 
     class QEc2DescribeSnapshotsParser < RightAWSParser #:nodoc:
       def tagstart(name, attributes)
-        case name
-        when *@each then @snapshot = {}
+        case full_tag_name
+        when %r{CreateSnapshotResponse$},
+             %r{/snapshotSet/item$}  then @item = { :tags => {} }
+        when %r{/tagSet/item$}       then @aws_tag = {}
         end
       end
       def tagend(name)
         case name
-        when 'volumeId'    then @snapshot[:aws_volume_id]   = @text
-        when 'snapshotId'  then @snapshot[:aws_id]          = @text
-        when 'status'      then @snapshot[:aws_status]      = @text
-        when 'startTime'   then @snapshot[:aws_started_at]  = @text
-        when 'progress'    then @snapshot[:aws_progress]    = @text
-        when 'description' then @snapshot[:aws_description] = @text
-        when 'ownerId'     then @snapshot[:aws_owner]       = @text
-        when 'volumeSize'  then @snapshot[:aws_volume_size] = @text.to_i
-        when *@each        then @result << @snapshot
+        when 'volumeId'    then @item[:aws_volume_id]   = @text
+        when 'snapshotId'  then @item[:aws_id]          = @text
+        when 'status'      then @item[:aws_status]      = @text
+        when 'startTime'   then @item[:aws_started_at]  = @text
+        when 'progress'    then @item[:aws_progress]    = @text
+        when 'description' then @item[:aws_description] = @text
+        when 'ownerId'     then @item[:aws_owner]       = @text
+        when 'volumeSize'  then @item[:aws_volume_size] = @text.to_i
+        else
+          case full_tag_name
+          when %r{/tagSet/item/key$}         then @aws_tag[:key]                = @text
+          when %r{/tagSet/item/value$}       then @aws_tag[:value]              = @text
+          when %r{/tagSet/item$}             then @item[:tags][@aws_tag[:key]]  = @aws_tag[:value]
+          when %r{CreateSnapshotResponse$},
+               %r{/snapshotSet/item$}        then @result << @item
+          end
         end
       end
       def reset
-        @each = ['item', 'CreateSnapshotResponse']
         @result = []
       end
     end

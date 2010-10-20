@@ -47,8 +47,18 @@ module RightAws
       on_exception
     end
 
-    # Retrieve information about EC2 instances. If +list+ is omitted then returns the
-    # list of all instances.
+    # Retrieve information about EC2 instances.
+    #
+    # Accepts a list of instances and/or a set of filters as the last parameter.
+    # 
+    # Filters: architecture, availability-zone, block-device-mapping.attach-time, block-device-mapping.delete-on-termination,
+    # block-device-mapping.device-name, block-device-mapping.status, block-device-mapping.volume-id, client-token, dns-name,
+    # group-id, image-id, instance-id, instance-lifecycle, instance-state-code, instance-state-name, instance-type, ip-address,
+    # kernel-id, key-name, launch-index, launch-time, monitoring-state, owner-id, placement-group-name, platform,
+    # private-dns-name, private-ip-address, product-code, ramdisk-id, reason, requester-id, reservation-id, root-device-name,
+    # root-device-type, spot-instance-request-id, state-reason-code, state-reason-message, subnet-id, tag-key, tag-value,
+    # tag:key, virtualization-type, vpc-id,
+    #
     #
     #  ec2.describe_instances #=>
     #    [{:private_ip_address=>"10.240.7.99",
@@ -84,14 +94,15 @@ module RightAws
     #         :ebs_volume_id=>"vol-f900f990"}],
     #      :aws_instance_id=>"i-8ce84ae4"} , ... ]
     #
-    def describe_instances(*instances)
-      instances = instances.flatten
-      link = generate_request("DescribeInstances", amazonize_list('InstanceId', instances))
-      request_cache_or_info(:describe_instances, link,  QEc2DescribeInstancesParser, @@bench, instances.right_blank?) do |parser|
+    #   ec2.describe_instances("i-8ce84ae6", "i-8ce84ae8", "i-8ce84ae0")
+    #   ec2.describe_instances(:filters => { 'availability-zone' => 'us-east-1a', 'instance-type' => 'c1.medium' })
+    #
+    # P.S. filters: http://docs.amazonwebservices.com/AWSEC2/latest/APIReference/index.html?ApiReference-query-DescribeInstances.html
+    #
+    def describe_instances(*list_and_options)
+      describe_resources_with_list_and_options('DescribeInstances', 'InstanceId', QEc2DescribeInstancesParser, list_and_options) do |parser|
         get_desc_instances(parser.result)
       end
-    rescue Exception
-      on_exception
     end
 
     # Return the product code attached to instance or +nil+ otherwise.
@@ -226,9 +237,6 @@ module RightAws
       params['Placement.GroupName']               = options[:placement_group_name]                 unless options[:placement_group_name].right_blank?
       params['License.Pool']                      = options[:license_pool]                         unless options[:license_pool].right_blank?
       params['ClientToken']                       = options[:client_token] || AwsUtils::generate_unique_token
-#     params['VolumeId']                          = options[:volume_id]                            unless options[:volume_id].right_blank?
-#     params['RootDeviceName']                    = options[:root_device_name]                     unless options[:root_device_name].right_blank?
-#     params['RootDeviceType']                    = options[:root_device_type]                     unless options[:root_device_type].right_blank?
       params.merge!(amazonize_block_device_mappings(options[:block_device_mappings]))
       unless options[:user_data].right_blank?
         options[:user_data].strip!
@@ -489,9 +497,13 @@ module RightAws
     end
 
     # Describe the status of the Windows AMI bundlings.
-    # If +list+ is omitted the returns the whole list of tasks.
     #
-    #  ec2.describe_bundle_tasks(['bun-4fa74226']) #=>
+    # Accepts a list of tasks and/or a set of filters as the last parameter.
+    #
+    # Filters" bundle-id, error-code, error-message, instance-id, progress, s3-aws-access-key-id, s3-bucket, s3-prefix,
+    # start-time, state, update-time
+    #
+    #  ec2.describe_bundle_tasks('bun-4fa74226') #=>
     #    [{:s3_bucket         => "my-awesome-bucket"
     #      :aws_id            => "bun-0fa70206",
     #      :s3_prefix         => "win1pr",
@@ -503,12 +515,12 @@ module RightAws
     #      :aws_state         => "failed",
     #      :aws_instance_id   => "i-e3e24e8a"}]
     #
-    def describe_bundle_tasks(*tasks)
-      tasks = tasks.flatten
-      link = generate_request("DescribeBundleTasks", amazonize_list('BundleId', tasks))
-      request_info(link, QEc2DescribeBundleTasksParser.new)
-    rescue Exception
-      on_exception
+    #   ec2.describe_bundle_tasks(:filters => { 'state' => 'pending' })
+    #
+    # P.S. filters: http://docs.amazonwebservices.com/AWSEC2/latest/APIReference/ApiReference-query-DescribeBundleTasks.html
+    #
+    def describe_bundle_tasks(*list_and_options)
+      describe_resources_with_list_and_options('DescribeBundleTasks', 'BundleId', QEc2DescribeBundleTasksParser, list_and_options)
     end
 
     # Cancel an in‐progress or pending bundle task by id.
@@ -551,10 +563,13 @@ module RightAws
                     :ami_launch_index => '',
                     :ssh_key_name     => '',
                     :aws_state        => '',
-                    :aws_product_codes => [] }
+                    :aws_product_codes => [],
+                    :tags              => {} }
         when %r{blockDeviceMapping/item$}
           @item[:block_device_mappings] ||= []
           @block_device_mapping = {}
+        when %r{/tagSet/item$}
+          @aws_tag = {}
         end
       end
       def tagend(name)
@@ -609,6 +624,9 @@ module RightAws
             when 'item'                then @item[:block_device_mappings]                     << @block_device_mapping
             end
           when %r{/instancesSet/item$} then @reservation[:instances_set] << @item
+          when %r{/tagSet/item/key$}   then @aws_tag[:key]               = @text
+          when %r{/tagSet/item/value$} then @aws_tag[:value]             = @text
+          when %r{/tagSet/item$}       then @item[:tags][@aws_tag[:key]] = @aws_tag[:value]
           when 'DescribeInstancesResponse/reservationSet/item',
                'RunInstancesResponse'
             @result << @reservation

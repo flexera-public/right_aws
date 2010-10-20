@@ -30,14 +30,24 @@ module RightAws
 
     # Describe tags.
     #
+    # Accepts set of filters.
+    #
+    # Filters: key, resource-id, resource-type, value
+    #
     #  ec2.describe_tags  #=> [{:resource_id   => "i-12345678",
     #                           :value         => "foo",
     #                           :resource_type => "instance",
     #                           :key           => "myKey"}]
     #
-    def describe_tags
-      link = generate_request("DescribeTags")
-      request_cache_or_info :describe_tags, link,  QEc2DescribeTagsParser, @@bench
+    #  ec2.describe_tags(:filters => { 'resource_id' => "i-12345678"})
+    #
+    # P.S. filters: http://docs.amazonwebservices.com/AWSEC2/latest/APIReference/ApiReference_query_DescribeTags.html
+    def describe_tags(options={})
+      request_hash = {}
+      request_hash.merge!(amazonize_list(['Filter.?.Name', 'Filter.?.Value.?'], options[:filters])) unless options[:filters].right_blank?
+      cache_for = (options[:filters].right_blank?) ? :describe_tags : nil
+      link = generate_request("DescribeTags", request_hash)
+      request_cache_or_info cache_for, link,  QEc2DescribeTagsParser, @@bench, cache_for
     rescue Exception
       on_exception
     end
