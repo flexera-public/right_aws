@@ -255,6 +255,28 @@ module RightAws
       on_exception
     end
 
+    # Query Metadata for Domain
+    #
+    # Returns a hash on success or an exception on error.
+    #
+    # example: 
+    # sdb = RightAWS:::SdbInterface.new
+    # sdb.domain_metadata('toys') # => {:box_usage=>["0.0000071759"], 
+    #                                     :domain_metadata_result=>["1287621099"], 
+    #                                     :item_names_size_bytes=>["24116"], 
+    #                                     :attribute_name_count=>["9"], 
+    #                                     :domain_metadata_response=>["0.0000071759"], 
+    #                                     :request_id=>["d2702097-e2e6-709c-97a8-dac38d158fae"], 
+    #                                     :attribute_names_size_bytes=>["78"], 
+    #                                     :attribute_value_count=>["22707"], 
+    #                                     :attribute_values_size_bytes=>["360289"], 
+    #                                     :item_count=>["2661"]}
+    # see http://docs.amazonwebservices.com/AmazonSimpleDB/latest/DeveloperGuide/index.html?SDB_API_DomainMetadata.html
+    def domain_metadata(domain)
+      link = generate_request("DomainMetadata","DomainName"=>domain)
+      request_info(link,QSdbGenericParser.new)
+    end
+
     # Delete SDB domain at Amazon.
     # 
     # Returns a hash: { :box_usage, :request_id } on success or an exception on error.
@@ -615,6 +637,16 @@ module RightAws
     #-----------------------------------------------------------------
     #      PARSERS:
     #-----------------------------------------------------------------
+    class QSdbGenericParser < RightAWSParser #:nodoc:
+      def reset
+        @result = { :items => [] }
+      end
+      def tagend(name)
+        @result[name.underscore.to_sym] ||= []
+        @result[name.underscore.to_sym] << @text
+      end
+    end
+      
     class QSdbListDomainParser < RightAWSParser #:nodoc:
       def reset
         @result = { :domains => [] }
