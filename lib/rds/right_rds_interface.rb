@@ -198,7 +198,7 @@ module RightAws
       request_hash['AllocatedStorage'] = params[:allocated_storage].right_blank? ? 25            : params[:allocated_storage]
       request_hash['Engine']           = params[:engine].right_blank?            ? 'MySQL5.1'    : params[:engine]
       # Optional
-      request_hash['EndpointPort']               = params[:endpoint_port]                unless params[:endpoint_port].right_blank?
+      request_hash['Port']                       = params[:endpoint_port]                unless params[:endpoint_port].right_blank?
       request_hash['DBName']                     = params[:db_name]                      unless params[:db_name].right_blank?
       request_hash['AvailabilityZone']           = params[:availability_zone]            unless params[:availability_zone].right_blank?
       request_hash['MultiAZ']                    = params[:multi_az].to_s                unless params[:multi_az].nil?  
@@ -688,7 +688,7 @@ module RightAws
       request_hash = { 'DBSnapshotIdentifier' => snapshot_aws_id,
                        'DBInstanceIdentifier' => instance_aws_id }
       request_hash['DBInstanceClass']  = params[:instance_class]    unless params[:instance_class].right_blank?
-      request_hash['EndpointPort']     = params[:endpoint_port]     unless params[:endpoint_port].right_blank?
+      request_hash['Port']             = params[:endpoint_port]     unless params[:endpoint_port].right_blank?
       request_hash['AvailabilityZone'] = params[:availability_zone] unless params[:availability_zone].right_blank?
       request_hash['MultiAZ']          = params[:multi_az]          unless params[:multi_az].nil?
       link = generate_request('RestoreDBInstanceFromDBSnapshot', request_hash)
@@ -964,7 +964,7 @@ module RightAws
         when 'MaxRecords'           then @result[:max_records]       = @text.to_i  # ?
         when 'Engine'               then @db_snapshot[:engine]               = @text
         when 'InstanceCreateTime'   then @db_snapshot[:instance_create_time] = @text
-        when 'EndpointPort'         then @db_snapshot[:endpoint_port]        = @text.to_i
+        when 'Port'                 then @db_snapshot[:endpoint_port]        = @text.to_i
         when 'Status'               then @db_snapshot[:status]               = @text
         when 'AvailabilityZone'     then @db_snapshot[:availability_zone]    = @text
         when 'MasterUsername'       then @db_snapshot[:master_username]      = @text
