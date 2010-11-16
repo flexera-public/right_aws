@@ -83,7 +83,7 @@ module RightAws
     DEFAULT_INSTANCE_TYPE   =  'm1.small' 
     INSTANCE_TYPES          = ['t1.micro','m1.small','c1.medium','m1.large','m1.xlarge',
                                'c1.xlarge', 'm2.xlarge', 'm2.2xlarge', 'm2.4xlarge',
-                               'cc1.4xlarge']
+                               'cc1.4xlarge', 'cg1.4xlarge']
     
     @@bench = AwsBenchmarkingBlock.new
     def self.bench_xml
