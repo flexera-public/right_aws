@@ -293,10 +293,8 @@ the source key.
       - HPC Support
       - Tags Suport
       - ClientToken support added on instance launch
-    - RDS: API '2010-01-01' (MultiAZ support)
+    - RDS: API "2010-07-28"
     - 301 Redirect support added
-  - Fixed:
-    - RDS: DB Parameter group name on instance launch
   - Removed:
     - ActiveSupport dependency
     - SDB: uuid gem dependency
