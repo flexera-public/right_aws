@@ -27,14 +27,14 @@ module RightAws
     
     include RightAwsBaseInterface
 
-    API_VERSION      = "2010-01-01"
+    API_VERSION      = "2010-07-28"
     DEFAULT_HOST     = 'rds.amazonaws.com'
     DEFAULT_PORT     = 443
     DEFAULT_PROTOCOL = 'https'
     DEFAULT_PATH     = '/'
 
     DEFAULT_INSTANCE_CLASS   =  'db.m1.small'
-    INSTANCE_CLASSES         = ['db.m1.small', 'db.m1.large', 'db.m1.xlarge', 'db.m2.2xlarge', 'db.m2.4xlarge']
+    INSTANCE_CLASSES         = ['db.m1.small', 'db.m1.large', 'db.m1.xlarge', 'db.m2.2xlarge', 'db.m2.2xlarge', 'db.m2.4xlarge']
 
     @@bench = AwsBenchmarkingBlock.new
     def self.bench_xml
@@ -113,20 +113,23 @@ module RightAws
     #
     #  # Get a list of DB instances. The response is an +Array+ of instances.
     #  rds.describe_db_instances #=>
-    #    [{:instance_class=>"Medium",
+    #    [{:instance_class=>"db.m1.small",
     #      :status=>"creating",
-    #      :engine=>"MySQL5.1",
-    #      :allocated_storage=>50,
-    #      :pending_modified_values=>{},
-    #      :db_parameter_group=>{:status=>"in-sync", :name=>"default.MySQL5.1"},
-    #      :db_security_groups=>
-    #       [{:status=>"active", :name=>"kd-2-test"},
-    #        {:status=>"active", :name=>"default"},
-    #        {:status=>"active", :name=>"kd-1-test"}],
-    #      :availability_zone=>"us-east-1b",
+    #      :backup_retention_period=>1,
+    #      :read_replica_db_instance_identifiers=>["kd-delete-me-01-replica-01"],
     #      :master_username=>"username",
-    #      :aws_id=>"kd-my-awesome-db-2",
-    #      :preferred_maintenance_window=>"Sun:05:00-Sun:09:00"}]
+    #      :preferred_maintenance_window=>"sun:05:00-sun:09:00",
+    #      :db_parameter_group=>{:status=>"in-sync", :name=>"default.mysql5.1"},
+    #      :multi_az=>true,
+    #      :engine=>"mysql",
+    #      :auto_minor_version_upgrade=>false,
+    #      :allocated_storage=>25,
+    #      :availability_zone=>"us-east-1d",
+    #      :aws_id=>"kd-delete-me-01",
+    #      :preferred_backup_window=>"03:00-05:00",
+    #      :engine_version=>"5.1.50",
+    #      :pending_modified_values=>{:master_user_password=>"****"},
+    #      :db_security_groups=>[{:status=>"active", :name=>"default"}]}]
     #
     #  # Retrieve a custom DB instance.
     #  # The response is an +Array+ with a single instance record.
@@ -136,24 +139,27 @@ module RightAws
     #  rds.describe_db_instances(:max_records => 30) do |x|
     #    puts x.inspect #=>
     #      {:db_instances=>
-    #        [{:instance_class=>"Medium",
+    #        [{:instance_class=>"db.m1.small",
     #          :status=>"creating",
-    #          :engine=>"MySQL5.1",
-    #          :allocated_storage=>50,
-    #          :pending_modified_values=>{},
-    #          :db_parameter_group=>{:status=>"in-sync", :name=>"default.MySQL5.1"},
-    #          :db_security_groups=>
-    #           [{:status=>"active", :name=>"kd-2-test"},
-    #            {:status=>"active", :name=>"default"},
-    #            {:status=>"active", :name=>"kd-1-test"}],
-    #          :availability_zone=>"us-east-1b",
+    #          :backup_retention_period=>1,
+    #          :read_replica_db_instance_identifiers=>["kd-delete-me-01-replica-01"],
     #          :master_username=>"username",
-    #          :aws_id=>"kd-my-awesome-db-2",
-    #          :preferred_maintenance_window=>"Sun:05:00-Sun:09:00"}]}
+    #          :preferred_maintenance_window=>"sun:05:00-sun:09:00",
+    #          :db_parameter_group=>{:status=>"in-sync", :name=>"default.mysql5.1"},
+    #          :multi_az=>true,
+    #          :engine=>"mysql",
+    #          :auto_minor_version_upgrade=>false,
+    #          :allocated_storage=>25,
+    #          :availability_zone=>"us-east-1d",
+    #          :aws_id=>"kd-delete-me-01",
+    #          :preferred_backup_window=>"03:00-05:00",
+    #          :engine_version=>"5.1.50",
+    #          :pending_modified_values=>{:master_user_password=>"****"},
+    #          :db_security_groups=>[{:status=>"active", :name=>"default"}]}]}
     #    true
     #  end
     #
-    def describe_db_instances(params={}, &block)
+    def describe_db_instances(*params, &block)
       item, params = AwsUtils::split_items_and_params(params)
       params = params.dup
       params['DBInstanceIdentifier'] = item if item
@@ -168,24 +174,30 @@ module RightAws
     # Create a new RDS instance of the type and size specified by you. The default storage engine for RDS Instances is InnoDB.
     #
     # Mandatory arguments: +aws_id+, +master_username+, +master_user_password+
-    # Optional params: +:allocated_storage+ (25 by def), +:instance_class+, +:engine+ ('MySQL5.1' by def),
+    # Optional params: +:allocated_storage+ (25 by def), +:instance_class+, +:engine+ ('MySQL' by def),
     # +:endpoint_port+, +:db_name+, +:db_security_groups+, +:db_parameter_group+,  +:availability_zone+, +:preferred_maintenance_window+
-    # +:backup_retention_period+, +:preferred_backup_window+, +:multi_az+
+    # +:backup_retention_period+, +:preferred_backup_window+, +:multi_az+, +:engine_version+, +:auto_minor_version_upgrade+
     #
-    #  ds.create_db_instance('my-awesome-db', 'username', 'password') #=>
-    #    {:instance_class=>"Medium",
-    #     :status=>"creating",
-    #     :engine=>"MySQL5.1",
-    #     :allocated_storage=>50,
-    #     :pending_modified_values=>{},
-    #     :db_security_groups=>
-    #      [{:status=>"active", :name=>"kd-2-test"},
-    #       {:status=>"active", :name=>"default"},
-    #       {:status=>"active", :name=>"kd-1-test"}],
-    #     :availability_zone=>"us-east-1b",
-    #     :master_username=>"username",
-    #     :aws_id=>"kd-my-awesome-db-2",
-    #     :preferred_maintenance_window=>"Sun:05:00-Sun:09:00"}
+    #   rds.create_db_instance('kd-delete-me-01', 'username', 'password',
+    #                           :db_instance_class => 'db.m1.small',
+    #                           :multi_az          => true,
+    #                           :auto_minor_version_upgrade => false ) #=>
+    #    {:instance_class=>"db.m1.small",
+    #      :multi_az=>true,
+    #      :status=>"creating",
+    #      :backup_retention_period=>1,
+    #      :read_replica_db_instance_identifiers=>[],
+    #      :master_username=>"username",
+    #      :preferred_maintenance_window=>"sun:05:00-sun:09:00",
+    #      :auto_minor_version_upgrade=>false,
+    #      :db_parameter_group=>{:status=>"in-sync", :name=>"default.mysql5.1"},
+    #      :engine=>"mysql",
+    #      :allocated_storage=>25,
+    #      :aws_id=>"kd-delete-me-01",
+    #      :preferred_backup_window=>"03:00-05:00",
+    #      :engine_version=>"5.1.50",
+    #      :pending_modified_values=>{:master_user_password=>"****"},
+    #      :db_security_groups=>[{:status=>"active", :name=>"default"}]}
     #
     def create_db_instance(aws_id, master_username, master_user_password, params={})
       request_hash = {}
@@ -194,20 +206,21 @@ module RightAws
       request_hash['MasterUsername']       = master_username
       request_hash['MasterUserPassword']   = master_user_password
       # Mandatory with default values
-      request_hash['DBInstanceClass']  = params[:instance_class].right_blank?    ? DEFAULT_INSTANCE_CLASS : params[:instance_class].to_s
-      request_hash['AllocatedStorage'] = params[:allocated_storage].right_blank? ? 25            : params[:allocated_storage]
-      request_hash['Engine']           = params[:engine].right_blank?            ? 'MySQL5.1'    : params[:engine]
+      request_hash['DBInstanceClass']            = params[:instance_class].right_blank?    ? DEFAULT_INSTANCE_CLASS : params[:instance_class].to_s
+      request_hash['AllocatedStorage']           = params[:allocated_storage].right_blank? ? 25                     : params[:allocated_storage]
+      request_hash['Engine']                     = params[:engine].right_blank?            ? 'mysql'                : params[:engine]
       # Optional
-      request_hash['Port']                       = params[:endpoint_port]                unless params[:endpoint_port].right_blank?
-      request_hash['DBName']                     = params[:db_name]                      unless params[:db_name].right_blank?
-      request_hash['AvailabilityZone']           = params[:availability_zone]            unless params[:availability_zone].right_blank?
-      request_hash['MultiAZ']                    = params[:multi_az].to_s                unless params[:multi_az].nil?  
-      request_hash['PreferredMaintenanceWindow'] = params[:preferred_maintenance_window] unless params[:preferred_maintenance_window].right_blank?
-      request_hash['BackupRetentionPeriod']      = params[:backup_retention_period]      unless params[:backup_retention_period].right_blank?
-      request_hash['PreferredBackupWindow']      = params[:preferred_backup_window]      unless params[:preferred_backup_window].right_blank?
+      request_hash['Port']                       = params[:endpoint_port]                   unless params[:endpoint_port].right_blank?
+      request_hash['DBName']                     = params[:db_name]                         unless params[:db_name].right_blank?
+      request_hash['AvailabilityZone']           = params[:availability_zone]               unless params[:availability_zone].right_blank?
+      request_hash['MultiAZ']                    = params[:multi_az].to_s                   unless params[:multi_az].nil?
+      request_hash['PreferredMaintenanceWindow'] = params[:preferred_maintenance_window]    unless params[:preferred_maintenance_window].right_blank?
+      request_hash['BackupRetentionPeriod']      = params[:backup_retention_period]         unless params[:backup_retention_period].right_blank?
+      request_hash['PreferredBackupWindow']      = params[:preferred_backup_window]         unless params[:preferred_backup_window].right_blank?
+      request_hash['DBParameterGroupName']       = params[:db_parameter_group]              unless params[:db_parameter_group].right_blank?
+      request_hash['EngineVersion']              = params[:engine_version]                  unless params[:engine_version].right_blank?
+      request_hash['AutoMinorVersionUpgrade']    = params[:auto_minor_version_upgrade].to_s unless params[:auto_minor_version_upgrade].nil?
       request_hash.merge!(amazonize_list('DBSecurityGroups.member',  params[:db_security_groups]))
-#      request_hash.merge!(amazonize_list('DBParameterGroups.member', params[:db_parameter_groups]))
-      request_hash['DBParameterGroupName']       = params[:db_parameter_group]           unless params[:db_parameter_group].right_blank?
       link = generate_request('CreateDBInstance', request_hash)
       request_info(link, DescribeDbInstancesParser.new(:logger => @logger))[:db_instances].first
     end
@@ -217,24 +230,60 @@ module RightAws
     # Mandatory arguments: +aws_id+. 
     # Optional params: +:master_user_password+, +:instance_class+, +:db_security_groups+,
     # +:db_parameter_group+, +:preferred_maintenance_window+, +:allocated_storage+, +:apply_immediately+,
-    # +:backup_retention_period+, +:preferred_backup_window+, +:multi_az+
+    # +:backup_retention_period+, +:preferred_backup_window+, +:multi_az+, +:engine_version+,
+    # +:auto_minor_version_upgrade+, +:auto_major_version_upgrade+
+    #
+    #    rds.modify_db_instance('kd-delete-me-01',
+    #                           :master_user_password => 'newpassword',
+    #                           :instance_class => 'db.m1.large',
+    #                           :multi_az => false,
+    #                           :allocated_storage => 30,
+    #                           :auto_major_version_upgrade => true,
+    #                           :auto_minor_version_upgrade => true,
+    #                           :preferred_maintenance_window => 'sun:06:00-sun:10:00',
+    #                           :preferred_backup_window => '02:00-04:00',
+    #                           :apply_immediately => true,
+    #                           :backup_retention_period => 2) #=>
+    #        {:engine_version=>"5.1.50",
+    #         :aws_id=>"kd-delete-me-01",
+    #         :multi_az=>true,
+    #         :status=>"available",
+    #         :read_replica_db_instance_identifiers=>[],
+    #         :availability_zone=>"us-east-1d",
+    #         :auto_minor_version_upgrade=>true,
+    #         :master_username=>"username",
+    #         :preferred_maintenance_window=>"sun:06:00-sun:10:00",
+    #         :db_parameter_group=>{:status=>"in-sync", :name=>"default.mysql5.1"},
+    #         :create_time=>"2010-11-17T10:21:59.720Z",
+    #         :preferred_backup_window=>"02:00-04:00",
+    #         :engine=>"mysql",
+    #         :db_security_groups=>[{:status=>"active", :name=>"default"}],
+    #         :endpoint_address=>"kd-delete-me-01.chxspydgchoo.us-east-1.rds.amazonaws.com",
+    #         :instance_class=>"db.m1.small",
+    #         :latest_restorable_time=>"2010-11-17T10:27:17.089Z",
+    #         :backup_retention_period=>2,
+    #         :pending_modified_values=>
+    #          {:multi_az=>false, :master_user_password=>"****", :allocated_storage=>30, :instance_class=>"db.m1.large"},
+    #         :allocated_storage=>25}
     #
     def modify_db_instance(aws_id, params={})
       request_hash = {}
       # Mandatory
       request_hash['DBInstanceIdentifier'] = aws_id
       # Optional
-      request_hash['MasterUserPassword']         = params[:master_user_password]           unless params[:master_user_password].right_blank?
-      request_hash['DBInstanceClass']            = params[:instance_class].to_s.capitalize unless params[:instance_class].right_blank?
-      request_hash['PreferredMaintenanceWindow'] = params[:preferred_maintenance_window]   unless params[:preferred_maintenance_window].right_blank?
-      request_hash['BackupRetentionPeriod']      = params[:backup_retention_period]        unless params[:backup_retention_period].right_blank?
-      request_hash['PreferredBackupWindow']      = params[:preferred_backup_window]        unless params[:preferred_backup_window].right_blank?
-      request_hash['AllocatedStorage']           = params[:allocated_storage]              unless params[:allocated_storage].right_blank?
-      request_hash['MultiAZ']                    = params[:multi_az].to_s                  unless params[:multi_az].nil?  
-      request_hash['ApplyImmediately']           = params[:apply_immediately].to_s         unless params[:apply_immediately].right_blank?
+      request_hash['MasterUserPassword']         = params[:master_user_password]            unless params[:master_user_password].right_blank?
+      request_hash['DBInstanceClass']            = params[:instance_class].to_s.capitalize  unless params[:instance_class].right_blank?
+      request_hash['PreferredMaintenanceWindow'] = params[:preferred_maintenance_window]    unless params[:preferred_maintenance_window].right_blank?
+      request_hash['BackupRetentionPeriod']      = params[:backup_retention_period]         unless params[:backup_retention_period].right_blank?
+      request_hash['PreferredBackupWindow']      = params[:preferred_backup_window]         unless params[:preferred_backup_window].right_blank?
+      request_hash['AllocatedStorage']           = params[:allocated_storage]               unless params[:allocated_storage].right_blank?
+      request_hash['MultiAZ']                    = params[:multi_az].to_s                   unless params[:multi_az].nil?
+      request_hash['EngineVersion']              = params[:engine_version]                  unless params[:engine_version].right_blank?
+      request_hash['AutoMinorVersionUpgrade']    = params[:auto_minor_version_upgrade].to_s unless params[:auto_minor_version_upgrade].nil?
+      request_hash['AutoMajorVersionUpgrade']    = params[:auto_major_version_upgrade].to_s unless params[:auto_major_version_upgrade].nil?
+      request_hash['ApplyImmediately']           = params[:apply_immediately].to_s          unless params[:apply_immediately].right_blank?
       request_hash.merge!(amazonize_list('DBSecurityGroups.member',  params[:db_security_groups]))
-#      request_hash.merge!(amazonize_list('DBParameterGroups.member', params[:db_parameter_groups]))
-      request_hash['DBParameterGroupName']       = params[:db_parameter_group]             unless params[:db_parameter_group].right_blank?
+      request_hash['DBParameterGroupName']       = params[:db_parameter_group]              unless params[:db_parameter_group].right_blank?
       link = generate_request('ModifyDBInstance', request_hash)
       request_info(link, DescribeDbInstancesParser.new(:logger => @logger))[:db_instances].first
     end
@@ -451,14 +500,13 @@ module RightAws
     #
     #  TODO: this call returns an empty hash, but should be a parameter group data - ask Amazon guys.
     #
-    def create_db_parameter_group(db_parameter_group_name, db_parameter_group_description, engine='MySQL5.1', params={})
-      params['DBParameterGroupName'] = db_parameter_group_name
-      params['Description']          = db_parameter_group_description
-      params['Engine']               = engine
+    def create_db_parameter_group(db_parameter_group_name, db_parameter_group_description, db_parameter_group_family='mysql5.1', params={})
+      params['DBParameterGroupName']   = db_parameter_group_name
+      params['Description']            = db_parameter_group_description
+      params['DBParameterGroupFamily'] = db_parameter_group_family
       link = generate_request('CreateDBParameterGroup', params )
       request_info(link, DescribeDbParameterGroupsParser.new(:logger => @logger))[:db_parameter_groups].first
     end
-
 
     # Modify DBParameterGroup paramaters. Up to 20 params can be midified at once.
     #
@@ -559,7 +607,7 @@ module RightAws
       result
     end
 
-    # Describe a default parameters for the engine.
+    # Describe a default parameters for the parameter group family.
     #
     #  rds.describe_engine_default_parameters('MySQL5.1') #=>
     #    [{:is_modifiable=>true,
@@ -577,10 +625,10 @@ module RightAws
     #      :name=>"auto_increment_increment",
     #      :data_type=>"integer"}, ... ]
     #
-    def describe_engine_default_parameters(*engine, &block)
-      engine = ['MySQL5.1'] if engine.right_blank?
-      item, params = AwsUtils::split_items_and_params(engine)
-      params['Engine'] = item if item
+    def describe_engine_default_parameters(*db_parameter_group_family, &block)
+      db_parameter_group_family = ['MySQL5.1'] if db_parameter_group_family.right_blank?
+      item, params = AwsUtils::split_items_and_params(db_parameter_group_family)
+      params['DBParameterGroupFamily'] = item if item
       result = []
       incrementally_list_items('DescribeEngineDefaultParameters', DescribeDbParametersParser, params) do |response|
         result += response[:parameters]
@@ -669,7 +717,8 @@ module RightAws
     # Create a new RDS instance from a DBSnapshot. The source DBSnapshot must be
     # in the "Available" state. The new RDS instance is created with the Default security group.
     #
-    # Optional params: +:instance_class+, +:endpoint_port+, +:availability_zone+
+    # Optional params: +:instance_class+, +:endpoint_port+, +:availability_zone+, +:multi_az+,
+    # +:auto_minor_version_upgrade+
     #
     #  rds.restore_db_instance_from_db_snapshot('ahahahaha-final-snapshot-20090828081159', 'q1') #=>
     #    {:status=>"creating",
@@ -682,15 +731,17 @@ module RightAws
     #     :create_time=>"2009-08-29T18:07:01.510Z",
     #     :instance_class=>"Medium",
     #     :preferred_maintenance_window=>"Sun:05:00-Sun:09:00",
-    #     :engine=>"MySQL5.1"}
+    #     :engine=>"MySQL",
+    #     :engine_version=>"5.1.49"}
     #
     def restore_db_instance_from_db_snapshot(snapshot_aws_id, instance_aws_id, params={})
       request_hash = { 'DBSnapshotIdentifier' => snapshot_aws_id,
                        'DBInstanceIdentifier' => instance_aws_id }
-      request_hash['DBInstanceClass']  = params[:instance_class]    unless params[:instance_class].right_blank?
-      request_hash['Port']             = params[:endpoint_port]     unless params[:endpoint_port].right_blank?
-      request_hash['AvailabilityZone'] = params[:availability_zone] unless params[:availability_zone].right_blank?
-      request_hash['MultiAZ']          = params[:multi_az]          unless params[:multi_az].nil?
+      request_hash['DBInstanceClass']         = params[:instance_class]             unless params[:instance_class].right_blank?
+      request_hash['Port']                    = params[:endpoint_port]              unless params[:endpoint_port].right_blank?
+      request_hash['AvailabilityZone']        = params[:availability_zone]          unless params[:availability_zone].right_blank?
+      request_hash['MultiAZ']                 = params[:multi_az]                   unless params[:multi_az].nil?
+      request_hash['AutoMinorVersionUpgrade'] = params[:auto_minor_version_upgrade] unless params[:auto_minor_version_upgrade].nil?
       link = generate_request('RestoreDBInstanceFromDBSnapshot', request_hash)
       request_info(link, DescribeDbInstancesParser.new(:logger => @logger))[:db_instances].first
     end
@@ -699,10 +750,20 @@ module RightAws
     # database is created from the source database restore point with the same configuration as
     # the original source database, except that the new RDS instance is created with the default
     # security group.
-    def restore_db_instance_to_point_in_time(instance_aws_id, new_instance_aws_id, restore_time)
+    #
+    # Optional params: +:instance_class+, +:endpoint_port+, +:availability_zone+, +:multi_az+, +:restore_time+,
+    # +:auto_minor_version_upgrade+, +:use_latest_restorable_time+
+    #
+    def restore_db_instance_to_point_in_time(instance_aws_id, new_instance_aws_id, params={})
       request_hash = { 'SourceDBInstanceIdentifier' => instance_aws_id,
-                       'TargetDBInstanceIdentifier' => new_instance_aws_id,
-                       'RestoreTime' => restore_time}
+                       'TargetDBInstanceIdentifier' => new_instance_aws_id}
+      request_hash['UseLatestRestorableTime'] = params[:use_latest_restorable_time].to_s unless params[:use_latest_restorable_time].nil?
+      request_hash['RestoreTime']             = params[:restore_time]               unless params[:restore_time].right_blank?
+      request_hash['DBInstanceClass']         = params[:instance_class]             unless params[:instance_class].right_blank?
+      request_hash['MultiAZ']                 = params[:multi_az]                   unless params[:multi_az].nil?
+      request_hash['Port']                    = params[:endpoint_port]              unless params[:endpoint_port].right_blank?
+      request_hash['AvailabilityZone']        = params[:availability_zone]          unless params[:availability_zone].right_blank?
+      request_hash['AutoMinorVersionUpgrade'] = params[:auto_minor_version_upgrade] unless params[:auto_minor_version_upgrade].nil?
       link = generate_request('RestoreDBInstanceToPointInTime', request_hash)
       request_info(link, DescribeDbInstancesParser.new(:logger => @logger))[:db_instances].first
     end
@@ -777,6 +838,170 @@ module RightAws
     end
 
     # --------------------------------------------
+    #  DB Engine Versions
+    # --------------------------------------------
+
+    # Get a list of the available DB engines.
+    # Optional params: +:db_parameter_group_family+, +:default_only+, +:engine+, +:engine_version+
+    #
+    #  rds.describe_db_engine_versions #=>
+    #    [{:engine=>"mysql",
+    #      :db_parameter_group_family=>"mysql5.1",
+    #      :engine_version=>"5.1.45"},
+    #     {:engine=>"mysql",
+    #      :db_parameter_group_family=>"mysql5.1",
+    #      :engine_version=>"5.1.49"},
+    #     {:engine=>"mysql",
+    #      :db_parameter_group_family=>"mysql5.1",
+    #      :engine_version=>"5.1.50"}]
+    #
+    def describe_db_engine_versions(params={}, &block)
+      params = params.dup
+      params['DBParameterGroupFamily'] = params.delete(:db_parameter_group_family) unless params[:db_parameter_group_family].right_blank?
+      params['DefaultOnly']            = params.delete(:default_only).to_s         unless params[:default_only].nil?
+      params['Engine']                 = params.delete(:engine)                    unless params[:engine].right_blank?
+      params['EngineVersion']          = params.delete(:engine_version)            unless params[:engine_version].right_blank?
+      result = []
+      incrementally_list_items('DescribeDBEngineVersions', DescribeDBEngineVersionsParser, params) do |response|
+        result += response[:db_engine_versions]
+        block ? block.call(response) : true
+      end
+      result
+    end
+
+    # --------------------------------------------
+    #  DB Replicas
+    # --------------------------------------------
+
+    # Create a DB Instance that acts as a Read Replica of a source DB Instance.
+    #
+    # Optional params: +:endpoint_port+, +:availability_zone+, +:db_instance_class+, +:auto_minor_version_upgrade+
+    #
+    #    rds.create_db_instance_read_replica('kd-delete-me-01-replica-01', 'kd-delete-me-01',
+    #                                        :db_instance_class => 'db.m1.small',
+    #                                        :endpoint_port => '11000',
+    #                                        :auto_minor_version_upgrade => false ) #=>
+    #      {:auto_minor_version_upgrade=>false,
+    #       :read_replica_source_db_instance_identifier=>"kd-delete-me-01",
+    #       :status=>"creating",
+    #       :backup_retention_period=>0,
+    #       :allocated_storage=>30,
+    #       :read_replica_db_instance_identifiers=>[],
+    #       :engine_version=>"5.1.50",
+    #       :aws_id=>"kd-delete-me-01-replica-01",
+    #       :multi_az=>false,
+    #       :preferred_maintenance_window=>"sun:06:00-sun:10:00",
+    #       :master_username=>"username",
+    #       :preferred_backup_window=>"02:00-04:00",
+    #       :db_parameter_group=>{:status=>"in-sync", :name=>"default.mysql5.1"},
+    #       :engine=>"mysql",
+    #       :db_security_groups=>[{:status=>"active", :name=>"default"}],
+    #       :instance_class=>"db.m1.small",
+    #       :pending_modified_values=>{}}
+    #
+    def create_db_instance_read_replica(aws_id, source_db_instance_identifier, params={})
+      request_hash = { 'DBInstanceIdentifier'       => aws_id,
+                       'SourceDBInstanceIdentifier' => source_db_instance_identifier}
+      request_hash['Port']                    = params[:endpoint_port]                   unless params[:endpoint_port].right_blank?
+      request_hash['AvailabilityZone']        = params[:availability_zone]               unless params[:availability_zone].right_blank?
+      request_hash['DBInstanceClass']         = params[:db_instance_class]               unless params[:db_instance_class].right_blank?
+      request_hash['AutoMinorVersionUpgrade'] = params[:auto_minor_version_upgrade].to_s unless params[:auto_minor_version_upgrade].nil?
+      link = generate_request('CreateDBInstanceReadReplica', request_hash)
+      request_info(link, DescribeDbInstancesParser.new(:logger => @logger))[:db_instances].first
+    end
+
+
+    #---------------------------------------------
+    #  Reserved Instances
+    #---------------------------------------------
+
+    # Lists available reserved DB Instance offerings.
+    # Options: :aws_id, :instance_class, :duration, :product_description, :multi_az
+    #
+    #  rds.describe_reserved_db_instances_offerings #=>
+    #    [{:multi_az=>false,
+    #      :duration=>31536000,
+    #      :fixed_price=>1325.0,
+    #      :usage_price=>0.262,
+    #      :aws_id=>"248e7b75-2451-4381-9025-b5553d421c7b",
+    #      :instance_class=>"db.m2.xlarge",
+    #      :product_description=>"mysql"},
+    #     {:multi_az=>true,
+    #      :duration=>94608000,
+    #      :fixed_price=>700.0,
+    #      :usage_price=>0.092,
+    #      :aws_id=>"248e7b75-49a7-4cd7-9a9b-354f4906a9b1",
+    #      :instance_class=>"db.m1.small",
+    #      :product_description=>"mysql"}, ... ]
+    #
+    #  rds.describe_reserved_db_instances_offerings(:aws_id => "248e7b75-49a7-4cd7-9a9b-354f4906a9b1") #=>
+    #    [{:duration=>94608000,
+    #      :multi_az=>true,
+    #      :fixed_price=>700.0,
+    #      :usage_price=>0.092,
+    #      :aws_id=>"248e7b75-49a7-4cd7-9a9b-354f4906a9b1",
+    #      :instance_class=>"db.m1.small",
+    #      :product_description=>"mysql"}]
+    #
+    #  rds.describe_reserved_db_instances_offerings(:instance_class => "db.m1.small")
+    #  rds.describe_reserved_db_instances_offerings(:duration => 31536000)
+    #  rds.describe_reserved_db_instances_offerings(:product_description => 'mysql')
+    #  rds.describe_reserved_db_instances_offerings(:multi_az => true)
+    #
+    def describe_reserved_db_instances_offerings(params={}, &block)
+      params = params.dup
+      params['ReservedDBInstancesOfferingId'] = params.delete(:aws_id)              unless params[:aws_id].right_blank?
+      params['DBInstanceClass']               = params.delete(:instance_class)      unless params[:instance_class].right_blank?
+      params['Duration']                      = params.delete(:duration)            unless params[:duration].right_blank?
+      params['ProductDescription']            = params.delete(:product_description) unless params[:product_description].right_blank?
+      params['MultiAZ']                       = params.delete(:multi_az).to_s       unless params[:multi_az].nil?
+      result = []
+      incrementally_list_items('DescribeReservedDBInstancesOfferings', DescribeReservedDBInstancesOfferingsParser, params) do |response|
+        result += response[:reserved_db_instances_offerings]
+        block ? block.call(response) : true
+      end
+      result
+    end
+
+    # Returns information about reserved DB Instances for this account, or about
+    # a specified reserved DB Instance.
+    # Options: :aws_id, :offering_aws_id, :instance_class, :duration, :product_description, :multi_az
+    #
+    #  rds.describe_reserved_db_instances
+    #  rds.describe_reserved_db_instances(:aws_id => "myreservedinstance")
+    #  rds.describe_reserved_db_instances(:offering_aws_id => "248e7b75-49a7-4cd7-9a9b-354f4906a9b1")
+    #  rds.describe_reserved_db_instances(:instance_class => "db.m1.small")
+    #  rds.describe_reserved_db_instances(:duration => 31536000)
+    #  rds.describe_reserved_db_instances(:product_description => 'mysql')
+    #  rds.describe_reserved_db_instances_offerings(:multi_az => true)
+    #
+    def describe_reserved_db_instances(params={}, &block)
+      params = params.dup
+      params['ReservedDBInstancesId']         = params.delete(:aws_id)              unless params[:aws_id].right_blank?
+      params['ReservedDBInstancesOfferingId'] = params.delete(:offering_aws_id)     unless params[:offering_aws_id].right_blank?
+      params['DBInstanceClass']               = params.delete(:instance_class)      unless params[:instance_class].right_blank?
+      params['Duration']                      = params.delete(:duration)            unless params[:duration].right_blank?
+      params['ProductDescription']            = params.delete(:product_description) unless params[:product_description].right_blank?
+      params['MultiAZ']                       = params.delete(:multi_az).to_s       unless params[:multi_az].nil?
+      result = []
+      incrementally_list_items('DescribeReservedDBInstances', DescribeReservedDBInstancesParser, params) do |response|
+        result += response[:reserved_db_instances]
+        block ? block.call(response) : true
+      end
+      result
+    end
+
+    # Purchases a reserved DB Instance offering.
+    # Options: :aws_id, :count
+    def purchase_reserved_db_instances_offering(offering_aws_id, params={})
+      request_hash = { 'ReservedDBInstancesOfferingId' => offering_aws_id }
+      request_hash['ReservedDBInstanceId'] = params[:aws_id] unless params[:aws_id].right_blank?
+      request_hash['DBInstanceCount']      = params[:count]  unless params[:count].right_blank?
+      link = generate_request('PurchaseReservedDBInstancesOffering', request_hash)
+      request_info(link, DescribeReservedDBInstancesParser.new(:logger => @logger))[:reserved_db_instances].first
+    end
+    
+    # --------------------------------------------
     #  Parsers
     # --------------------------------------------
 
@@ -786,59 +1011,60 @@ module RightAws
 
     class DescribeDbInstancesParser < RightAWSParser # :nodoc:
       def reset
-        @m = [ 'DBInstance',
-               'CreateDBInstanceResult',
-               'DeleteDBInstanceResult',
-               'ModifyDBInstanceResult',
-               'RebootDBInstanceResult',
-               'RestoreDBInstanceToPointInTimeResponse',
-               'RestoreDBInstanceFromDBSnapshotResult' ]
         @result = { :db_instances => [] }
       end
       def tagstart(name, attributes)
         case name
-          when *@m               then @db_instance = { :db_security_groups => [], 
-                                                       :pending_modified_values => {} }
-          when 'DBSecurityGroup' then @db_security_group = {}
-          when 'DBParameterGroup', 'DBParameterGroupStatus' then @db_parameter_group = {}
+        when 'DBInstance'             then @item = { :db_security_groups => [], :pending_modified_values => {}, :read_replica_db_instance_identifiers => [] }
+        when 'DBSecurityGroup'        then @db_security_group = {}
+        when 'DBParameterGroup',
+             'DBParameterGroupStatus' then @db_parameter_group = {}
         end
       end
       def tagend(name)
         case name
-        when 'Marker'                     then @result[:marker]       = @text
-        when 'MaxRecords'                 then @result[:max_records]  = @text.to_i
-        when 'DBInstanceIdentifier'       then @db_instance[:aws_id]               = @text
-        when 'DBName'                     then @db_instance[:name]                 = @text  # ? is this one used?
-        when 'InstanceCreateTime'         then @db_instance[:create_time]          = @text
-        when 'Engine'                     then @db_instance[:engine]               = @text
-        when 'DBInstanceStatus'           then @db_instance[:status]               = @text
-        when 'AllocatedStorage'           then @db_instance[:allocated_storage]    = @text.to_i
-        when 'Port'                       then @db_instance[:endpoint_port]        = @text.to_i
-        when 'Address'                    then @db_instance[:endpoint_address]     = @text
-        when 'MasterUsername'             then @db_instance[:master_username]      = @text
-        when 'AvailabilityZone'           then @db_instance[:availability_zone]    = @text
-        when 'MultiAZ'                    then @db_instance[:multi_az]             = (@text == 'true')      
-        when 'PreferredMaintenanceWindow' then @db_instance[:preferred_maintenance_window] = @text
-        when 'BackupRetentionPeriod'      then @db_instance[:backup_retention_period] = @text
-        when 'PreferredBackupWindow'      then @db_instance[:preferred_backup_window] = @text
-        when 'LatestRestorableTime'       then @db_instance[:latest_restorable_time]
-        when 'DBSecurityGroupName'        then @db_security_group[:name]   = @text
-        when 'Status'                     then @db_security_group[:status] = @text
-        when 'DBParameterGroupName'       then @db_parameter_group[:name]   = @text
-        when 'ParameterApplyStatus'       then @db_parameter_group[:status] = @text
-        when 'DBSecurityGroup'            then @db_instance[:db_security_groups] << @db_security_group
-        when 'DBParameterGroup','DBParameterGroupStatus'
-          @db_instance[:db_parameter_group] = @db_parameter_group
-        when *@m                          then @result[:db_instances]            << @db_instance
+        when 'Marker'                                then @result[:marker]               = @text
+        when 'MaxRecords'                            then @result[:max_records]          = @text.to_i
+        when 'DBInstanceIdentifier'                  then @item[:aws_id]                 = @text
+        when 'InstanceCreateTime'                    then @item[:create_time]            = @text
+        when 'Engine'                                then @item[:engine]                 = @text
+        when 'DBInstanceStatus'                      then @item[:status]                 = @text
+        when 'Address'                               then @item[:endpoint_address]       = @text
+        when 'Port'                                  then @item[:endpoint_port]          = @text.to_i
+        when 'MasterUsername'                        then @item[:master_username]        = @text
+        when 'AvailabilityZone'                      then @item[:availability_zone]      = @text
+        when 'LatestRestorableTime'                  then @item[:latest_restorable_time] = @text
+        when 'ReadReplicaSourceDBInstanceIdentifier' then @item[:read_replica_source_db_instance_identifier] = @text
+        when 'ReadReplicaDBInstanceIdentifier'       then @item[:read_replica_db_instance_identifiers]      << @text
+        when 'DBSecurityGroupName'                   then @db_security_group[:name]             = @text
+        when 'Status'                                then @db_security_group[:status]           = @text
+        when 'DBParameterGroupName'                  then @db_parameter_group[:name]            = @text
+        when 'ParameterApplyStatus'                  then @db_parameter_group[:status]          = @text
+        when 'DBSecurityGroup'                       then @item[:db_security_groups] << @db_security_group
+        when 'DBParameterGroup',
+             'DBParameterGroupStatus'                then @item[:db_parameter_group] = @db_parameter_group
+        when 'DBInstance'                            then @result[:db_instances]            << @item
         else
           case full_tag_name
-          when %r{PendingModifiedValues/DBInstanceClass$}       then @db_instance[:pending_modified_values][:instance_class]          = @text
-          when %r{PendingModifiedValues/AllocatedStorage$}      then @db_instance[:pending_modified_values][:allocated_storage]       = @text
-          when %r{PendingModifiedValues/MasterUserPassword$}    then @db_instance[:pending_modified_values][:master_user_password]    = @text
-          when %r{PendingModifiedValues/MultiAZ$}               then @db_instance[:pending_modified_values][:multi_az]                = @text
-          when %r{PendingModifiedValues/Port$}                  then @db_instance[:pending_modified_values][:endpoint_port]           = @text
-          when %r{PendingModifiedValues/BackupRetentionPeriod$} then @db_instance[:pending_modified_values][:backup_retention_period] = @text
-          when %r{DBInstance/DBInstanceClass$}                  then @db_instance[:instance_class]                                    = @text
+          when %r{DBInstance/DBInstanceClass$}                       then @item[:instance_class]               = @text
+          when %r{DBInstance/AllocatedStorage$}                      then @item[:allocated_storage]            = @text.to_i
+          when %r{DBInstance/MultiAZ$}                               then @item[:multi_az]                     = (@text == 'true')
+          when %r{DBInstance/BackupRetentionPeriod$}                 then @item[:backup_retention_period]      = @text.to_i
+          when %r{DBInstance/PreferredMaintenanceWindow$}            then @item[:preferred_maintenance_window] = @text
+          when %r{DBInstance/PreferredBackupWindow$}                 then @item[:preferred_backup_window]      = @text
+          when %r{DBInstance/EngineVersion$}                         then @item[:engine_version]               = @text
+          when %r{DBInstance/AutoMinorVersionUpgrade$}               then @item[:auto_minor_version_upgrade]   = (@text == 'true')
+          when %r{DBInstance/AllowMajorVersionUpgrade$}              then @item[:auto_major_version_upgrade]   = (@text == 'true')
+          when %r{PendingModifiedValues/DBInstanceClass$}            then @item[:pending_modified_values][:instance_class]               = @text
+          when %r{PendingModifiedValues/AllocatedStorage$}           then @item[:pending_modified_values][:allocated_storage]            = @text.to_i
+          when %r{PendingModifiedValues/MasterUserPassword$}         then @item[:pending_modified_values][:master_user_password]         = @text
+          when %r{PendingModifiedValues/MultiAZ$}                    then @item[:pending_modified_values][:multi_az]                     = (@text == 'true')
+          when %r{PendingModifiedValues/BackupRetentionPeriod$}      then @item[:pending_modified_values][:backup_retention_period]      = @text.to_i
+          when %r{PendingModifiedValues/PreferredMaintenanceWindow$} then @item[:pending_modified_values][:preferred_maintenance_window] = @text
+          when %r{PendingModifiedValues/PreferredBackupWindow$}      then @item[:pending_modified_values][:preferred_backup_window]      = @text
+          when %r{PendingModifiedValues/EngineVersion$}              then @item[:pending_modified_values][:engine_version]               = @text
+          when %r{PendingModifiedValues/AutoMinorVersionUpgrade$}    then @item[:pending_modified_values][:auto_minor_version_upgrade]   = (@text == 'true')
+          when %r{PendingModifiedValues/AllowMajorVersionUpgrade$}   then @item[:pending_modified_values][:auto_major_version_upgrade]   = (@text == 'true')
           end
         end
       end
@@ -850,41 +1076,37 @@ module RightAws
 
     class DescribeDbSecurityGroupsParser < RightAWSParser # :nodoc:
       def reset
-        @m = [ 'DBSecurityGroup',
-               'CreateDBSecurityGroupResult',
-               'AuthorizeDBSecurityGroupIngressResult',
-               'RevokeDBSecurityGroupIngressResult' ]
         @result = { :db_security_groups => [] }
       end
       def tagstart(name, attributes)
         case name
-          when *@m                then @item     = { :ec2_security_groups => [], :ip_ranges => [] }
-          when 'IPRange'          then @ip_range = {}
-          when 'EC2SecurityGroup' then @ec2_security_group = {}
+        when 'DBSecurityGroup'  then @item               = { :ec2_security_groups => [], :ip_ranges => [] }
+        when 'IPRange'          then @ip_range           = {}
+        when 'EC2SecurityGroup' then @ec2_security_group = {}
         end
       end
       def tagend(name)
         case name
-        when 'Marker'                     then @result[:marker]       = @text
-        when 'MaxRecords'                 then @result[:max_records]  = @text.to_i
-        when 'DBSecurityGroupDescription' then @item[:description] = @text
-        when 'OwnerId'                    then @item[:owner_id]    = @text
-        when 'DBSecurityGroupName'        then @item[:name]        = @text
-        when 'Status'
-          case @xmlpath
-          when /IPRange$/          then @ip_range[:status] = @text
-          when /EC2SecurityGroup$/ then @ec2_security_group[:status] = @text
-          end
-        when 'EC2SecurityGroupName'    then @ec2_security_group[:name]     = @text
-        when 'EC2SecurityGroupOwnerId' then @ec2_security_group[:owner_id] = @text
-        when 'CIDRIP'                  then @ip_range[:cidrip]             = @text
-        when 'IPRange'                 then @item[:ip_ranges]           << @ip_range
-        when 'EC2SecurityGroup'        then @item[:ec2_security_groups] << @ec2_security_group
-        when *@m
+        when 'Marker'                     then @result[:marker]               = @text
+        when 'MaxRecords'                 then @result[:max_records]          = @text.to_i
+        when 'DBSecurityGroupDescription' then @item[:description ]           = @text
+        when 'OwnerId'                    then @item[:owner_id]               = @text
+        when 'DBSecurityGroupName'        then @item[:name]                   = @text
+        when 'EC2SecurityGroupName'       then @ec2_security_group[:name]     = @text
+        when 'EC2SecurityGroupOwnerId'    then @ec2_security_group[:owner_id] = @text
+        when 'CIDRIP'                     then @ip_range[:cidrip]             = @text
+        when 'IPRange'                    then @item[:ip_ranges]             << @ip_range
+        when 'EC2SecurityGroup'           then @item[:ec2_security_groups]   << @ec2_security_group
+        when 'DBSecurityGroup'
           # Sort the ip_ranges and ec2_security_groups
           @item[:ip_ranges].sort!{ |i1,i2| "#{i1[:cidrip]}" <=> "#{i2[:cidrip]}" }
           @item[:ec2_security_groups].sort!{ |i1,i2| "#{i1[:owner_id]}#{i1[:name]}" <=> "#{i2[:owner_id]}#{i2[:name]}" }
           @result[:db_security_groups] << @item
+        else
+          case full_tag_name
+          when %r{IPRange/Status$}          then @ip_range[:status]           = @text
+          when %r{EC2SecurityGroup/Status$} then @ec2_security_group[:status] = @text
+          end
         end
       end
     end
@@ -895,22 +1117,23 @@ module RightAws
 
     class DescribeDbParameterGroupsParser < RightAWSParser # :nodoc:
       def reset
-        @m = [ 'DBParameterGroup', 'CreateDBParameterGroupResult', 'ModifyDBParameterGroupResult' ]
         @result = { :db_parameter_groups => [] }
       end
       def tagstart(name, attributes)
         case name
-          when *@m then @item = { }
+        when 'DBParameterGroup',
+             'ModifyDBParameterGroupResult' then @item = { }
         end
       end
       def tagend(name)
         case name
-        when 'Marker'               then @result[:marker]       = @text
-        when 'MaxRecords'           then @result[:max_records]  = @text.to_i
-        when 'DBParameterGroupName' then @item[:name]        = @text
-        when 'Description'          then @item[:description] = @text
-        when 'Engine'               then @item[:engine]      = @text
-        when *@m                    then @result[:db_parameter_groups] << @item
+        when 'Marker'                 then @result[:marker]       = @text
+        when 'MaxRecords'             then @result[:max_records]  = @text.to_i
+        when 'DBParameterGroupName'   then @item[:name]           = @text
+        when 'Description'            then @item[:description]    = @text
+        when 'DBParameterGroupFamily' then @item[:db_parameter_group_family] = @text
+        when 'DBParameterGroup',
+             'ModifyDBParameterGroupResult' then @result[:db_parameter_groups] << @item
         end
       end
     end
@@ -921,24 +1144,24 @@ module RightAws
       end
       def tagstart(name, attributes)
         case name
-          when 'Parameter' then @item = {}
+        when 'Parameter' then @item = {}
         end
       end
       def tagend(name)
         case name
         when 'Marker'               then @result[:marker]       = @text
         when 'MaxRecords'           then @result[:max_records]  = @text.to_i
-        when 'DBParameterGroupName' then @result[:group_name]   = @text # DescribeDbParametersResponse
-        when 'Engine'               then @result[:engine]       = @text # DescribeDBEngineDefaultParametersResponse
-        when 'DataType'      then @item[:data_type]     = @text
-        when 'Source'        then @item[:source]        = @text
-        when 'Description'   then @item[:description]   = @text
-        when 'IsModifiable'  then @item[:is_modifiable] = @text[/true/] ? true : false
-        when 'ApplyType'     then @item[:apply_type]     = @text
-        when 'AllowedValues' then @item[:allowed_values] = @text
-        when 'ParameterName' then @item[:name]           = @text
-        when 'ParameterValue' then @item[:value]         = @text
-        when 'Parameter'     then @result[:parameters] << @item
+        when 'DBParameterGroupName'   then @result[:group_name]                = @text # DescribeDbParametersResponse
+        when 'DBParameterGroupFamily' then @result[:db_parameter_group_family] = @text # DescribeDBEngineDefaultParametersResponse
+        when 'DataType'             then @item[:data_type]      = @text
+        when 'Source'               then @item[:source]         = @text
+        when 'Description'          then @item[:description]    = @text
+        when 'IsModifiable'         then @item[:is_modifiable]  = (@text == 'true')
+        when 'ApplyType'            then @item[:apply_type]     = @text
+        when 'AllowedValues'        then @item[:allowed_values] = @text
+        when 'ParameterName'        then @item[:name]           = @text
+        when 'ParameterValue'       then @item[:value]          = @text
+        when 'Parameter'            then @result[:parameters]  << @item
         end
       end
     end
@@ -949,30 +1172,29 @@ module RightAws
 
     class DescribeDbSnapshotsParser < RightAWSParser # :nodoc:
       def reset
-        @m = ['DBSnapshot', 'CreateDBSnapshotResult', 'DeleteDBSnapshotResult']
         @result = { :db_snapshots => [] }
       end
       def tagstart(name, attributes)
         case name
-          when *@m
-            @db_snapshot = {}
+        when 'DBSnapshot' then @item = {}
         end
       end
       def tagend(name)
         case name
-        when 'Marker'               then @result[:marker]            = @text
-        when 'MaxRecords'           then @result[:max_records]       = @text.to_i  # ?
-        when 'Engine'               then @db_snapshot[:engine]               = @text
-        when 'InstanceCreateTime'   then @db_snapshot[:instance_create_time] = @text
-        when 'Port'                 then @db_snapshot[:endpoint_port]        = @text.to_i
-        when 'Status'               then @db_snapshot[:status]               = @text
-        when 'AvailabilityZone'     then @db_snapshot[:availability_zone]    = @text
-        when 'MasterUsername'       then @db_snapshot[:master_username]      = @text
-        when 'AllocatedStorage'     then @db_snapshot[:allocated_storage]    = @text.to_i
-        when 'SnapshotCreateTime'   then @db_snapshot[:create_time]          = @text
-        when 'DBInstanceIdentifier' then @db_snapshot[:instance_aws_id]      = @text
-        when 'DBSnapshotIdentifier' then @db_snapshot[:aws_id]               = @text
-        when *@m                    then @result[:db_snapshots]               << @db_snapshot
+        when 'Marker'               then @result[:marker]             = @text
+        when 'MaxRecords'           then @result[:max_records]        = @text.to_i  # ?
+        when 'Engine'               then @item[:engine]               = @text
+        when 'EngineVersion'        then @item[:engine_version]       = @text
+        when 'InstanceCreateTime'   then @item[:instance_create_time] = @text
+        when 'Port'                 then @item[:endpoint_port]        = @text.to_i
+        when 'Status'               then @item[:status]               = @text
+        when 'AvailabilityZone'     then @item[:availability_zone]    = @text
+        when 'MasterUsername'       then @item[:master_username]      = @text
+        when 'AllocatedStorage'     then @item[:allocated_storage]    = @text.to_i
+        when 'SnapshotCreateTime'   then @item[:create_time]          = @text
+        when 'DBInstanceIdentifier' then @item[:instance_aws_id]      = @text
+        when 'DBSnapshotIdentifier' then @item[:aws_id]               = @text
+        when 'DBSnapshot'           then @result[:db_snapshots]      << @item
         end
       end
     end
@@ -987,18 +1209,99 @@ module RightAws
       end
       def tagstart(name, attributes)
         case name
-          when 'Event' then @event = {}
+        when 'Event' then @item = {}
         end
       end
       def tagend(name)
         case name
         when 'Marker'           then @result[:marker]       = @text
         when 'MaxRecords'       then @result[:max_records]  = @text.to_i  # ?
-        when 'Date'             then @event[:date]          = @text
-        when 'SourceIdentifier' then @event[:aws_id]        = @text
-        when 'SourceType'       then @event[:source_type]   = @text
-        when 'Message'          then @event[:message]       = @text
-        when 'Event'            then @result[:events]      << @event
+        when 'Date'             then @item[:date]           = @text
+        when 'SourceIdentifier' then @item[:aws_id]         = @text
+        when 'SourceType'       then @item[:source_type]    = @text
+        when 'Message'          then @item[:message]        = @text
+        when 'Event'            then @result[:events]      << @item
+        end
+      end
+    end
+
+    # --------------------------------------------
+    #  DB Events
+    # --------------------------------------------
+
+    class DescribeDBEngineVersionsParser < RightAWSParser # :nodoc:
+      def reset
+        @result = { :db_engine_versions => [] }
+      end
+      def tagstart(name, attributes)
+        case name
+        when 'DBEngineVersion' then @item = {}
+        end
+      end
+      def tagend(name)
+        case name
+        when 'Marker'                 then @result[:marker]                  = @text
+        when 'MaxRecords'             then @result[:max_records]             = @text.to_i
+        when 'DBParameterGroupFamily' then @item[:db_parameter_group_family] = @text
+        when 'Engine'                 then @item[:engine]                    = @text
+        when 'EngineVersion'          then @item[:engine_version]            = @text
+        when 'DBEngineVersion'        then @result[:db_engine_versions]     << @item
+        end
+      end
+    end
+
+    # --------------------------------------------
+    #  DB Reserved Instances
+    # --------------------------------------------
+
+    class DescribeReservedDBInstancesOfferingsParser < RightAWSParser # :nodoc:
+      def reset
+        @result = { :reserved_db_instances_offerings => [] }
+      end
+      def tagstart(name, attributes)
+        case name
+        when 'ReservedDBInstancesOffering' then @item = {}
+        end
+      end
+      def tagend(name)
+        case name
+        when 'Marker'                        then @result[:marker]            = @text
+        when 'MaxRecords'                    then @result[:max_records]       = @text.to_i
+        when 'DBInstanceClass'               then @item[:instance_class]      = @text
+        when 'Duration'                      then @item[:duration]            = @text.to_i
+        when 'FixedPrice'                    then @item[:fixed_price]         = @text.to_f
+        when 'UsagePrice'                    then @item[:usage_price]         = @text.to_f
+        when 'MultiAZ'                       then @item[:multi_az]            = (@text == 'true')
+        when 'ProductDescription'            then @item[:product_description] = @text
+        when 'ReservedDBInstancesOfferingId' then @item[:aws_id]              = @text
+        when 'ReservedDBInstancesOffering'   then @result[:reserved_db_instances_offerings] << @item
+        end
+      end
+    end
+
+    class DescribeReservedDBInstancesParser < RightAWSParser # :nodoc:
+      def reset
+        @result = { :reserved_db_instances => [] }
+      end
+      def tagstart(name, attributes)
+        case name
+        when 'ReservedDBInstance' then @item = {}
+        end
+      end
+      def tagend(name)
+        case name
+        when 'Marker'                        then @result[:marker]            = @text
+        when 'MaxRecords'                    then @result[:max_records]       = @text.to_i
+        when 'DBInstanceClass'               then @item[:instance_class]      = @text
+        when 'Duration'                      then @item[:duration]            = @text.to_i
+        when 'FixedPrice'                    then @item[:fixed_price]         = @text.to_f
+        when 'UsagePrice'                    then @item[:usage_price]         = @text.to_f
+        when 'MultiAZ'                       then @item[:multi_az]            = (@text == 'true')
+        when 'ProductDescription'            then @item[:product_description] = @text
+        when 'ReservedDBInstancesOfferingId' then @item[:offering_aws_id]     = @text
+        when 'ReservedDBInstanceId'          then @item[:aws_id]              = @text
+        when 'State'                         then @item[:state]               = @text
+        when 'ReservedDBInstance'            then @result[:reserved_db_instances] << @item
         end
       end
     end
