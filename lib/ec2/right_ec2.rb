@@ -161,6 +161,21 @@ module RightAws
       on_exception
     end
       
+      # Import new SSH key. Returns a hash of the key's data or an exception.
+      #
+      #  ec2.import_key_pair('my_awesome_key', 'C:\keys\myfavoritekeypair_public.ppk') #=>
+      #    {:aws_key_name    => "my_awesome_key",
+      #     :aws_fingerprint => "01:02:03:f4:25:e6:97:e8:9b:02:1a:26:32:4e:58:6b:7a:8c:9f:03"}
+      #
+    def import_key_pair(name, key_file)
+      link = generate_request("ImportKeyPair",
+                              'KeyName' => name.to_s,
+                              'PublicKeyFile' => key_file.to_s)
+      request_info(link, QEc2ImportKeyPairParser.new(:logger => @logger))
+    rescue Exception
+      on_exception
+    end
+
       # Create new SSH key. Returns a hash of the key's data or an exception.
       #
       #  ec2.create_key_pair('my_awesome_key') #=>
@@ -169,7 +184,7 @@ module RightAws
       #     :aws_material    => "-----BEGIN RSA PRIVATE KEY-----\nMIIEpQIBAAK...Q8MDrCbuQ=\n-----END RSA PRIVATE KEY-----"}
       #
     def create_key_pair(name)
-      link = generate_request("CreateKeyPair", 
+      link = generate_request("CreateKeyPair",
                               'KeyName' => name.to_s)
       request_info(link, QEc2CreateKeyPairParser.new(:logger => @logger))
     rescue Exception
@@ -328,6 +343,18 @@ module RightAws
           when 'keyName'        then @result[:aws_key_name]    = @text
           when 'keyFingerprint' then @result[:aws_fingerprint] = @text
           when 'keyMaterial'    then @result[:aws_material]    = @text
+        end
+      end
+    end
+
+    class QEc2ImportKeyPairParser < RightAWSParser #:nodoc:
+      def tagstart(name, attributes)
+        @result = {} if name == 'ImportKeyPairResponse'
+      end
+      def tagend(name)
+        case name
+          when 'keyName'        then @result[:aws_key_name]    = @text
+          when 'keyFingerprint' then @result[:aws_fingerprint] = @text
         end
       end
     end
