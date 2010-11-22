@@ -198,7 +198,7 @@ module RightAws
       request_hash['AllocatedStorage'] = params[:allocated_storage].right_blank? ? 25            : params[:allocated_storage]
       request_hash['Engine']           = params[:engine].right_blank?            ? 'MySQL5.1'    : params[:engine]
       # Optional
-      request_hash['EndpointPort']               = params[:endpoint_port]                unless params[:endpoint_port].right_blank?
+      request_hash['Port']                       = params[:endpoint_port]                unless params[:endpoint_port].right_blank?
       request_hash['DBName']                     = params[:db_name]                      unless params[:db_name].right_blank?
       request_hash['AvailabilityZone']           = params[:availability_zone]            unless params[:availability_zone].right_blank?
       request_hash['MultiAZ']                    = params[:multi_az].to_s                unless params[:multi_az].nil?  
@@ -688,8 +688,9 @@ module RightAws
       request_hash = { 'DBSnapshotIdentifier' => snapshot_aws_id,
                        'DBInstanceIdentifier' => instance_aws_id }
       request_hash['DBInstanceClass']  = params[:instance_class]    unless params[:instance_class].right_blank?
-      request_hash['EndpointPort']     = params[:endpoint_port]     unless params[:endpoint_port].right_blank?
+      request_hash['Port']             = params[:endpoint_port]     unless params[:endpoint_port].right_blank?
       request_hash['AvailabilityZone'] = params[:availability_zone] unless params[:availability_zone].right_blank?
+      request_hash['MultiAZ']          = params[:multi_az]          unless params[:multi_az].nil?
       link = generate_request('RestoreDBInstanceFromDBSnapshot', request_hash)
       request_info(link, DescribeDbInstancesParser.new(:logger => @logger))[:db_instances].first
     end
@@ -820,12 +821,7 @@ module RightAws
         when 'PreferredMaintenanceWindow' then @db_instance[:preferred_maintenance_window] = @text
         when 'BackupRetentionPeriod'      then @db_instance[:backup_retention_period] = @text
         when 'PreferredBackupWindow'      then @db_instance[:preferred_backup_window] = @text
-        when 'DBInstanceClass'
-          case @xmlpath
-          when /PendingModifiedValues$/ then @db_instance[:pending_modified_values][:instance_class] = @text
-          else                               @db_instance[:instance_class] = @text
-          end
-        when 'MasterUserPassword'         then @db_instance[:pending_modified_values][:master_user_password] = @text
+        when 'LatestRestorableTime'       then @db_instance[:latest_restorable_time]
         when 'DBSecurityGroupName'        then @db_security_group[:name]   = @text
         when 'Status'                     then @db_security_group[:status] = @text
         when 'DBParameterGroupName'       then @db_parameter_group[:name]   = @text
@@ -834,6 +830,16 @@ module RightAws
         when 'DBParameterGroup','DBParameterGroupStatus'
           @db_instance[:db_parameter_group] = @db_parameter_group
         when *@m                          then @result[:db_instances]            << @db_instance
+        else
+          case full_tag_name
+          when %r{PendingModifiedValues/DBInstanceClass$}       then @db_instance[:pending_modified_values][:instance_class]          = @text
+          when %r{PendingModifiedValues/AllocatedStorage$}      then @db_instance[:pending_modified_values][:allocated_storage]       = @text
+          when %r{PendingModifiedValues/MasterUserPassword$}    then @db_instance[:pending_modified_values][:master_user_password]    = @text
+          when %r{PendingModifiedValues/MultiAZ$}               then @db_instance[:pending_modified_values][:multi_az]                = @text
+          when %r{PendingModifiedValues/Port$}                  then @db_instance[:pending_modified_values][:endpoint_port]           = @text
+          when %r{PendingModifiedValues/BackupRetentionPeriod$} then @db_instance[:pending_modified_values][:backup_retention_period] = @text
+          when %r{DBInstance/DBInstanceClass$}                  then @db_instance[:instance_class]                                    = @text
+          end
         end
       end
     end
@@ -958,7 +964,7 @@ module RightAws
         when 'MaxRecords'           then @result[:max_records]       = @text.to_i  # ?
         when 'Engine'               then @db_snapshot[:engine]               = @text
         when 'InstanceCreateTime'   then @db_snapshot[:instance_create_time] = @text
-        when 'EndpointPort'         then @db_snapshot[:endpoint_port]        = @text.to_i
+        when 'Port'                 then @db_snapshot[:endpoint_port]        = @text.to_i
         when 'Status'               then @db_snapshot[:status]               = @text
         when 'AvailabilityZone'     then @db_snapshot[:availability_zone]    = @text
         when 'MasterUsername'       then @db_snapshot[:master_username]      = @text

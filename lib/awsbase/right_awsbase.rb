@@ -136,6 +136,24 @@ module RightAws
       params = items.last.kind_of?(Hash) ? items.pop : {}
       [items, params]
     end
+
+    # Generates a token in format of:
+    #  1. "1dd8d4e4-db6b-11df-b31d-0025b37efad0 (if UUID gem is loaded)
+    #  2. "1287483761-855215-zSv2z-bWGj2-31M5t-ags9m" (if UUID gem is not loaded)
+    TOKEN_GENERATOR_CHARSET = ('a'..'z').to_a + ('A'..'Z').to_a + ('0'..'9').to_a
+    def self.generate_unique_token
+      if defined?(UUID)
+        token = (UUID::VERSION::STRING < '2.0.0' ? UUID : UUIDTools::UUID).timestamp_create().to_s
+      else
+        time  = Time.now
+        token = "%d-%06d" % [time.to_i, time.usec]
+        4.times do
+          token << "-"
+          5.times { token << TOKEN_GENERATOR_CHARSET[rand(TOKEN_GENERATOR_CHARSET.size)] }
+        end
+      end
+      token
+    end
   end
 
   class AwsBenchmarkingBlock #:nodoc:
@@ -518,6 +536,9 @@ module RightAws
     end
 
     # Format array of items into Amazons handy hash ('?' is a place holder):
+    # Options:
+    #   :default => "something"   : Set a value to "something" when it is nil
+    #   :default => :skip_nils    : Skip nil values
     #
     #  amazonize_list('Item', ['a', 'b', 'c']) =>
     #    { 'Item.1' => 'a', 'Item.2' => 'b', 'Item.3' => 'c' }
@@ -541,7 +562,7 @@ module RightAws
     #     "Filter.2.Key"=>"B",
     #     "Filter.2.Value.1"=>"ba",
     #     "Filter.2.Value.2"=>"bb"}
-    def amazonize_list(masks, list) #:nodoc:
+    def amazonize_list(masks, list, options={}) #:nodoc:
       groups = {}
       Array(list).each_with_index do |list_item, i|
         Array(masks).each_with_index do |mask, mask_idx|
@@ -549,8 +570,12 @@ module RightAws
           key.sub!('?', (i+1).to_s)
           value = Array(list_item)[mask_idx]
           if value.is_a?(Array)
-            groups.merge!(amazonize_list(key, value))
+            groups.merge!(amazonize_list(key, value, options))
           else
+            if value.nil?
+              next if options[:default] == :skip_nils
+              value = options[:default]
+            end
             groups[key] = value
           end
         end

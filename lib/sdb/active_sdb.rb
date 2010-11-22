@@ -21,13 +21,6 @@
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
-begin
-  require 'uuidtools'
-rescue LoadError => e
-  STDERR.puts("RightSDB requires the uuidtools gem.  Run \'gem install uuidtools\' and try again.")
-  exit
-end
-
 module RightAws
 
   # = RightAws::ActiveSdb -- RightScale SDB interface (alpha release)
@@ -441,11 +434,7 @@ module RightAws
         end
 
         def generate_id # :nodoc:
-          if UUID::VERSION::STRING < '2.0.0'
-            UUID.timestamp_create().to_s
-          else
-            UUIDTools::UUID.timestamp_create().to_s
-          end
+          AwsUtils::generate_unique_token
         end
 
       protected
