@@ -167,10 +167,10 @@ module RightAws
       #    {:aws_key_name    => "my_awesome_key",
       #     :aws_fingerprint => "01:02:03:f4:25:e6:97:e8:9b:02:1a:26:32:4e:58:6b:7a:8c:9f:03"}
       #
-    def import_key_pair(name, key_file)
+    def import_key_pair(name, encoded_key_material)
       link = generate_request("ImportKeyPair",
                               'KeyName' => name.to_s,
-                              'PublicKeyFile' => key_file.to_s)
+                              'PublicKeyMaterial' => encoded_key_material.to_s)
       request_info(link, QEc2ImportKeyPairParser.new(:logger => @logger))
     rescue Exception
       on_exception
