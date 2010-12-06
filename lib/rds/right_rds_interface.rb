@@ -51,7 +51,6 @@ module RightAws
     # * <tt>:server</tt>: RDS service host, default: DEFAULT_HOST
     # * <tt>:port</tt>: RDS service port, default: DEFAULT_PORT
     # * <tt>:protocol</tt>: 'http' or 'https', default: DEFAULT_PROTOCOL
-    # * <tt>:multi_thread</tt>: true=HTTP connection per thread, false=per process
     # * <tt>:logger</tt>: for log messages, default: RAILS_DEFAULT_LOGGER else STDOUT
     #
     #  rds = RightAws::RdsInterface.new('xxxxxxxxxxxxxxxxxxxxx','xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',

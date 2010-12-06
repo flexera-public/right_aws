@@ -107,7 +107,6 @@ module RightAws
     # * <tt>:region</tt>: EC2 region (North America by default)
     # * <tt>:port</tt>: EC2 service port, default: DEFAULT_PORT
     # * <tt>:protocol</tt>: 'http' or 'https', default: DEFAULT_PROTOCOL
-    # * <tt>:multi_thread</tt>: true=HTTP connection per thread, false=per process
     # * <tt>:logger</tt>: for log messages, default: RAILS_DEFAULT_LOGGER else STDOUT
     # * <tt>:signature_version</tt>:  The signature version : '0','1' or '2'(default)
     # * <tt>:cache</tt>: true/false: caching for: ec2_describe_images, describe_instances,

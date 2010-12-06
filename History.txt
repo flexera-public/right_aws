@@ -294,6 +294,8 @@ the source key.
       - Tags Suport
       - ClientToken support added on instance launch
     - RDS: API "2010-07-28"
+    - ELB: API '2010-07-01' (SSL support)
+    - IAM: API '2010-05-08' (AWS Identity and Access Management interface)
     - 301 Redirect support added
   - Removed:
     - ActiveSupport dependency

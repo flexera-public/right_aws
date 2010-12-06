@@ -49,13 +49,12 @@ module RightAws
     #      :port         => 443                  # Amazon service port: 80 or 443(default)
     #      :protocol     => 'https'              # Amazon service protocol: 'http' or 'https'(default)
     #      :signature_version => '0'             # The signature version : '0','1 or '2'(default)
-    #      :multi_thread => true|false           # Multi-threaded (connection per each thread): true or false(default)
     #      :logger       => Logger Object        # Logger instance: logs to STDOUT if omitted 
     #      :nil_representation => 'mynil'}       # interpret Ruby nil as this string value; i.e. use this string in SDB to represent Ruby nils (default is the string 'nil')
     #      
     # Example:
     # 
-    #  sdb = RightAws::SdbInterface.new('1E3GDYEOGFJPIT7XXXXXX','hgTHt68JY07JKUY08ftHYtERkjgtfERn57XXXXXX', {:multi_thread => true, :logger => Logger.new('/tmp/x.log')}) #=> #<RightSdb:0xa6b8c27c>
+    #  sdb = RightAws::SdbInterface.new('1E3GDYEOGFJPIT7XXXXXX','hgTHt68JY07JKUY08ftHYtERkjgtfERn57XXXXXX', {:logger => Logger.new('/tmp/x.log')}) #=> #<RightSdb:0xa6b8c27c>
     #  
     # see: http://docs.amazonwebservices.com/AmazonSimpleDB/2007-11-07/DeveloperGuide/
     #

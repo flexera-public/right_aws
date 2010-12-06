@@ -63,14 +63,13 @@ module RightAws
 
       # Creates new RightS3 instance.
       #
-      #  s3 = RightAws::S3Interface.new('1E3GDYEOGFJPIT7XXXXXX','hgTHt68JY07JKUY08ftHYtERkjgtfERn57XXXXXX', {:multi_thread => true, :logger => Logger.new('/tmp/x.log')}) #=> #<RightAws::S3Interface:0xb7b3c27c>
+      #  s3 = RightAws::S3Interface.new('1E3GDYEOGFJPIT7XXXXXX','hgTHt68JY07JKUY08ftHYtERkjgtfERn57XXXXXX', {:logger => Logger.new('/tmp/x.log')}) #=> #<RightAws::S3Interface:0xb7b3c27c>
       #  
       # Params is a hash:
       #
       #    {:server       => 's3.amazonaws.com'   # Amazon service host: 's3.amazonaws.com'(default)
       #     :port         => 443                  # Amazon service port: 80 or 443(default)
       #     :protocol     => 'https'              # Amazon service protocol: 'http' or 'https'(default)
-      #     :multi_thread => true|false           # Multi-threaded (connection per each thread): true or false(default)
       #     :logger       => Logger Object}       # Logger instance: logs to STDOUT if omitted }
       #
     def initialize(aws_access_key_id=nil, aws_secret_access_key=nil, params={})

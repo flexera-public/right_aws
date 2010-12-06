@@ -65,10 +65,6 @@ concurrent requests to AWS. The way this plays out in practice is:
 Note that due to limitations in the I/O of the Ruby interpreter you
 may not get the degree of parallelism you may expect with the multi-threaded setting.
 
-By default, EC2/S3/SQS/SDB/ACF interface instances are created in single-threaded mode.  Set
-"params[:multi_thread]" to "true" in the initialization arguments to use
-multithreaded mode.
-
 == GETTING STARTED:
 
 * For EC2 read RightAws::Ec2 and consult the Amazon EC2 API documentation at

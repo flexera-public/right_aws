@@ -49,13 +49,12 @@ module RightAws
 
       # Creates a new SqsInterface instance.
       #
-      #  sqs = RightAws::SqsInterface.new('1E3GDYEOGFJPIT75KDT40','hgTHt68JY07JKUY08ftHYtERkjgtfERn57DFE379', {:multi_thread => true, :logger => Logger.new('/tmp/x.log')}) 
+      #  sqs = RightAws::SqsInterface.new('1E3GDYEOGFJPIT75KDT40','hgTHt68JY07JKUY08ftHYtERkjgtfERn57DFE379', {:logger => Logger.new('/tmp/x.log')}) 
       #  
       # Params is a hash:
       #
       #    {:server       => 'queue.amazonaws.com' # Amazon service host: 'queue.amazonaws.com'(default)
       #     :port         => 443                   # Amazon service port: 80 or 443(default)
-      #     :multi_thread => true|false            # Multi-threaded (connection per each thread): true or false(default)
       #     :signature_version => '0'              # The signature version : '0', '1' or '2'(default)
       #     :logger       => Logger Object}        # Logger instance: logs to STDOUT if omitted }
       #
