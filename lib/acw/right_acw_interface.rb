@@ -54,7 +54,6 @@ module RightAws
     # * <tt>:server</tt>: ACW service host, default: DEFAULT_HOST
     # * <tt>:port</tt>: ACW service port, default: DEFAULT_PORT
     # * <tt>:protocol</tt>: 'http' or 'https', default: DEFAULT_PROTOCOL
-    # * <tt>:multi_thread</tt>: true=HTTP connection per thread, false=per process
     # * <tt>:logger</tt>: for log messages, default: RAILS_DEFAULT_LOGGER else STDOUT
     # * <tt>:signature_version</tt>:  The signature version : '0','1' or '2'(default)
     # * <tt>:cache</tt>: true/false(default): list_metrics

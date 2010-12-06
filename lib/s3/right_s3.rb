@@ -59,7 +59,6 @@ module RightAws
     #    {:server       => 's3.amazonaws.com'   # Amazon service host: 's3.amazonaws.com'(default)
     #     :port         => 443                  # Amazon service port: 80 or 443(default)
     #     :protocol     => 'https'              # Amazon service protocol: 'http' or 'https'(default)
-    #     :multi_thread => true|false           # Multi-threaded (connection per each thread): true or false(default)
     #     :logger       => Logger Object}       # Logger instance: logs to STDOUT if omitted }
     def initialize(aws_access_key_id=nil, aws_secret_access_key=nil, params={})
       @interface = S3Interface.new(aws_access_key_id, aws_secret_access_key, params)

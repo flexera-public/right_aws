@@ -65,6 +65,12 @@ require 'acf/right_acf_interface'
 require 'acf/right_acf_streaming_interface'
 require 'acf/right_acf_origin_access_identities'
 require 'rds/right_rds_interface'
+require 'iam/right_iam_interface'
+require 'iam/right_iam_groups'
+require 'iam/right_iam_users'
+require 'iam/right_iam_access_keys'
+require 'iam/right_iam_mfa_devices'
+
 #-
 
 # We also want everything available in the Rightscale namespace for backward

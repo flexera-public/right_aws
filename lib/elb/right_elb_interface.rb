@@ -62,11 +62,13 @@ module RightAws
     include RightAwsBaseInterface
 
     # Amazon ELB API version being used
-    API_VERSION       = "2009-11-25"
+    API_VERSION       = "2010-07-01"
     DEFAULT_HOST      = "elasticloadbalancing.amazonaws.com"
     DEFAULT_PATH      = '/'
     DEFAULT_PROTOCOL  = 'https'
     DEFAULT_PORT      = 443
+
+    LISTENER_PROTOCOLS = [ 'HTTP', 'HTTPS', 'TCP', 'SSL' ]
 
     @@bench = AwsBenchmarkingBlock.new
     def self.bench_xml
@@ -83,7 +85,6 @@ module RightAws
     # * <tt>:server</tt>: ELB service host, default: DEFAULT_HOST
     # * <tt>:port</tt>: ELB service port, default: DEFAULT_PORT
     # * <tt>:protocol</tt>: 'http' or 'https', default: DEFAULT_PROTOCOL
-    # * <tt>:multi_thread</tt>: true=HTTP connection per thread, false=per process
     # * <tt>:logger</tt>: for log messages, default: RAILS_DEFAULT_LOGGER else STDOUT
     # * <tt>:signature_version</tt>:  The signature version : '0','1' or '2'(default)
     # * <tt>:cache</tt>: true/false(default): caching works for: describe_load_balancers
@@ -172,11 +173,15 @@ module RightAws
     # Create new load balancer.
     # Returns a new load balancer DNS name.
     #
-    #  lb = elb.create_load_balancer( 'test-kd1',
-    #                                ['us-east-1a', 'us-east-1b'],
-    #                                [ { :protocol => :http, :load_balancer_port => 80,  :instance_port => 80 },
-		#						                    	 { :protocol => :tcp,  :load_balancer_port => 443, :instance_port => 443 } ])
-    #	 puts lb #=> "test-kd1-1519253964.us-east-1.elb.amazonaws.com"
+    # Listener options: :protocol, :load_balancer_port, :instance_port and :ssl_certificate_id
+    # Protocols: :tcp, :http, :https or :ssl
+    # 
+    #  elb.create_load_balancer( 'test-kd1',
+    #                            ['us-east-1a', 'us-east-1b'],
+    #                            [ { :protocol => :http,  :load_balancer_port => 80,  :instance_port => 80 },
+		#                              { :protocol => :https, :load_balancer_port => 443, :instance_port => 443,
+    #                                :ssl_certificate_id => 'arn:aws:iam::123456789012:user/division_abc/subdivision_xyz/Bob' } ])
+    #                                #=> "test-kd1-1519253964.us-east-1.elb.amazonaws.com"
     #
     def create_load_balancer(load_balancer_name, availability_zones=[], listeners=[])
       request_hash = { 'LoadBalancerName' => load_balancer_name }
@@ -188,13 +193,7 @@ module RightAws
                       :load_balancer_port => 80,
                       :instance_port      => 80 }
       end
-      listeners = [listeners] unless listeners.is_a?(Array)
-      request_hash.merge!( amazonize_list( ['Listeners.member.?.Protocol',
-                                            'Listeners.member.?.LoadBalancerPort',
-                                            'Listeners.member.?.InstancePort'],
-                                             listeners.map{|i| [ (i[:protocol] || 'HTTP').to_s.upcase,
-                                                                 (i[:load_balancer_port] || 80),
-                                                                 (i[:instance_port] || 80) ] } ) )
+      request_hash = merge_listeners_into_request_hash(request_hash, listeners)
       link = generate_request("CreateLoadBalancer", request_hash)
       request_info(link, CreateLoadBalancerParser.new(:logger => @logger))
     end
@@ -209,6 +208,37 @@ module RightAws
     #
     def delete_load_balancer(load_balancer_name)
       link = generate_request("DeleteLoadBalancer", 'LoadBalancerName' => load_balancer_name)
+      request_info(link, DeleteLoadBalancerParser.new(:logger => @logger))
+    end
+
+    # Creates one or more new listeners on a LoadBalancer for the specified port. If a listener with the given
+    # port does not already exist, it will be created; otherwise, the properties of the new listener must match
+    # the the properties of the existing listener.
+    #
+    # Listener options: :protocol, :load_balancer_port, :instance_port and :ssl_certificate_id
+    # Protocols: :tcp, :http, :https or :ssl
+    #
+    #  elb.create_load_balancer_listeners( 'test-kd1',
+    #                                      [ { :protocol => :http,  :load_balancer_port => 80,  :instance_port => 80 },
+		#                                        { :protocol => :https, :load_balancer_port => 443, :instance_port => 443,
+    #                                          :ssl_certificate_id => 'arn:aws:iam::123456789012:user/division_abc/subdivision_xyz/Bob' } ]) #=> true
+    #
+    def create_load_balancer_listeners(load_balancer_name, listeners)
+      request_hash = { 'LoadBalancerName' => load_balancer_name }
+      request_hash = merge_listeners_into_request_hash(request_hash, listeners)
+      link = generate_request("CreateLoadBalancerListeners", request_hash)
+      request_info(link, RightHttp2xxParser.new(:logger => @logger))
+    end
+
+    # Removes listeners from the load balancer for the specified port number.
+    #
+    #  elb.delete_load_balancer_listeners( 'kd_test', 80, 443) #=> true
+    #
+    def delete_load_balancer_listeners(load_balancer_name, *load_balancer_ports)
+      load_balancer_ports.flatten!
+      request_hash = { 'LoadBalancerName' => load_balancer_name }
+      request_hash.merge!( amazonize_list("LoadBalancerPorts.member", load_balancer_ports ) )
+      link = generate_request("DeleteLoadBalancerListeners", request_hash )
       request_info(link, DeleteLoadBalancerParser.new(:logger => @logger))
     end
 
@@ -368,6 +398,35 @@ module RightAws
       request_info(link, RightHttp2xxParser.new(:logger => @logger))
     end
 
+    def set_load_balancer_listener_ssl_certificate(load_balancer_name, load_balancer_port, ssl_sertificate_id)
+      request_hash = { 'LoadBalancerName' => load_balancer_name,
+                       'LoadBalancerPort' => load_balancer_port,
+                       'SSLCertificateId' => ssl_sertificate_id }
+      link = generate_request("SetLoadBalancerListenerSSLCertificate", request_hash)
+      request_info(link, RightHttp2xxParser.new(:logger => @logger))
+    end
+
+    #-----------------------------------------------------------------
+    #      Helpers
+    #-----------------------------------------------------------------
+
+    def merge_listeners_into_request_hash(request_hash, listeners) # :nodoc:
+      listeners = [listeners] unless listeners.is_a?(Array)
+      request_hash.merge(amazonize_list( ['Listeners.member.?.Protocol',
+                                          'Listeners.member.?.LoadBalancerPort',
+                                          'Listeners.member.?.InstancePort',
+                                          'Listeners.member.?.SSLCertificateId'],
+                                          listeners.map{ |i|
+                                            [ (i[:protocol]           || 'HTTP').to_s.upcase,
+                                               i[:load_balancer_port] || 80,
+                                               i[:instance_port]      || 80,
+                                               i[:ssl_certificate_id]]
+                                          },
+                                          :default => :skip_nils
+                                       )
+                        )
+    end
+
     #-----------------------------------------------------------------
     #      PARSERS: Load Balancers
     #-----------------------------------------------------------------
@@ -400,6 +459,7 @@ module RightAws
         when 'Protocol'           then @listener[:protocol]           = @text
         when 'LoadBalancerPort'   then @listener[:load_balancer_port] = @text
         when 'InstancePort'       then @listener[:instance_port]      = @text
+        when 'SSLCertificateId'   then @listener[:ssl_certificate_id] = @text
         end
         case full_tag_name
         when %r{AvailabilityZones/member$}    then @item[:availability_zones] << @text

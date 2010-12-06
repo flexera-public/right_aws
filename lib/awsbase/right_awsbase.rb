@@ -23,7 +23,6 @@
 
 # Test
 module RightAws
-#  require 'md5'
   require 'digest/md5'
   require 'pp'
   
@@ -288,7 +287,6 @@ module RightAws
       # a set of options to be passed to RightHttpConnection object
       @params[:connection_options] = {} unless @params[:connection_options].is_a?(Hash) 
       @with_connection_options = {}
-#      @params[:multi_thread] ||= defined?(AWS_DAEMON)
       @params[:connections] ||= :shared # || :dedicated
       @params[:max_connections] ||= 10
       @params[:connection_lifetime] ||= 20*60
@@ -360,11 +358,6 @@ module RightAws
       AwsError::on_aws_exception(self, options)
     end
     
-#      # Return +true+ if this instance works in multi_thread mode and +false+ otherwise.
-#    def multi_thread
-#      @params[:multi_thread]
-#    end
-
     # ACF, AMS, EC2, LBS and SDB uses this guy
     # SQS and S3 use their own methods
     def generate_request_impl(verb, action, options={}) #:nodoc:
@@ -533,6 +526,20 @@ module RightAws
     # Returns Amazons request ID for the latest request
     def last_request_id
       @last_response && @last_response.body.to_s[%r{<requestId>(.+?)</requestId>}i] && $1
+    end
+
+    # Incrementally lists something.
+    def incrementally_list_items(action, parser_class, params={}, &block) # :nodoc:
+      params = params.dup
+      params['MaxItems'] = params.delete(:max_items) if params[:max_items]
+      params['Marker']   = params.delete(:marker)    if params[:marker]
+      last_response = nil
+      loop do
+        last_response    = request_info( generate_request(action, params), parser_class.new(:logger => @logger))
+        params['Marker'] = last_response[:marker]
+        break unless block && block.call(last_response) && !last_response[:marker].right_blank?
+      end
+      last_response
     end
 
     # Format array of items into Amazons handy hash ('?' is a place holder):
