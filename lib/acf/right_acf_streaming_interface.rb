@@ -40,7 +40,7 @@ module RightAws
     #      :aws_id=>"E3CWE2Z9USOS6B",
     #      :enabled=>true,
     #      :domain_name=>"s2jz1ourvss1fj.cloudfront.net",
-    #      :origin=>"bucket-for-konstantin-00.s3.amazonaws.com",
+    #      :s3_origin=> {:dns_name=>"bucket-for-konstantin-00.s3.amazonaws.com"},
     #      :last_modified_time=>"2010-04-19T08:53:32.574Z",
     #      :comment=>"Woo-Hoo!",
     #      :cnames=>["stream.web.my-awesome-site.net"]},
@@ -49,7 +49,7 @@ module RightAws
     #      :aws_id=>"E3NPQZY4LKAYQ8",
     #      :enabled=>true,
     #      :domain_name=>"sw9nrsq9pudk3.cloudfront.net",
-    #      :origin=>"bucket-for-konstantin-00.s3.amazonaws.com",
+    #      :s3_origin=> {:dns_name=>"bucket-for-konstantin-00.s3.amazonaws.com"},
     #      :last_modified_time=>"2010-04-19T08:59:09.600Z",
     #      :comment=>"Woo-Hoo!",
     #      :cnames=>["stream-6.web.my-awesome-site.net"]}]
@@ -78,7 +78,7 @@ module RightAws
     #        :enabled=>true,
     #        :last_modified_time=>"2010-04-19T08:53:32.574Z",
     #        :domain_name=>"s2jz1ourvss1fj.cloudfront.net",
-    #        :origin=>"bucket-for-konstantin-00.s3.amazonaws.com",
+    #        :s3_origin=> {:dns_name=>"bucket-for-konstantin-00.s3.amazonaws.com"},
     #        :comment=>"Woo-Hoo!"}],
     #     :max_items=>1,
     #     :is_truncated=>true}
@@ -118,26 +118,18 @@ module RightAws
     #     :e_tag=>"E2588L5QL4BLXH",
     #     :enabled=>true,
     #     :domain_name=>"s1di8imd85wgld.cloudfront.net",
-    #     :origin=>"bucket-for-konstantin-00.s3.amazonaws.com",
+    #     :s3_origin=> {:dns_name=>"bucket-for-konstantin-00.s3.amazonaws.com"},
     #     :last_modified_time=>Mon Apr 19 08:54:42 UTC 2010,
     #     :location=>
     #      "https://cloudfront.amazonaws.com/streaming-distribution/E1M5LERJLU636F",
     #     :comment=>"Woo-Hoo!"}
     #
-    def create_streaming_distribution(origin, comment='', enabled=true, cnames=[], caller_reference=nil)
-      config = { :origin  => origin,
-                 :comment => comment,
-                 :enabled => enabled,
-                 :cnames  => Array(cnames),
-                 :caller_reference => caller_reference }
-      create_streaming_distribution_by_config(config)
-    end
-
-    def create_streaming_distribution_by_config(config)
+    def create_streaming_distribution(config)
       config[:caller_reference] ||= generate_call_reference
       link = generate_request('POST', 'streaming-distribution', {}, streaming_distribution_config_to_xml(config))
       merge_headers(request_info(link, AcfDistributionListParser.new(:logger => @logger))[:distributions].first)
     end
+    alias_method :create_streaming_distribution_by_config, :create_streaming_distribution
 
     # Get a streaming distribution's information.
     # Returns a distribution's information or RightAws::AwsError exception.
@@ -149,7 +141,7 @@ module RightAws
     #     :aws_id=>"E3CWE2Z9USOS6B",
     #     :enabled=>true,
     #     :domain_name=>"s2jz1ourvss1fj.cloudfront.net",
-    #     :origin=>"bucket-for-konstantin-00.s3.amazonaws.com",
+    #     :s3_origin=> {:dns_name=>"bucket-for-konstantin-00.s3.amazonaws.com"},
     #     :last_modified_time=>"2010-04-19T08:53:32.574Z",
     #     :comment=>"Woo-Hoo!",
     #     :caller_reference=>"201004191253311625537161"}
@@ -167,10 +159,11 @@ module RightAws
     #     :aws_id=>"E1M5LERJLU636F",
     #     :enabled=>false,
     #     :domain_name=>"s1di8imd85wgld.cloudfront.net",
-    #     :origin=>"bucket-for-konstantin-00.s3.amazonaws.com",
+    #     :s3_origin=> {
+    #       :dns_name=>"bucket-for-konstantin-00.s3.amazonaws.com",
+    #       :origin_access_identity=>"origin-access-identity/cloudfront/E3JPJZ80ZBX24G"},
     #     :last_modified_time=>"2010-04-19T09:14:07.160Z",
     #     :comment=>"Olah-lah!",
-    #     :origin_access_identity=>"origin-access-identity/cloudfront/E3JPJZ80ZBX24G",
     #     :caller_reference=>"201004191254412191173215"}
     #
     def get_streaming_distribution(aws_id)
@@ -186,9 +179,10 @@ module RightAws
     #     :e_tag=>"E2K6XD13RCJQ6E",
     #     :cnames=>["stream-1.web.my-awesome-site.net"],
     #     :enabled=>false,
-    #     :origin=>"bucket-for-konstantin-00.s3.amazonaws.com",
+    #     :s3_origin=> {
+    #       :dns_name=>"bucket-for-konstantin-00.s3.amazonaws.com",
+    #       :origin_access_identity=>"origin-access-identity/cloudfront/E3JPJZ80ZBX24G",},
     #     :comment=>"Olah-lah!",
-    #     :origin_access_identity=>"origin-access-identity/cloudfront/E3JPJZ80ZBX24G",
     #     :caller_reference=>"201004191254412191173215"}
     #
     def get_streaming_distribution_config(aws_id)
@@ -197,21 +191,20 @@ module RightAws
     end
 
     # Set a streaming distribution's configuration
-    # (the :origin and the :caller_reference cannot be changed).
     # Returns +true+ on success or RightAws::AwsError exception.
     #
     #  acf.get_streaming_distribution_config('E1M5LERJLU636F') #=>
     #    {:e_tag=>"E2588L5QL4BLXH",
     #     :cnames=>["stream-1.web.my-awesome-site.net"],
     #     :enabled=>true,
-    #     :origin=>"bucket-for-konstantin-00.s3.amazonaws.com",
+    #     :s3_origin=> {:dns_name=>"bucket-for-konstantin-00.s3.amazonaws.com"},
     #     :comment=>"Woo-Hoo!",
     #     :caller_reference=>"201004191254412191173215"}
     #
-    #  config[:comment]                = 'Olah-lah!'
-    #  config[:enabled]                = false
-    #  config[:origin_access_identity] = "origin-access-identity/cloudfront/E3JPJZ80ZBX24G"
-    #  config[:trusted_signers]        = ['self', '648772220000', '120288270000']
+    #  config[:comment]                            = 'Olah-lah!'
+    #  config[:enabled]                            = false
+    #  config[:s3_origin][:origin_access_identity] = "origin-access-identity/cloudfront/E3JPJZ80ZBX24G"
+    #  config[:trusted_signers]                    = ['self', '648772220000', '120288270000']
     #
     #  acf.set_distribution_config('E2REJM3VUN5RSI', config) #=> true
     #
