@@ -286,7 +286,7 @@ the source key.
 === next
   Release Notes:
   - Added:
-    - ACF: API '2010-05-01'
+    - ACF: API '2010-11-01'
     - EC2:
       - API '2010-08-31'
       - Port based group permissions support

@@ -32,6 +32,7 @@ lib/sqs/right_sqs_interface.rb
 lib/acf/right_acf_interface.rb
 lib/acf/right_acf_streaming_interface.rb
 lib/acf/right_acf_origin_access_identities.rb
+lib/acf/right_acf_invalidations.rb
 lib/rds/right_rds_interface.rb
 lib/iam/right_iam_interface.rb
 lib/iam/right_iam_groups.rb
