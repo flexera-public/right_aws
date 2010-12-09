@@ -35,6 +35,7 @@ require 'rubygems'
 require 'right_http_connection'
 
 $:.unshift(File.dirname(__FILE__))
+require 'awsbase/version'
 require 'awsbase/support'
 require 'awsbase/benchmark_fix'
 require 'awsbase/right_awsbase'
@@ -64,17 +65,6 @@ require 'acf/right_acf_interface'
 require 'acf/right_acf_streaming_interface'
 require 'acf/right_acf_origin_access_identities'
 require 'rds/right_rds_interface'
-
-
-module RightAws #:nodoc:
-  module VERSION #:nodoc:
-    MAJOR = 2  unless defined?(MAJOR)
-    MINOR = 0 unless defined?(MINOR)
-    TINY  = 0  unless defined?(TINY)
-
-    STRING = [MAJOR, MINOR, TINY].join('.') unless defined?(STRING)
-  end
-end
 
 #-
 
