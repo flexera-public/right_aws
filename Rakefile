@@ -1,12 +1,15 @@
 # -*- ruby -*-
 
 require 'rubygems'
+require 'bundler'
 require "rake/testtask"
 require 'rcov/rcovtask'
 require 'rake/gempackagetask'
 require 'rake/clean'
 $: << File.dirname(__FILE__)
 testglobs =     ["test/ts_right_aws.rb"]
+
+Bundler::GemHelper.install_tasks
 
 # == Gem == #
 
