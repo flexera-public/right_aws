@@ -1054,7 +1054,7 @@ module RightAws
           when %r{DBInstance/PreferredBackupWindow$}                 then @item[:preferred_backup_window]      = @text
           when %r{DBInstance/EngineVersion$}                         then @item[:engine_version]               = @text
           when %r{DBInstance/AutoMinorVersionUpgrade$}               then @item[:auto_minor_version_upgrade]   = (@text == 'true')
-          when %r{DBInstance/AllowMajorVersionUpgrade$}              then @item[:auto_major_version_upgrade]   = (@text == 'true')
+          when %r{DBInstance/AllowMajorVersionUpgrade$}              then @item[:allow_major_version_upgrade]  = (@text == 'true')
           when %r{PendingModifiedValues/DBInstanceClass$}            then @item[:pending_modified_values][:instance_class]               = @text
           when %r{PendingModifiedValues/AllocatedStorage$}           then @item[:pending_modified_values][:allocated_storage]            = @text.to_i
           when %r{PendingModifiedValues/MasterUserPassword$}         then @item[:pending_modified_values][:master_user_password]         = @text
@@ -1064,7 +1064,7 @@ module RightAws
           when %r{PendingModifiedValues/PreferredBackupWindow$}      then @item[:pending_modified_values][:preferred_backup_window]      = @text
           when %r{PendingModifiedValues/EngineVersion$}              then @item[:pending_modified_values][:engine_version]               = @text
           when %r{PendingModifiedValues/AutoMinorVersionUpgrade$}    then @item[:pending_modified_values][:auto_minor_version_upgrade]   = (@text == 'true')
-          when %r{PendingModifiedValues/AllowMajorVersionUpgrade$}   then @item[:pending_modified_values][:auto_major_version_upgrade]   = (@text == 'true')
+          when %r{PendingModifiedValues/AllowMajorVersionUpgrade$}   then @item[:pending_modified_values][:allow_major_version_upgrade]  = (@text == 'true')
           end
         end
       end
