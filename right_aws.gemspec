@@ -38,6 +38,11 @@ Gem::Specification.new do |spec|
   spec.require_path = 'lib'
 
   spec.add_dependency('right_http_connection', '>= 1.2.5')
+  spec.requirements << "uuidtools >= 1.0.7 if you want to use ActiveSdb"
+  spec.requirements << "libxml-ruby >= 0.5.2.0 is encouraged"
+
+  spec.add_development_dependency('rake')
+  spec.add_development_dependency('rcov')
 
   spec.description = <<-EOF
 == DESCRIPTION:
