@@ -1,0 +1,18 @@
+GIT
+  remote: git@github.com:rightscale/right_http_connection.git
+  revision: 0bc3343232133bdb38c237d8285525d74495d3f5
+  specs:
+    right_http_connection (1.2.5)
+
+GEM
+  specs:
+    rake (0.8.7)
+    rcov (0.8.1.2.0)
+
+PLATFORMS
+  ruby
+
+DEPENDENCIES
+  rake
+  rcov
+  right_http_connection (= 1.2.5)!
