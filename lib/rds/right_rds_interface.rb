@@ -231,14 +231,14 @@ module RightAws
     # Optional params: +:master_user_password+, +:instance_class+, +:db_security_groups+,
     # +:db_parameter_group+, +:preferred_maintenance_window+, +:allocated_storage+, +:apply_immediately+,
     # +:backup_retention_period+, +:preferred_backup_window+, +:multi_az+, +:engine_version+,
-    # +:auto_minor_version_upgrade+, +:auto_major_version_upgrade+
+    # +:auto_minor_version_upgrade+, +:allow_major_version_upgrade+
     #
     #    rds.modify_db_instance('kd-delete-me-01',
     #                           :master_user_password => 'newpassword',
     #                           :instance_class => 'db.m1.large',
     #                           :multi_az => false,
     #                           :allocated_storage => 30,
-    #                           :auto_major_version_upgrade => true,
+    #                           :allow_major_version_upgrade => true,
     #                           :auto_minor_version_upgrade => true,
     #                           :preferred_maintenance_window => 'sun:06:00-sun:10:00',
     #                           :preferred_backup_window => '02:00-04:00',
@@ -280,7 +280,7 @@ module RightAws
       request_hash['MultiAZ']                    = params[:multi_az].to_s                   unless params[:multi_az].nil?
       request_hash['EngineVersion']              = params[:engine_version]                  unless params[:engine_version].right_blank?
       request_hash['AutoMinorVersionUpgrade']    = params[:auto_minor_version_upgrade].to_s unless params[:auto_minor_version_upgrade].nil?
-      request_hash['AutoMajorVersionUpgrade']    = params[:auto_major_version_upgrade].to_s unless params[:auto_major_version_upgrade].nil?
+      request_hash['AllowMajorVersionUpgrade']   = params[:allow_major_version_upgrade].to_s unless params[:allow_major_version_upgrade].nil?
       request_hash['ApplyImmediately']           = params[:apply_immediately].to_s          unless params[:apply_immediately].right_blank?
       request_hash.merge!(amazonize_list('DBSecurityGroups.member',  params[:db_security_groups]))
       request_hash['DBParameterGroupName']       = params[:db_parameter_group]              unless params[:db_parameter_group].right_blank?
