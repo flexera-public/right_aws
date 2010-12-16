@@ -402,7 +402,7 @@ module RightAws
     class QEc2DescribeVpcsParser < RightAWSParser #:nodoc:
       def tagstart(name, attributes)
         case full_tag_name
-        when %r{/(vpcSet/item|subnet)$} then @item    = { :tags => {} }
+        when %r{/(vpcSet/item|vpc)$} then @item    = { :tags => {} }
         when %r{/tagSet/item$}          then @aws_tag = {}
         end
       end
