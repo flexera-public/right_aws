@@ -238,13 +238,15 @@ module RightAws
       params['License.Pool']                      = options[:license_pool]                         unless options[:license_pool].right_blank?
       params['ClientToken']                       = options[:client_token] || AwsUtils::generate_unique_token
       params.merge!(amazonize_block_device_mappings(options[:block_device_mappings]))
-      unless options[:user_data].right_blank?
-        options[:user_data].strip!
-          # Do not use CGI::escape(encode64(...)) as it is done in Amazons EC2 library.
-          # Amazon 169.254.169.254 does not like escaped symbols!
-          # And it doesn't like "\n" inside of encoded string! Grrr....
-          # Otherwise, some of UserData symbols will be lost...
-        params['UserData'] = Base64.encode64(options[:user_data]).delete("\n") unless options[:user_data].right_blank?
+      # KD: https://github.com/rightscale/right_aws/issues#issue/11
+      # Do not modify user data and pass it as is: one may pass there a hex-binary data
+      options[:user_data] = options[:user_data].to_s
+      unless options[:user_data].empty?
+        # Do not use CGI::escape(encode64(...)) as it is done in Amazons EC2 library.
+        # Amazon 169.254.169.254 does not like escaped symbols!
+        # And it doesn't like "\n" inside of encoded string! Grrr....
+        # Otherwise, some of UserData symbols will be lost...
+        params['UserData'] = Base64.encode64(options[:user_data]).delete("\n")
       end
       params
     end
