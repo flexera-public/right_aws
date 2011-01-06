@@ -216,11 +216,10 @@ module RightAws
         #
         #  keys, service = bucket.keys_and_service({'max-keys'=> 2, 'prefix' => 'logs'})
         #  p keys    #=> # 2 keys array
-        #  p service #=> {"max-keys"=>"2", "prefix"=>"logs", "name"=>"my_awesome_bucket", "marker"=>"", "is_truncated"=>true}
+        #  p service #=> {"max-keys"=>"2", "prefix"=>"logs", "name"=>"my_awesome_bucket", "marker"=>"", "is_truncated"=>true, :common_prefixes=>[]}
         #
       def keys_and_service(options={}, head=false)
         opt = {}; options.each{ |key, value| opt[key.to_s] = value }
-        service_data = {}
         thislist = {}
         list = []
         @s3.interface.incrementally_list_bucket(@name, opt) do |thislist|
@@ -231,10 +230,8 @@ module RightAws
             list << key
           end
         end
-        thislist.each_key do |key|
-          service_data[key] = thislist[key] unless (key == :contents || key == :common_prefixes)
-        end
-        [list, service_data]
+        thislist.delete(:contents)
+        [list, thislist]
       end
 
         # Retrieve key information from Amazon. 
