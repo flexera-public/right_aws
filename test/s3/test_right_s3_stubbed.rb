@@ -5,12 +5,18 @@ class TestS3Stubbed < Test::Unit::TestCase
   RIGHT_OBJECT_TEXT     = 'Right test message'
   
   def setup
-    @s3     = Rightscale::S3Interface.new(TestCredentials.aws_access_key_id, TestCredentials.aws_secret_access_key)
-    @bucket = 'right_s3_awesome_test_bucket'
-    @key1   = 'test/woohoo1'
-    @key2   = 'test1/key/woohoo2'
-    @s      = Rightscale::S3.new(TestCredentials.aws_access_key_id, TestCredentials.aws_secret_access_key)
+    @s3       = Rightscale::S3Interface.new(TestCredentials.aws_access_key_id, TestCredentials.aws_secret_access_key)
+    @bucket   = 'right_s3_awesome_test_bucket'
+    @key1     = 'test/woohoo1'
+    @key2     = 'test1/key/woohoo2'
+    @s        = Rightscale::S3.new(TestCredentials.aws_access_key_id, TestCredentials.aws_secret_access_key)
+    @filename = '/tmp/foobar'
+    @file     = File.new(@filename, "w") { |f| f.write(RIGHT_OBJECT_TEXT) }
     Rightscale::HttpConnection.reset
+  end
+
+  def teardown
+    File.delete(@filename)
   end
 
   # Non-remote tests: these use the stub version of Rightscale::HTTPConnection
@@ -91,6 +97,24 @@ class TestS3Stubbed < Test::Unit::TestCase
     Rightscale::HttpConnection.push(500, 'not found') 
     assert_raise RightAws::AwsError do
       @s3.rename(@bucket, @key2, @key2_new_name)
+    end
+  end
+
+  def test_118_multipart_upload_file_does_not_exist
+    assert_raise RightAws::AwsError do
+      @s3.store_object_multipart(:bucket=>@bucket, :key=>@key1, :file_path=>"/foo/bar", :part_size=>5 * 1024 * 1024, :threads=>10)
+    end
+  end
+
+  def test_119_multipart_upload_part_too_small
+    assert_raise RightAws::AwsError do
+      @s3.store_object_multipart(:bucket=>@bucket, :key=>@key1, :file_path=>"/tmp/foobar", :part_size=>4 * 1024 * 1024, :threads=>10)
+    end
+  end
+
+  def test_120_multipart_upload_file_smaller_than_part_size
+    assert_raise RightAws::AwsError do
+      @s3.store_object_multipart(:bucket=>@bucket, :key=>@key1, :file_path=>"/tmp/foobar", :part_size=>5 * 1024 * 1024, :threads=>10)
     end
   end
 
