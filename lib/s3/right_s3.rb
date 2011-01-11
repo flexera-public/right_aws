@@ -342,9 +342,10 @@ module RightAws
         # If +force+ is set, clears and deletes the bucket. 
         # Returns +true+. 
         #
-        #  bucket.delete(true) #=> true
+        #  bucket.delete(:force => true) #=> true
         #
-      def delete(force=false)
+      def delete(options={})
+        force = options.is_a?(Hash) && options[:force]==true
         force ? @s3.interface.force_delete_bucket(@name) : @s3.interface.delete_bucket(@name)
       end
 
