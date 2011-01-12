@@ -141,8 +141,9 @@ module RightAws
     #  2. "1287483761-855215-zSv2z-bWGj2-31M5t-ags9m" (if UUID gem is not loaded)
     TOKEN_GENERATOR_CHARSET = ('a'..'z').to_a + ('A'..'Z').to_a + ('0'..'9').to_a
     def self.generate_unique_token
-      if defined?(UUID)
-        token = (UUID::VERSION::STRING < '2.0.0' ? UUID : UUIDTools::UUID).timestamp_create().to_s
+      if defined?(UUID::VERSION)
+        uuid  = (UUID::VERSION.is_a?(String) || UUID::VERSION::STRING >= '2.0.0') ? UUIDTools::UUID : UUID
+        token = uuid.timestamp_create().to_s
       else
         time  = Time.now
         token = "%d-%06d" % [time.to_i, time.usec]
