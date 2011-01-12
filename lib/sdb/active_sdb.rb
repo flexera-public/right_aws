@@ -32,9 +32,6 @@ module RightAws
   #   require 'right_aws'
   #   require 'sdb/active_sdb'
   #   
-  # Additionally, the ActiveSdb class requires the 'uuidtools' gem; this gem is not normally required by RightAws and is not installed as a 
-  # dependency of RightAws.
-  #
   # Simple ActiveSdb usage example:
   #
   #  class Client < RightAws::ActiveSdb::Base 
