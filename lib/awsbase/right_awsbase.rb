@@ -980,7 +980,7 @@ module RightAws
     end
   end
 
-  class RightSaxParserCallback14 < RightSaxParserCallbackTemplate
+  class RightSaxParserCallbackNs < RightSaxParserCallbackTemplate
     def on_start_element_ns(name, attr_hash, prefix, uri, namespaces)
       @right_aws_parser.tag_start(name, attr_hash)
     end
@@ -1050,8 +1050,8 @@ module RightAws
         begin
           require 'xml/libxml'
           # is it new ? - Setup SaxParserCallback 
-          if    XML::Parser::VERSION >= '1.4'
-            RightSaxParserCallback14.include_callback
+          if    XML::Parser::VERSION >= '0.9.7'
+            RightSaxParserCallbackNs.include_callback
           elsif XML::Parser::VERSION >= '0.5.1.0'
             RightSaxParserCallback.include_callback
           end           
@@ -1076,8 +1076,8 @@ module RightAws
           xml.string = xml_text 
         end
         # check libxml-ruby version 
-        if    XML::Parser::VERSION >= '1.4'
-          xml.callbacks = RightSaxParserCallback14.new(self)
+        if    XML::Parser::VERSION >= '0.9.7'
+          xml.callbacks = RightSaxParserCallbackNs.new(self)
         elsif XML::Parser::VERSION >= '0.5.1.0'
           xml.callbacks = RightSaxParserCallback.new(self) 
         else 
