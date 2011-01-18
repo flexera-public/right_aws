@@ -71,6 +71,7 @@ require 'iam/right_iam_groups'
 require 'iam/right_iam_users'
 require 'iam/right_iam_access_keys'
 require 'iam/right_iam_mfa_devices'
+require 'route_53/right_route_53_interface'
 
 #-
 

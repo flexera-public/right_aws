@@ -99,7 +99,7 @@ module RightAws
     def invalidation_batch_to_xml(invalidation_batch) # :nodoc:
       paths = ''
       Array(invalidation_batch[:path]).each do |path|
-        paths << "  <Path>#{AcfInterface::escape(path)}</Path>\n"
+        paths << "  <Path>#{AwsUtils::xml_escape(path)}</Path>\n"
       end
       "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
       "<InvalidationBatch xmlns=\"http://#{@params[:server]}/doc/#{API_VERSION}/\">\n" +

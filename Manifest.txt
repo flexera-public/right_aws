@@ -39,6 +39,7 @@ lib/iam/right_iam_groups.rb
 lib/iam/right_iam_users.rb
 lib/iam/right_iam_access_keys.rb
 lib/iam/right_iam_mfa_devices.rb
+lib/route_53/right_route_53_interface.rb
 test/ec2/test_helper.rb
 test/ec2/test_right_ec2.rb
 test/http_connection.rb

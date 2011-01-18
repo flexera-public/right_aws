@@ -154,14 +154,6 @@ module RightAws
     #      Helpers:
     #-----------------------------------------------------------------
 
-    def self.escape(text) # :nodoc:
-      REXML::Text::normalize(text)
-    end
-
-    def self.unescape(text) # :nodoc:
-      REXML::Text::unnormalize(text)
-    end
-
     def generate_call_reference # :nodoc:
       result = Time.now.strftime('%Y%m%d%H%M%S')
       10.times{ result << rand(10).to_s }
@@ -242,7 +234,7 @@ module RightAws
       "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"                                +
       "<#{xml_wrapper} xmlns=\"http://#{@params[:server]}/doc/#{API_VERSION}/\">\n" +
       "  <CallerReference>#{config[:caller_reference]}</CallerReference>\n"         +
-      "  <Comment>#{AcfInterface::escape(config[:comment].to_s)}</Comment>\n"       +
+      "  <Comment>#{AwsUtils::xml_escape(config[:comment].to_s)}</Comment>\n"       +
       "  <Enabled>#{config[:enabled]}</Enabled>\n" +
       s3_origin           +
       custom_origin       +
@@ -522,7 +514,7 @@ module RightAws
         when 'Status'           then @distribution[:status]                    = @text
         when 'LastModifiedTime' then @distribution[:last_modified_time]        = @text
         when 'DomainName'       then @distribution[:domain_name]               = @text
-        when 'Comment'          then @distribution[:comment]                   = AcfInterface::unescape(@text)
+        when 'Comment'          then @distribution[:comment]                   = AwsUtils::xml_unescape(@text)
         when 'CallerReference'  then @distribution[:caller_reference]          = @text
         when 'CNAME'            then (@distribution[:cnames] ||= [])          << @text
         when 'Enabled'          then @distribution[:enabled]                   = (@text == 'true')
