@@ -52,6 +52,14 @@ module RightAws
       end
     end
 
+    def self.xml_escape(text) # :nodoc:
+      REXML::Text::normalize(text)
+    end
+
+    def self.xml_unescape(text) # :nodoc:
+      REXML::Text::unnormalize(text)
+    end
+
     # Set a timestamp and a signature version
     def self.fix_service_params(service_hash, signature)
       service_hash["Timestamp"] ||= utc_iso8601(Time.now) unless service_hash["Expires"]

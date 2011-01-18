@@ -286,6 +286,7 @@ the source key.
 === 2.1.0
   Release Notes:
   - Added:
+    - Route 53: API '2010-10-01'
     - ACF: API '2010-11-01'
     - EC2:
       - API '2010-08-31'

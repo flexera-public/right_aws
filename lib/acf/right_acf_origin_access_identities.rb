@@ -159,7 +159,7 @@ module RightAws
       "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
       "<CloudFrontOriginAccessIdentityConfig xmlns=\"http://#{@params[:server]}/doc/#{API_VERSION}/\">\n" +
       "  <CallerReference>#{config[:caller_reference]}</CallerReference>\n" +
-      "  <Comment>#{AcfInterface::escape(config[:comment].to_s)}</Comment>\n" +
+      "  <Comment>#{AwsUtils::xml_escape(config[:comment].to_s)}</Comment>\n" +
       "</CloudFrontOriginAccessIdentityConfig>"
     end
 
@@ -214,8 +214,8 @@ module RightAws
         when 'IsTruncated'       then @result[:is_truncated] = (@text == 'true')
         when 'Id'                then @item[:aws_id]               = @text
         when 'S3CanonicalUserId' then @item[:s3_canonical_user_id] = @text
-        when 'CallerReference'   then @item[:caller_reference] = @text
-        when 'Comment'           then @item[:comment]              = AcfInterface::unescape(@text)
+        when 'CallerReference'   then @item[:caller_reference]     = @text
+        when 'Comment'           then @item[:comment]              = AwsUtils::xml_unescape(@text)
         end
         case full_tag_name
         when %r{CloudFrontOriginAccessIdentitySummary$},
