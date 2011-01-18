@@ -283,7 +283,7 @@ the source key.
     - :created_time in:
         RightAws::ElbInterface#describe_load_balancers
 
-=== next
+=== 2.1.0
   Release Notes:
   - Added:
     - ACF: API '2010-11-01'
