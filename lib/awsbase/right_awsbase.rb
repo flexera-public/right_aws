@@ -955,9 +955,6 @@ module RightAws
   #-----------------------------------------------------------------
 
   class RightSaxParserCallbackTemplate #:nodoc:
-    def self.include_callback 
-      include XML::SaxParser::Callbacks       
-    end 
     def initialize(right_aws_parser) 
       @right_aws_parser = right_aws_parser 
     end 
@@ -972,6 +969,9 @@ module RightAws
   end 
 
   class RightSaxParserCallback < RightSaxParserCallbackTemplate
+    def self.include_callback
+      include XML::SaxParser::Callbacks
+    end
     def on_start_element(name, attr_hash)
       @right_aws_parser.tag_start(name, attr_hash)
     end
@@ -1049,19 +1049,18 @@ module RightAws
       if @xml_lib=='libxml' && !defined?(XML::SaxParser)
         begin
           require 'xml/libxml'
-          # is it new ? - Setup SaxParserCallback 
-          if    XML::Parser::VERSION >= '0.9.7'
-            RightSaxParserCallbackNs.include_callback
-          elsif XML::Parser::VERSION >= '0.5.1.0'
+          # Setup SaxParserCallback 
+          if XML::Parser::VERSION >= '0.5.1' &&
+             XML::Parser::VERSION  < '0.9.7'
             RightSaxParserCallback.include_callback
           end           
         rescue LoadError => e
-          @@supported_xml_libs.delete(@xml_lib) 
-          @xml_lib = DEFAULT_XML_LIBRARY           
+          @@supported_xml_libs.delete(@xml_lib)
+          @xml_lib = DEFAULT_XML_LIBRARY
           if @logger
             @logger.error e.inspect
             @logger.error e.backtrace
-            @logger.info "Can not load 'libxml' library. '#{DEFAULT_XML_LIBRARY}' is used for parsing." 
+            @logger.info "Can not load 'libxml' library. '#{DEFAULT_XML_LIBRARY}' is used for parsing."
           end
         end
       end
@@ -1072,13 +1071,13 @@ module RightAws
           # avoid warning on every usage
           xml        = XML::SaxParser.string(xml_text)
         else
-          xml        = XML::SaxParser.new 
+          xml        = XML::SaxParser.new
           xml.string = xml_text 
         end
         # check libxml-ruby version 
         if    XML::Parser::VERSION >= '0.9.7'
           xml.callbacks = RightSaxParserCallbackNs.new(self)
-        elsif XML::Parser::VERSION >= '0.5.1.0'
+        elsif XML::Parser::VERSION >= '0.5.1'
           xml.callbacks = RightSaxParserCallback.new(self) 
         else 
           xml.on_start_element{|name, attr_hash| self.tag_start(name, attr_hash)} 
