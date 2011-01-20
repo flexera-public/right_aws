@@ -39,7 +39,7 @@ module RightAws
     #                           :resource_type => "instance",
     #                           :key           => "myKey"}]
     #
-    #  ec2.describe_tags(:filters => { 'resource_id' => "i-12345678"})
+    #  ec2.describe_tags(:filters => { 'resource-id' => "i-12345678"})
     #
     # P.S. filters: http://docs.amazonwebservices.com/AWSEC2/latest/APIReference/ApiReference_query_DescribeTags.html
     def describe_tags(options={})
