@@ -66,7 +66,7 @@ module RightAws
     # ec2.create_tags("i-12345678", ["myKey1", "myKey2", "myKey3"], :default => true ) => true
     #
     # Add multiple keys and values to a resource:
-    # ec2.create_tags("i-12345678", [{"myKey1" => "foo", "myKey2" => "bar", "myKeyWithoutVal" => nil }]) #=> true
+    # ec2.create_tags("i-12345678", {"myKey1" => "foo", "myKey2" => "bar", "myKeyWithoutVal" => nil }) #=> true
     #
     # Add a key and value to multiple resources:
     # ec2.create_tags(["i-12345678","i-86fb3eec","i-86fb3eed"], {"myKey" => "foo"}) #=> true
