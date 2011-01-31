@@ -28,8 +28,82 @@
   #
   class String #:nodoc:
 
-    def right_underscore
-      self.gsub(/[A-Z]/){|match| "#{$`=='' ? '' : '_'}#{match.downcase}" }
+    # Constantize tries to find a declared constant with the name specified
+    # in the string. It raises a NameError when the name is not in CamelCase
+    # or is not initialized.
+    #
+    # Examples
+    #   "Module".constantize #=> Module
+    #   "Class".constantize #=> Class
+    def right_constantize()
+      unless /\A(?:::)?([A-Z]\w*(?:::[A-Z]\w*)*)\z/ =~ self
+        raise NameError, "#{self.inspect} is not a valid constant name!"
+      end
+      Object.module_eval("::#{$1}", __FILE__, __LINE__)
     end
-    
+
+    def right_camelize()
+      self.dup.split(/_/).map{ |word| word.capitalize }.join('')
+    end
+
+  end
+
+
+  class Object #:nodoc:
+    # "", "   ", nil, [], and {} are blank
+    def right_blank?
+      if respond_to?(:empty?) && respond_to?(:strip)
+        empty? or strip.empty?
+      elsif respond_to?(:empty?)
+        empty?
+      else
+        !self
+      end
+    end
+  end
+
+  class NilClass #:nodoc:
+    def right_blank?
+      true
+    end
+  end
+
+  class FalseClass #:nodoc:
+    def right_blank?
+      true
+    end
+  end
+
+  class TrueClass #:nodoc:
+    def right_blank?
+      false
+    end
+  end
+
+  class Array #:nodoc:
+    alias_method :right_blank?, :empty?
+  end
+
+  class Hash #:nodoc:
+    alias_method :right_blank?, :empty?
+
+    # Return a new hash with all keys converted to symbols.
+    def right_symbolize_keys
+      inject({}) do |options, (key, value)|
+        options[key.to_sym] = value
+        options
+      end
+    end
+  end
+
+  class String #:nodoc:
+    def right_blank?
+      empty? || strip.empty?
+    end
+  end
+
+  class Numeric #:nodoc:
+    def right_blank?
+      false
+    end
   end
