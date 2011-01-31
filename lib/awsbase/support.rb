@@ -28,6 +28,10 @@
   #
   class String #:nodoc:
 
+    def right_underscore
+      self.gsub(/[A-Z]/){|match| "#{$`=='' ? '' : '_'}#{match.downcase}" }
+    end
+
     # Constantize tries to find a declared constant with the name specified
     # in the string. It raises a NameError when the name is not in CamelCase
     # or is not initialized.
