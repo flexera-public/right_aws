@@ -114,6 +114,14 @@ module RightAws
       out_string << '?torrent'  if path[/[&?]torrent($|&|=)/]
       out_string << '?location' if path[/[&?]location($|&|=)/]
       out_string << '?logging'  if path[/[&?]logging($|&|=)/]  # this one is beta, no support for now
+      if method == 'GET'
+        # fetch all response-* param pairs recursively (dirty method)
+        while path[/[&?](response\-[A-Za-z\-]+=[A-Za-z0-9\-\s;\.=]+)($|&)/]
+          resp = $1
+          out_string << (out_string[/\?/] ? "&#{resp}" : "?#{resp}")
+          path = path.gsub(/[&?]#{resp}/, '')
+        end
+      end
       out_string
     end
 
@@ -916,8 +924,13 @@ module RightAws
       #  s3.get_link('my_awesome_bucket',key) #=> https://s3.amazonaws.com:443/my_awesome_bucket/asia%2Fcustomers?Signature=QAO...
       #
       # see http://docs.amazonwebservices.com/AmazonS3/2006-03-01/VirtualHosting.html
-    def get_link(bucket, key, expires=nil, headers={})
-      generate_link('GET', headers.merge(:url=>"#{bucket}/#{CGI::escape key}"), expires)
+    def get_link(bucket, key, expires=nil, headers={}, response_params={})
+      if response_params == {} || response_params == nil
+        generate_link('GET', headers.merge(:url=>"#{bucket}/#{CGI::escape key}"), expires)
+      else
+        params_s = response_params.sort { |a,b| a[0] <=> b[0] }.map { |x| "#{x[0]}=#{x[1]}" }.join('&')
+        generate_link('GET', headers.merge(:url=>"#{bucket}/#{CGI::escape key}?#{params_s}"), expires)
+      end
     rescue
       on_exception
     end
