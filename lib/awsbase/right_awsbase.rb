@@ -121,6 +121,16 @@ module RightAws
       e.gsub(/\+/, "%2b")
     end
     
+    def self.CGIescape(raw)
+      e = CGI::escape raw
+      e.gsub(/\+/, "%20")
+    end
+    
+    def self.CGIunescape(escaped)
+      r = escaped.gsub("%20", "+")
+      CGI::unescape r
+    end
+    
     def self.allow_only(allowed_keys, params)
       bogus_args = []
       params.keys.each {|p| bogus_args.push(p) unless allowed_keys.include?(p) }

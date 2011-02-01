@@ -116,9 +116,11 @@ module RightAws
       out_string << '?logging'  if path[/[&?]logging($|&|=)/]  # this one is beta, no support for now
       if method == 'GET'
         # fetch all response-* param pairs recursively (dirty method)
-        while path[/[&?](response\-[A-Za-z\-]+=[A-Za-z0-9\-\s;\.=]+)($|&)/]
+        while path[/[&?](response\-[A-Za-z\-]+=[^&]+)($|&)/]
           resp = $1
-          out_string << (out_string[/\?/] ? "&#{resp}" : "?#{resp}")
+          # string-to-sign must be un-encoded, so an unescape process is taken on resp,
+          # which is already escaped in get_link()
+          out_string << ("#{out_string[/\?/] ? "&" : "?"}#{AwsUtils.CGIunescape(resp)}")
           path = path.gsub(/[&?]#{resp}/, '')
         end
       end
@@ -924,11 +926,28 @@ module RightAws
       #  s3.get_link('my_awesome_bucket',key) #=> https://s3.amazonaws.com:443/my_awesome_bucket/asia%2Fcustomers?Signature=QAO...
       #
       # see http://docs.amazonwebservices.com/AmazonS3/2006-03-01/VirtualHosting.html
+      #
+      # To specify +response+-* parameters, gather them together in a hash at the 5th parameter,
+      # with +expires+ set to +nil+ and +headers+ to {} (or whatever values you want):
+      # 
+      #  s3.get_link('my_awesome_bucket', key, nil, {}, {
+      #              "response-content-disposition" => "attachment; filename=café.png", # supports non-ascii chars
+      #              "response-content-type" => "image/png"})
+      #  #=> https://s3.amazonaws.com:443/my_awesome_bucket/asia%2Fcustomers?response-content-disposition=attachment%3B%20filename%3Dcaf%25C3%25A9.png
+      #      &response-content-type=image%2Fpng&Signature=wio...
     def get_link(bucket, key, expires=nil, headers={}, response_params={})
       if response_params == {} || response_params == nil
         generate_link('GET', headers.merge(:url=>"#{bucket}/#{CGI::escape key}"), expires)
       else
-        params_s = response_params.sort { |a,b| a[0] <=> b[0] }.map { |x| "#{x[0]}=#{x[1]}" }.join('&')
+        params_s = response_params.sort { |a,b| a[0] <=> b[0] }.map { |x| 
+          if (x[0] == 'response-content-disposition')
+            if (x[1][/(.+filename=)(.+)/])
+              # escape the filename with "+" being replaced with "%20" to avoid enconding issue on non-ascii chars
+              x[1] = "#{$1}#{AwsUtils.CGIescape($2)}"
+            end
+          end
+          "#{x[0]}=#{AwsUtils.CGIescape(x[1])}" # collect escaped parameters
+        }.join('&')
         generate_link('GET', headers.merge(:url=>"#{bucket}/#{CGI::escape key}?#{params_s}"), expires)
       end
     rescue
