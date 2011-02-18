@@ -101,4 +101,11 @@ task :testrds do
   require 'test/rds/test_right_rds.rb'
 end
 
+desc "Test just the SNS interface"
+task :testsns do
+  require 'test/test_credentials'
+  TestCredentials.get_credentials
+  require 'test/sns/test_right_sns.rb'
+end
+
 # vim: syntax=Ruby
