@@ -274,12 +274,13 @@ module RightAws
       @aws_secret_access_key = aws_secret_access_key
       # if the endpoint was explicitly defined - then use it
       if @params[:endpoint_url]
-        @params[:server]   = URI.parse(@params[:endpoint_url]).host
-        @params[:port]     = URI.parse(@params[:endpoint_url]).port
-        @params[:service]  = URI.parse(@params[:endpoint_url]).path
+        uri = URI.parse(@params[:endpoint_url])
+        @params[:server]   = uri.host
+        @params[:port]     = uri.port
+        @params[:service]  = uri.path
         # make sure the 'service' path is not empty
         @params[:service]  = service_info[:default_service] if @params[:service].right_blank?
-        @params[:protocol] = URI.parse(@params[:endpoint_url]).scheme
+        @params[:protocol] = uri.scheme
         @params[:region]   = nil
       else
         @params[:server]   ||= service_info[:default_host]
