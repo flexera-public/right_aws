@@ -281,6 +281,7 @@ module RightAws
         # make sure the 'service' path is not empty
         @params[:service]  = service_info[:default_service] if @params[:service].right_blank?
         @params[:protocol] = uri.scheme
+        @params[:protocol_port] = uri.default_port
         @params[:region]   = nil
       else
         @params[:server]   ||= service_info[:default_host]
@@ -288,6 +289,7 @@ module RightAws
         @params[:port]     ||= service_info[:default_port]
         @params[:service]  ||= service_info[:default_service]
         @params[:protocol] ||= service_info[:default_protocol]
+        @params[:protocol_port] = service_info[:default_protocol] == 'https' ? 443 : 80
       end
       # a set of options to be passed to RightHttpConnection object
       @params[:connection_options] = {} unless @params[:connection_options].is_a?(Hash) 
@@ -427,14 +429,15 @@ module RightAws
                       "AWSAccessKeyId" => @aws_access_key_id,
                       "Version"        => @params[:api_version] }
       service_hash.merge!(options)
+      sig_host = (@params[:port].to_i == @params[:protocol_port].to_i) ? @params[:server] : "#{@params[:server]}:#{@params[:port]}"
       # Sign request options
-      service_params = signed_service_params(@aws_secret_access_key, service_hash, http_verb, @params[:server], @params[:service])
+      service_params = signed_service_params(@aws_secret_access_key, service_hash, http_verb, sig_host, @params[:service])
       # Use POST if the length of the query string is too large
       # see http://docs.amazonwebservices.com/AmazonSimpleDB/2007-11-07/DeveloperGuide/MakingRESTRequests.html
       if http_verb != 'POST' && service_params.size > 2000
         http_verb = 'POST'
         if signature_version == '2'
-          service_params = signed_service_params(@aws_secret_access_key, service_hash, http_verb, @params[:server], @params[:service])
+          service_params = signed_service_params(@aws_secret_access_key, service_hash, http_verb, sig_host, @params[:service])
         end
       end
       # create a request
