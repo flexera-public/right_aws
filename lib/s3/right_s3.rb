@@ -99,8 +99,7 @@ module RightAws
     def bucket(name, create=false, perms=nil, headers={})
       headers['x-amz-acl'] = perms if perms
       @interface.create_bucket(name, headers) if create
-      buckets.each { |bucket| return bucket if bucket.name == name }
-      nil
+      Bucket.new(self, name)
     end
     
 
