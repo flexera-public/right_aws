@@ -145,7 +145,9 @@ module RightAws
 
     # Describe EBS snapshots.
     #
-    # Accepts a list of snapshots and/or a set of filters as the last parameter.
+    # Accepts a list of snapshots and/or options: :restorable_by, :owner and :filters
+    # 
+    # Options: :restorable_by => Array or String, :owner => Array or String, :filters => Hash
     #
     # Filters: description, owner-alias, owner-id, progress, snapshot-id, start-time, status, tag-key,
     # tag-value, tag:key, volume-id, volume-size
@@ -168,7 +170,11 @@ module RightAws
     #      :aws_volume_size=>180,
     #      :aws_status=>"completed"}, ...]
     #
-    #  ec2.describe_snapshots(:filters => {'tag:MyTag' => 'MyValue'))
+    #  ec2.describe_snapshots("snap-e676e28a", "snap-e176e281")
+    #
+    #  ec2.describe_snapshots(:restorable_by => ['123456781234'],
+    #                         :owner         => ['self', 'amazon'],
+    #                         :filters       => {'tag:MyTag' => 'MyValue'})
     #
     # P.S. filters: http://docs.amazonwebservices.com/AWSEC2/latest/APIReference/index.html?ApiReference-query-DescribeSnapshots.html
     #

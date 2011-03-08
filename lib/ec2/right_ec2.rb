@@ -144,9 +144,19 @@ module RightAws
       # 'RemoteFunctionName' -> :remote_funtion_name
       cache_name = remote_function_name.right_underscore.to_sym
       list, options = AwsUtils::split_items_and_params(list_and_options)
+      # Resource IDs to fetch
       request_hash  = amazonize_list(remote_item_name, list)
-      request_hash.merge!(amazonize_list(['Filter.?.Name', 'Filter.?.Value.?'], options[:filters])) unless options[:filters].right_blank?
-      cache_for     = (list.right_blank? && options[:filters].right_blank?) ? cache_name : nil
+      # Other custom options
+      options.each do |key, values|
+        next if values.right_blank?
+        case key
+        when :filters then
+          request_hash.merge!(amazonize_list(['Filter.?.Name', 'Filter.?.Value.?'], values))
+        else
+          request_hash.merge!(amazonize_list(key.to_s.right_camelize, values))
+        end
+      end
+      cache_for = (list.right_blank? && options.right_blank?) ? cache_name : nil
       link = generate_request(remote_function_name, request_hash)
       request_cache_or_info(cache_for, link,  parser_class, @@bench, cache_for, &block)
     rescue Exception
