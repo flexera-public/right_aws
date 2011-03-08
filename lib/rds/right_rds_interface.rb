@@ -1157,6 +1157,8 @@ module RightAws
         when 'Description'          then @item[:description]    = @text
         when 'IsModifiable'         then @item[:is_modifiable]  = (@text == 'true')
         when 'ApplyType'            then @item[:apply_type]     = @text
+        when 'ApplyMethod'          then @item[:apply_method]   = @text
+        when 'MinimumEngineVersion' then @item[:minimum_engine_version] = @text
         when 'AllowedValues'        then @item[:allowed_values] = @text
         when 'ParameterName'        then @item[:name]           = @text
         when 'ParameterValue'       then @item[:value]          = @text
