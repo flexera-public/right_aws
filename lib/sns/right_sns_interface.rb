@@ -144,6 +144,24 @@ module RightAws
       request_info(req_hash, SnsPublishParser.new)
     end
 
+    def set_topic_attribute(topic_arn, attribute_name, attribute_value)
+      if attribute_name != 'Policy' && attribute_name != 'DisplayName'
+        raise(ArgumentError, "The only values accepted for the attribute_name parameter are (Policy, DisplayName)")
+      end
+      req_hash = generate_request('SetTopicAttributes', 'TopicArn' => topic_arn, 'AttributeName' => attribute_name, 'AttributeValue' => attribute_value)
+      request_info(req_hash, RightHttp2xxParser.new)
+    end
+
+    def get_topic_attributes(topic_arn)
+      req_hash = generate_request('GetTopicAttributes', 'TopicArn' => topic_arn)
+      request_info(req_hash, SnsGetTopicAttributesParser.new)
+    end
+
+    def list_subscriptions()
+      req_hash = generate_request('ListSubscriptions')
+      request_info(req_hash, SnsListSubscriptionsParser.new)
+    end
+
     class SnsCreateTopicParser < RightAWSParser # :nodoc:
       def reset
         @result  = ''
@@ -192,6 +210,37 @@ module RightAws
       def tagend(name)
         case name
           when 'MessageId' then @result = @text
+        end
+      end
+    end
+
+    class SnsGetTopicAttributesParser < RightAWSParser # :nodoc:
+      def reset
+        @result = {}
+      end
+      def tagend(name)
+        case name
+          when 'key' then @current_attr = @text
+          when 'value' then @result[@current_attr] = @text
+        end
+      end
+    end
+
+    class SnsListSubscriptionsParser < RightAWSParser # :nodoc:
+      def reset
+        @result = []
+      end
+      def tagstart(name, attributes)
+        @current_key = {} if name == 'member'
+      end
+      def tagend(name)
+        case name
+          when 'TopicArn'         then @current_key[:topic_arn]         = name
+          when 'Protocol'         then @current_key[:protocol]          = name
+          when 'SubscriptionArn'  then @current_key[:subscription_arn]  = name
+          when 'Owner'            then @current_key[:owner]             = name
+          when 'Endpoint'         then @current_key[:endpoint] = name
+          when 'member'     then @result << @current_key
         end
       end
     end
