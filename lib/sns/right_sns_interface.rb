@@ -157,9 +157,35 @@ module RightAws
       request_info(req_hash, SnsGetTopicAttributesParser.new)
     end
 
-    def list_subscriptions()
-      req_hash = generate_request('ListSubscriptions')
+    # Calls either the ListSubscriptions or ListSubscriptionsByTopic depending on whether or not the topic_arn parameter is provided.
+    def list_subscriptions(topic_arn = nil)
+      req_hash = topic_arn ? generate_request('ListSubscriptionsByTopic', 'TopicArn' => topic_arn) : generate_request('ListSubscriptions')
       request_info(req_hash, SnsListSubscriptionsParser.new)
+    end
+
+    def confirm_subscription(topic_arn, token, authenticate_on_unsubscribe=false)
+      req_hash = generate_request('ConfirmSubscription', 'AuthenticateOnUnsubscribe' => authenticate_on_unsubscribe.to_s, 'Token' => token, 'TopicArn' => topic_arn)
+      request_info(req_hash, SnsConfirmSubscriptionParser.new)
+    end
+
+    def add_permission(topic_arn, label, acct_action_hash_ary)
+      n_hash = {
+        'TopicArn'  => topic_arn,
+        'Label'     => label
+      }
+
+      acct_action_hash_ary.each_with_index do |hash_val, idx|
+        n_hash["AWSAccountId.member.#{idx+1}"]  = hash_val[:aws_account_id]
+        n_hash["ActionName.member.#{idx+1}"]    = hash_val[:action]
+      end
+
+      req_hash = generate_request('AddPermission', n_hash)
+      request_info(req_hash, RightHttp2xxParser.new)
+    end
+
+    def remove_permission(topic_arn, label)
+      req_hash = generate_request('RemovePermission', 'TopicArn' => topic_arn, 'Label' => label)
+      request_info(req_hash, RightHttp2xxParser.new)
     end
 
     class SnsCreateTopicParser < RightAWSParser # :nodoc:
@@ -235,12 +261,23 @@ module RightAws
       end
       def tagend(name)
         case name
-          when 'TopicArn'         then @current_key[:topic_arn]         = name
-          when 'Protocol'         then @current_key[:protocol]          = name
-          when 'SubscriptionArn'  then @current_key[:subscription_arn]  = name
-          when 'Owner'            then @current_key[:owner]             = name
-          when 'Endpoint'         then @current_key[:endpoint] = name
+          when 'TopicArn'         then @current_key[:topic_arn]         = @text
+          when 'Protocol'         then @current_key[:protocol]          = @text
+          when 'SubscriptionArn'  then @current_key[:subscription_arn]  = @text
+          when 'Owner'            then @current_key[:owner]             = @text
+          when 'Endpoint'         then @current_key[:endpoint]          = @text
           when 'member'     then @result << @current_key
+        end
+      end
+    end
+
+    class SnsConfirmSubscriptionParser < RightAWSParser # :nodoc:
+      def reset
+        @result = ''
+      end
+      def tagend(name)
+        case name
+          when 'SubscriptionArn' then @result = @text
         end
       end
     end
