@@ -120,8 +120,13 @@ module RightAws
         'response-content-disposition',
         'response-content-encoding',
         'torrent' ].each { |parameter|
-        if path[/[&?]#{parameter}($|&|=)/]
-          out_string << (out_string[/[?]/] ? "&#{parameter}" : "?#{parameter}")
+        if path[/[&?]#{parameter}(=[^&]*)?($|&)/]
+          if $1
+            value = CGI::unescape($1)
+          else
+            value = ''
+          end
+          out_string << (out_string[/[?]/] ? "&#{parameter}#{value}" : "?#{parameter}#{value}")
         end
       }
       out_string
