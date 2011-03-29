@@ -940,7 +940,7 @@ module RightAws
       #
     def get_link(bucket, key, expires=nil, headers={}, response_params={})
       if response_params.size > 0
-        response_params = '?' + response_params.map { |k, v| "#{k}=#{CGI::escape(v)}" }.join('&')
+        response_params = '?' + response_params.map { |k, v| "#{k}=#{CGI::escape(v).gsub(/[+]/, '%20')}" }.join('&')
       else
         response_params = ''
       end
