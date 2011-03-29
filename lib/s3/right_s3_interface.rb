@@ -926,9 +926,16 @@ module RightAws
       #  s3.get_link('my_awesome_bucket',key) #=> https://s3.amazonaws.com:443/my_awesome_bucket/asia%2Fcustomers?Signature=QAO...
       #
       # see http://docs.amazonwebservices.com/AmazonS3/2006-03-01/VirtualHosting.html
+      #
+      # To specify +response+-* parameters, define them in the response_params hash:
+      #
+      #  s3.get_link('my_awesome_bucket',key,nil,{},{ "response-content-disposition" => "attachment; filename=café.png", "response-content-type" => "image/png"})
+      #
+      #    #=> https://s3.amazonaws.com:443/my_awesome_bucket/asia%2Fcustomers?response-content-disposition=attachment%3B%20filename%3Dcaf%25C3%25A9.png&response-content-type=image%2Fpng&Signature=wio...
+      #
     def get_link(bucket, key, expires=nil, headers={}, response_params={})
       if response_params.size > 0
-        response_params = '?' + response_params.map { |k, v| "#{k}=#{v}" }.join('&')
+        response_params = '?' + response_params.map { |k, v| "#{k}=#{CGI::escape(v).gsub(/[+]/, '%20')}" }.join('&')
       else
         response_params = ''
       end
