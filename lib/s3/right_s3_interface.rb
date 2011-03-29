@@ -107,13 +107,23 @@ module RightAws
       s3_headers.sort { |a, b| a[0] <=> b[0] }.each do |key, value|
         out_string << (key[/^#{AMAZON_HEADER_PREFIX}/o] ? "#{key}:#{value}\n" : "#{value}\n")
       end
-        # ignore everything after the question mark...
+      # ignore everything after the question mark by default...
       out_string << path.gsub(/\?.*$/, '')
-       # ...unless there is an acl or torrent parameter
-      out_string << '?acl'      if path[/[&?]acl($|&|=)/]
-      out_string << '?torrent'  if path[/[&?]torrent($|&|=)/]
-      out_string << '?location' if path[/[&?]location($|&|=)/]
-      out_string << '?logging'  if path[/[&?]logging($|&|=)/]  # this one is beta, no support for now
+      # ... unless there is a parameter that we care about.
+      [ 'acl',
+        'location',
+        'logging', # this one is beta, no support for now
+        'response-content-type',
+        'response-content-language',
+        'response-expires',
+        'response-cache-control',
+        'response-content-disposition',
+        'response-content-encoding',
+        'torrent' ].each { |parameter|
+        if path[/[&?]#{parameter}($|&|=)/]
+          out_string << (out_string[/[?]/] ? "&#{parameter}" : "?#{parameter}")
+        end
+      }
       out_string
     end
 
@@ -916,8 +926,13 @@ module RightAws
       #  s3.get_link('my_awesome_bucket',key) #=> https://s3.amazonaws.com:443/my_awesome_bucket/asia%2Fcustomers?Signature=QAO...
       #
       # see http://docs.amazonwebservices.com/AmazonS3/2006-03-01/VirtualHosting.html
-    def get_link(bucket, key, expires=nil, headers={})
-      generate_link('GET', headers.merge(:url=>"#{bucket}/#{CGI::escape key}"), expires)
+    def get_link(bucket, key, expires=nil, headers={}, response_params={})
+      if response_params.size > 0
+        response_params = '?' + response_params.map { |k, v| "#{k}=#{v}" }.join('&')
+      else
+        response_params = ''
+      end
+      generate_link('GET', headers.merge(:url=>"#{bucket}/#{CGI::escape key}#{response_params}"), expires)
     rescue
       on_exception
     end
