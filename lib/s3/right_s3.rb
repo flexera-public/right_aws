@@ -1041,8 +1041,8 @@ module RightAws
         #
         #  bucket.get('logs/today/1.log', 1.hour)
         #
-      def get(key, expires=nil, headers={})
-        @s3.interface.get_link(@name, key.to_s, expires, headers)
+      def get(key, expires=nil, headers={}, response_params={})
+        @s3.interface.get_link(@name, key.to_s, expires, headers, response_params)
       end
        
         # Generate link to delete bucket. 
@@ -1098,8 +1098,8 @@ module RightAws
         #
         #  bucket.get('logs/today/1.log', 1.hour) #=> https://s3.amazonaws.com:443/my_awesome_bucket/logs%2Ftoday%2F1.log?Signature=h...M%3D&Expires=1180820032&AWSAccessKeyId=1...2
         #
-      def get(expires=nil, headers={})
-        @bucket.s3.interface.get_link(@bucket.to_s, @name, expires, headers)
+      def get(expires=nil, headers={}, response_params={})
+        @bucket.s3.interface.get_link(@bucket.to_s, @name, expires, headers, response_params)
       end
        
         # Generate link to delete key. 
