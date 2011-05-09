@@ -236,7 +236,11 @@ module RightAws
       params['InstanceInitiatedShutdownBehavior'] = options[:instance_initiated_shutdown_behavior] unless options[:instance_initiated_shutdown_behavior].right_blank?
       params['Placement.GroupName']               = options[:placement_group_name]                 unless options[:placement_group_name].right_blank?
       params['License.Pool']                      = options[:license_pool]                         unless options[:license_pool].right_blank?
-      params['ClientToken']                       = options[:client_token] || AwsUtils::generate_unique_token
+      # Client token: do not set it automatically for Euca clouds (but let it go if it was set by a user)
+      client_token          = options[:client_token]
+      client_token        ||= AwsUtils::generate_unique_token unless @params[:eucalyptus]
+      params['ClientToken'] = client_token                    if     client_token
+      #
       params.merge!(amazonize_block_device_mappings(options[:block_device_mappings]))
       # KD: https://github.com/rightscale/right_aws/issues#issue/11
       # Do not modify user data and pass it as is: one may pass there a hex-binary data
