@@ -274,20 +274,26 @@ module RightAws
       @aws_secret_access_key = aws_secret_access_key
       # if the endpoint was explicitly defined - then use it
       if @params[:endpoint_url]
-        @params[:server]   = URI.parse(@params[:endpoint_url]).host
-        @params[:port]     = URI.parse(@params[:endpoint_url]).port
-        @params[:service]  = URI.parse(@params[:endpoint_url]).path
+        uri = URI.parse(@params[:endpoint_url])
+        @params[:server]   = uri.host
+        @params[:port]     = uri.port
+        @params[:service]  = uri.path
+        @params[:protocol] = uri.scheme
         # make sure the 'service' path is not empty
         @params[:service]  = service_info[:default_service] if @params[:service].right_blank?
-        @params[:protocol] = URI.parse(@params[:endpoint_url]).scheme
         @params[:region]   = nil
+        default_port       = uri.default_port
       else
         @params[:server]   ||= service_info[:default_host]
         @params[:server]     = "#{@params[:region]}.#{@params[:server]}" if @params[:region]
         @params[:port]     ||= service_info[:default_port]
         @params[:service]  ||= service_info[:default_service]
         @params[:protocol] ||= service_info[:default_protocol]
+        default_port         = @params[:protocol] == 'https' ? 443 : 80
       end
+      # build a host name to sign
+      @params[:host_to_sign]  = @params[:server]
+      @params[:host_to_sign] << ":#{@params[:port]}" unless default_port == @params[:port].to_i
       # a set of options to be passed to RightHttpConnection object
       @params[:connection_options] = {} unless @params[:connection_options].is_a?(Hash) 
       @with_connection_options = {}
@@ -427,13 +433,13 @@ module RightAws
                       "Version"        => @params[:api_version] }
       service_hash.merge!(options)
       # Sign request options
-      service_params = signed_service_params(@aws_secret_access_key, service_hash, http_verb, @params[:server], @params[:service])
+      service_params = signed_service_params(@aws_secret_access_key, service_hash, http_verb, @params[:host_to_sign], @params[:service])
       # Use POST if the length of the query string is too large
       # see http://docs.amazonwebservices.com/AmazonSimpleDB/2007-11-07/DeveloperGuide/MakingRESTRequests.html
       if http_verb != 'POST' && service_params.size > 2000
         http_verb = 'POST'
         if signature_version == '2'
-          service_params = signed_service_params(@aws_secret_access_key, service_hash, http_verb, @params[:server], @params[:service])
+          service_params = signed_service_params(@aws_secret_access_key, service_hash, http_verb, @params[:host_to_sign], @params[:service])
         end
       end
       # create a request
