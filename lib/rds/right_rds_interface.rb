@@ -27,7 +27,7 @@ module RightAws
     
     include RightAwsBaseInterface
 
-    API_VERSION      = "2010-07-28"
+    API_VERSION      = "2011-04-01"
     DEFAULT_HOST     = 'rds.amazonaws.com'
     DEFAULT_PORT     = 443
     DEFAULT_PROTOCOL = 'https'
@@ -35,6 +35,7 @@ module RightAws
 
     DEFAULT_INSTANCE_CLASS   =  'db.m1.small'
     INSTANCE_CLASSES         = ['db.m1.small', 'db.m1.large', 'db.m1.xlarge', 'db.m2.2xlarge', 'db.m2.2xlarge', 'db.m2.4xlarge']
+    LICENSE_MODELS           = ['bring-your-own-license', 'license-included', 'general-public-license']
 
     @@bench = AwsBenchmarkingBlock.new
     def self.bench_xml
@@ -175,7 +176,8 @@ module RightAws
     # Mandatory arguments: +aws_id+, +master_username+, +master_user_password+
     # Optional params: +:allocated_storage+ (25 by def), +:instance_class+, +:engine+ ('MySQL' by def),
     # +:endpoint_port+, +:db_name+, +:db_security_groups+, +:db_parameter_group+,  +:availability_zone+, +:preferred_maintenance_window+
-    # +:backup_retention_period+, +:preferred_backup_window+, +:multi_az+, +:engine_version+, +:auto_minor_version_upgrade+
+    # +:backup_retention_period+, +:preferred_backup_window+, +:multi_az+, +:engine_version+, +:auto_minor_version_upgrade+,
+    # +:license_model+
     #
     #   rds.create_db_instance('kd-delete-me-01', 'username', 'password',
     #                           :db_instance_class => 'db.m1.small',
@@ -219,6 +221,7 @@ module RightAws
       request_hash['DBParameterGroupName']       = params[:db_parameter_group]              unless params[:db_parameter_group].right_blank?
       request_hash['EngineVersion']              = params[:engine_version]                  unless params[:engine_version].right_blank?
       request_hash['AutoMinorVersionUpgrade']    = params[:auto_minor_version_upgrade].to_s unless params[:auto_minor_version_upgrade].nil?
+      request_hash['LicenseModel']               = params[:license_model]                   unless params[:license_model].right_blank?
       request_hash.merge!(amazonize_list('DBSecurityGroups.member',  params[:db_security_groups]))
       link = generate_request('CreateDBInstance', request_hash)
       request_info(link, DescribeDbInstancesParser.new(:logger => @logger))[:db_instances].first
@@ -636,6 +639,30 @@ module RightAws
       result
     end
 
+    # Describe a list of orderable DB Instance options for the specified engine.
+    #
+    #  rds.describe_orderable_db_instance_options('oracle-ee', :engine_version => '11.2.0.2.v2') #=>
+    #    [{:read_replica_capable=>false,
+    #      :db_instance_class=>"db.m1.large",
+    #      :availability_zones=>["us-east-1a", "us-east-1b", "us-east-1d"],
+    #      :engine=>"oracle-ee",
+    #      :license_model=>"bring-your-own-license",
+    #      :engine_version=>"11.2.0.2.v2",
+    #      :multi_az_capable=>"false"}, ... ]
+    #
+    def describe_orderable_db_instance_options(engine, params={}, &block)
+      request_hash = { 'Engine' => engine }
+      request_hash['DBInstanceClass'] = params[:db_instance_class] unless params[:db_instance_class].right_blank?
+      request_hash['EngineVersion']   = params[:engine_version]    unless params[:engine_version].right_blank?
+      request_hash['LicenseModel']    = params[:license_model]     unless params[:license_model].right_blank?
+      result = []
+      incrementally_list_items('DescribeOrderableDBInstanceOptions', DescribeOrderableDBInstanceOptionsParser, request_hash) do |response|
+        result += response[:items]
+        block ? block.call(response) : true
+      end
+      result
+    end
+    
     # --------------------------------------------
     #  DB Snapshots
     # --------------------------------------------
@@ -717,7 +744,7 @@ module RightAws
     # in the "Available" state. The new RDS instance is created with the Default security group.
     #
     # Optional params: +:instance_class+, +:endpoint_port+, +:availability_zone+, +:multi_az+,
-    # +:auto_minor_version_upgrade+
+    # +:auto_minor_version_upgrade+, +:license_model+, +:db_name+, +:engine+
     #
     #  rds.restore_db_instance_from_db_snapshot('ahahahaha-final-snapshot-20090828081159', 'q1') #=>
     #    {:status=>"creating",
@@ -741,6 +768,9 @@ module RightAws
       request_hash['AvailabilityZone']        = params[:availability_zone]          unless params[:availability_zone].right_blank?
       request_hash['MultiAZ']                 = params[:multi_az]                   unless params[:multi_az].nil?
       request_hash['AutoMinorVersionUpgrade'] = params[:auto_minor_version_upgrade] unless params[:auto_minor_version_upgrade].nil?
+      request_hash['LicenseModel']            = params[:license_model]              unless params[:license_model].right_blank?
+      request_hash['DBName']                  = params[:db_name]                    unless params[:db_name].right_blank?
+      request_hash['Engine']                  = params[:engine]                     unless params[:enginel].right_blank?
       link = generate_request('RestoreDBInstanceFromDBSnapshot', request_hash)
       request_info(link, DescribeDbInstancesParser.new(:logger => @logger))[:db_instances].first
     end
@@ -751,7 +781,7 @@ module RightAws
     # security group.
     #
     # Optional params: +:instance_class+, +:endpoint_port+, +:availability_zone+, +:multi_az+, +:restore_time+,
-    # +:auto_minor_version_upgrade+, +:use_latest_restorable_time+
+    # +:auto_minor_version_upgrade+, +:use_latest_restorable_time+, +:license_model+, +:db_name+, +:engine+
     #
     def restore_db_instance_to_point_in_time(instance_aws_id, new_instance_aws_id, params={})
       request_hash = { 'SourceDBInstanceIdentifier' => instance_aws_id,
@@ -763,6 +793,9 @@ module RightAws
       request_hash['Port']                    = params[:endpoint_port]              unless params[:endpoint_port].right_blank?
       request_hash['AvailabilityZone']        = params[:availability_zone]          unless params[:availability_zone].right_blank?
       request_hash['AutoMinorVersionUpgrade'] = params[:auto_minor_version_upgrade] unless params[:auto_minor_version_upgrade].nil?
+      request_hash['LicenseModel']            = params[:license_model]              unless params[:license_model].right_blank?
+      request_hash['DBName']                  = params[:db_name]                    unless params[:db_name].right_blank?
+      request_hash['Engine']                  = params[:engine]                     unless params[:enginel].right_blank?
       link = generate_request('RestoreDBInstanceToPointInTime', request_hash)
       request_info(link, DescribeDbInstancesParser.new(:logger => @logger))[:db_instances].first
     end
@@ -844,15 +877,17 @@ module RightAws
     # Optional params: +:db_parameter_group_family+, +:default_only+, +:engine+, +:engine_version+
     #
     #  rds.describe_db_engine_versions #=>
-    #    [{:engine=>"mysql",
-    #      :db_parameter_group_family=>"mysql5.1",
+    #    [{:db_parameter_group_family=>"mysql5.1",
+    #      :engine=>"mysql",
+    #      :db_engine_description=>"MySQL Community Edition",
+    #      :db_engine_version_description=>"Mysql 5.1.45",
     #      :engine_version=>"5.1.45"},
-    #     {:engine=>"mysql",
-    #      :db_parameter_group_family=>"mysql5.1",
-    #      :engine_version=>"5.1.49"},
-    #     {:engine=>"mysql",
-    #      :db_parameter_group_family=>"mysql5.1",
-    #      :engine_version=>"5.1.50"}]
+    #     {:db_parameter_group_family=>"oracle-se1-11.2",
+    #      :engine=>"oracle-se1",
+    #      :db_engine_description=>"Oracle Database Standard Edition One",
+    #      :db_engine_version_description=>
+    #       "Oracle Standard Edition One - DB Engine Version 11.2.0.2.v2",
+    #      :engine_version=>"11.2.0.2.v2"}]
     #
     def describe_db_engine_versions(params={}, &block)
       params = params.dup
@@ -918,26 +953,29 @@ module RightAws
     # Options: :aws_id, :instance_class, :duration, :product_description, :multi_az
     #
     #  rds.describe_reserved_db_instances_offerings #=>
-    #    [{:multi_az=>false,
+    #    [{:usage_price=>0.262,
+    #      :offering_aws_id=>"248e7b75-2451-4381-9025-b5553d421c7b",
+    #      :multi_az=>false,
     #      :duration=>31536000,
-    #      :fixed_price=>1325.0,
-    #      :usage_price=>0.262,
-    #      :aws_id=>"248e7b75-2451-4381-9025-b5553d421c7b",
+    #      :currency_code=>"USD",
     #      :instance_class=>"db.m2.xlarge",
-    #      :product_description=>"mysql"},
-    #     {:multi_az=>true,
+    #      :product_description=>"mysql",
+    #      :fixed_price=>1325.0},
+    #     {:usage_price=>0.092,
+    #      :offering_aws_id=>"248e7b75-49a7-4cd7-9a9b-354f4906a9b1",
+    #      :multi_az=>true,
     #      :duration=>94608000,
-    #      :fixed_price=>700.0,
-    #      :usage_price=>0.092,
-    #      :aws_id=>"248e7b75-49a7-4cd7-9a9b-354f4906a9b1",
+    #      :currency_code=>"USD",
     #      :instance_class=>"db.m1.small",
-    #      :product_description=>"mysql"}, ... ]
+    #      :product_description=>"mysql",
+    #      :fixed_price=>700.0},   ...]
     #
     #  rds.describe_reserved_db_instances_offerings(:aws_id => "248e7b75-49a7-4cd7-9a9b-354f4906a9b1") #=>
     #    [{:duration=>94608000,
     #      :multi_az=>true,
     #      :fixed_price=>700.0,
     #      :usage_price=>0.092,
+    #      :currency_code=>"USD",
     #      :aws_id=>"248e7b75-49a7-4cd7-9a9b-354f4906a9b1",
     #      :instance_class=>"db.m1.small",
     #      :product_description=>"mysql"}]
@@ -1033,6 +1071,8 @@ module RightAws
         when 'MasterUsername'                        then @item[:master_username]        = @text
         when 'AvailabilityZone'                      then @item[:availability_zone]      = @text
         when 'LatestRestorableTime'                  then @item[:latest_restorable_time] = @text
+        when 'LicenseModel'                          then @item[:license_model]          = @text
+        when 'DBName'                                then @item[:db_name]                = @text
         when 'ReadReplicaSourceDBInstanceIdentifier' then @item[:read_replica_source_db_instance_identifier] = @text
         when 'ReadReplicaDBInstanceIdentifier'       then @item[:read_replica_db_instance_identifiers]      << @text
         when 'DBSecurityGroupName'                   then @db_security_group[:name]             = @text
@@ -1065,6 +1105,31 @@ module RightAws
           when %r{PendingModifiedValues/AutoMinorVersionUpgrade$}    then @item[:pending_modified_values][:auto_minor_version_upgrade]   = (@text == 'true')
           when %r{PendingModifiedValues/AllowMajorVersionUpgrade$}   then @item[:pending_modified_values][:allow_major_version_upgrade]  = (@text == 'true')
           end
+        end
+      end
+    end
+
+    class DescribeOrderableDBInstanceOptionsParser < RightAWSParser # :nodoc:
+      def reset
+        @result = { :items => [] }
+      end
+      def tagstart(name, attributes)
+        case name
+        when 'OrderableDBInstanceOption' then @item = { :availability_zones => [] }
+        end
+      end
+      def tagend(name)
+        case name
+        when 'Marker'                     then @result[:marker]             = @text
+        when 'MaxRecords'                 then @result[:max_records]        = @text.to_i
+        when 'DBInstanceClass'            then @item[:db_instance_class]    = @text
+        when 'Engine'                     then @item[:engine]               = @text
+        when 'EngineVersion'              then @item[:engine_version]       = @text
+        when 'LicenseModel'               then @item[:license_model]        = @text
+        when 'MultiAZCapable'             then @item[:multi_az_capable]     = @text
+        when 'ReadReplicaCapable'         then @item[:read_replica_capable] = @text == 'true'
+        when 'Name'                       then @item[:availability_zones]  << @text
+        when 'OrderableDBInstanceOption'  then @result[:items]             << @item
         end
       end
     end
@@ -1195,6 +1260,7 @@ module RightAws
         when 'SnapshotCreateTime'   then @item[:create_time]          = @text
         when 'DBInstanceIdentifier' then @item[:instance_aws_id]      = @text
         when 'DBSnapshotIdentifier' then @item[:aws_id]               = @text
+        when 'LicenseModel'         then @item[:license_model]        = @text
         when 'DBSnapshot'           then @result[:db_snapshots]      << @item
         end
       end
@@ -1246,6 +1312,8 @@ module RightAws
         when 'DBParameterGroupFamily' then @item[:db_parameter_group_family] = @text
         when 'Engine'                 then @item[:engine]                    = @text
         when 'EngineVersion'          then @item[:engine_version]            = @text
+        when 'DBEngineDescription'    then @item[:db_engine_description]     = @text
+        when 'DBEngineVersionDescription' then @item[:db_engine_version_description] = @text
         when 'DBEngineVersion'        then @result[:db_engine_versions]     << @item
         end
       end
@@ -1268,6 +1336,7 @@ module RightAws
         case name
         when 'Marker'                        then @result[:marker]            = @text
         when 'MaxRecords'                    then @result[:max_records]       = @text.to_i
+        when 'CurrencyCode'                  then @item[:currency_code]       = @text
         when 'DBInstanceClass'               then @item[:instance_class]      = @text
         when 'Duration'                      then @item[:duration]            = @text.to_i
         when 'FixedPrice'                    then @item[:fixed_price]         = @text.to_f
@@ -1294,6 +1363,7 @@ module RightAws
         when 'Marker'                        then @result[:marker]            = @text
         when 'MaxRecords'                    then @result[:max_records]       = @text.to_i
         when 'DBInstanceClass'               then @item[:instance_class]      = @text
+        when 'CurrencyCode'                  then @item[:currency_code]       = @text
         when 'Duration'                      then @item[:duration]            = @text.to_i
         when 'FixedPrice'                    then @item[:fixed_price]         = @text.to_f
         when 'UsagePrice'                    then @item[:usage_price]         = @text.to_f
@@ -1302,6 +1372,8 @@ module RightAws
         when 'ReservedDBInstancesOfferingId' then @item[:offering_aws_id]     = @text
         when 'ReservedDBInstanceId'          then @item[:aws_id]              = @text
         when 'State'                         then @item[:state]               = @text
+        when 'DBInstanceCount'               then @item[:instance_count]      = @text.to_i
+        when 'StartTime'                     then @item[:start_time]          = @text
         when 'ReservedDBInstance'            then @result[:reserved_db_instances] << @item
         end
       end
