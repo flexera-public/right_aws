@@ -178,8 +178,8 @@ module RightAws
     # +:backup_retention_period+, +:preferred_backup_window+, +:multi_az+, +:engine_version+, +:auto_minor_version_upgrade+
     #
     #   rds.create_db_instance('kd-delete-me-01', 'username', 'password',
-    #                           :db_instance_class => 'db.m1.small',
-    #                           :multi_az          => true,
+    #                           :instance_class => 'db.m1.small',
+    #                           :multi_az       => true,
     #                           :auto_minor_version_upgrade => false ) #=>
     #    {:instance_class=>"db.m1.small",
     #      :multi_az=>true,
