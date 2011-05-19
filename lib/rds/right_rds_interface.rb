@@ -180,7 +180,7 @@ module RightAws
     # +:license_model+
     #
     #   rds.create_db_instance('kd-delete-me-01', 'username', 'password',
-    #                           :db_instance_class => 'db.m1.small',
+    #                           :instance_class    => 'db.m1.small',
     #                           :multi_az          => true,
     #                           :auto_minor_version_upgrade => false ) #=>
     #    {:instance_class=>"db.m1.small",
@@ -640,10 +640,11 @@ module RightAws
     end
 
     # Describe a list of orderable DB Instance options for the specified engine.
+    # Optionals: +:instance_class+, +:engine_version+ , +:license_model+
     #
     #  rds.describe_orderable_db_instance_options('oracle-ee', :engine_version => '11.2.0.2.v2') #=>
     #    [{:read_replica_capable=>false,
-    #      :db_instance_class=>"db.m1.large",
+    #      :instance_class=>"db.m1.large",
     #      :availability_zones=>["us-east-1a", "us-east-1b", "us-east-1d"],
     #      :engine=>"oracle-ee",
     #      :license_model=>"bring-your-own-license",
@@ -652,7 +653,7 @@ module RightAws
     #
     def describe_orderable_db_instance_options(engine, params={}, &block)
       request_hash = { 'Engine' => engine }
-      request_hash['DBInstanceClass'] = params[:db_instance_class] unless params[:db_instance_class].right_blank?
+      request_hash['DBInstanceClass'] = params[:instance_class] unless params[:instance_class].right_blank?
       request_hash['EngineVersion']   = params[:engine_version]    unless params[:engine_version].right_blank?
       request_hash['LicenseModel']    = params[:license_model]     unless params[:license_model].right_blank?
       result = []
@@ -909,10 +910,10 @@ module RightAws
 
     # Create a DB Instance that acts as a Read Replica of a source DB Instance.
     #
-    # Optional params: +:endpoint_port+, +:availability_zone+, +:db_instance_class+, +:auto_minor_version_upgrade+
+    # Optional params: +:endpoint_port+, +:availability_zone+, +:instance_class+, +:auto_minor_version_upgrade+
     #
     #    rds.create_db_instance_read_replica('kd-delete-me-01-replica-01', 'kd-delete-me-01',
-    #                                        :db_instance_class => 'db.m1.small',
+    #                                        :instance_class => 'db.m1.small',
     #                                        :endpoint_port => '11000',
     #                                        :auto_minor_version_upgrade => false ) #=>
     #      {:auto_minor_version_upgrade=>false,
@@ -938,7 +939,7 @@ module RightAws
                        'SourceDBInstanceIdentifier' => source_db_instance_identifier}
       request_hash['Port']                    = params[:endpoint_port]                   unless params[:endpoint_port].right_blank?
       request_hash['AvailabilityZone']        = params[:availability_zone]               unless params[:availability_zone].right_blank?
-      request_hash['DBInstanceClass']         = params[:db_instance_class]               unless params[:db_instance_class].right_blank?
+      request_hash['DBInstanceClass']         = params[:instance_class]                  unless params[:instance_class].right_blank?
       request_hash['AutoMinorVersionUpgrade'] = params[:auto_minor_version_upgrade].to_s unless params[:auto_minor_version_upgrade].nil?
       link = generate_request('CreateDBInstanceReadReplica', request_hash)
       request_info(link, DescribeDbInstancesParser.new(:logger => @logger))[:db_instances].first
@@ -1122,7 +1123,7 @@ module RightAws
         case name
         when 'Marker'                     then @result[:marker]             = @text
         when 'MaxRecords'                 then @result[:max_records]        = @text.to_i
-        when 'DBInstanceClass'            then @item[:db_instance_class]    = @text
+        when 'DBInstanceClass'            then @item[:instance_class]       = @text
         when 'Engine'                     then @item[:engine]               = @text
         when 'EngineVersion'              then @item[:engine_version]       = @text
         when 'LicenseModel'               then @item[:license_model]        = @text
