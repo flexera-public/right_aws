@@ -32,7 +32,6 @@ class TestS3 < Test::Unit::TestCase
   end
 
   def test_03_list_empty_bucket
-    #@s3.force_delete_bucket( @bucket )
     assert_equal 0, @s3.list_bucket(@bucket).size, "#{@bucket} isn't empty, arrgh!"
   end
 
