@@ -37,16 +37,19 @@ module RightAws
     # reserved-instances-id, start, state, tag-key, tag-value, tag:key, usage-price
     #
     # ec2.describe_reserved_instances #=>
-    #    [{:aws_id=>"1ba8e2e3-1c40-434c-a741-5ff16a4c542e",
-    #      :aws_duration=>31536000,
-    #      :aws_instance_type=>"m1.small",
-    #      :aws_usage_price=>0.03,
-    #      :aws_availability_zone=>"us-east-1b",
-    #      :aws_state=>"payment-pending",
-    #      :aws_product_description=>"Test",
-    #      :aws_fixed_price=>325.0,
-    #      :aws_start=>"2009-12-18T20:39:39.569Z"
-    #      :aws_instance_count=>1}]
+    #  [{:currency_code=>"USD",
+    #    :aws_fixed_price=>350.0,
+    #    :aws_availability_zone=>"us-east-1c",
+    #    :aws_instance_count=>1,
+    #    :tags=>{},
+    #    :aws_id=>"4357912c-ad94-4f57-8625-15ca71a8e66d",
+    #    :aws_product_description=>"Linux/UNIX",
+    #    :aws_state=>"active",
+    #    :aws_start=>"2010-03-18T20:39:39.569Z",
+    #    :aws_duration=>94608000,
+    #    :aws_instance_type=>"m1.small",
+    #    :instance_tenancy=>"default",
+    #    :aws_usage_price=>0.03}]
     #
     #  ec2.describe_reserved_instances(:filters => {'availability-zone' => 'us-east-1a'})
     #
@@ -63,22 +66,25 @@ module RightAws
     # Filters: availability-zone, duration, fixed-price, instance-type, product-description, reserved-instances-offering-id, usage-price
     #
     #  ec2.describe_reserved_instances_offerings #=>
-    #    [{:aws_instance_type=>"c1.medium",
-    #      :aws_availability_zone=>"us-east-1c",
+    #    [{:currency_code=>"USD",
+    #      :aws_fixed_price=>700.0,
+    #      :aws_id=>"248e7b75-933c-451b-b126-be25865e02a5",
+    #      :aws_product_description=>"Linux/UNIX",
+    #      :aws_instance_type=>"c1.medium",
     #      :aws_duration=>94608000,
-    #      :aws_product_description=>"Linux/UNIX",
-    #      :aws_id=>"e5a2ff3b-f6eb-4b4e-83f8-b879d7060257",
+    #      :instance_tenancy=>"default",
     #      :aws_usage_price=>0.06,
-    #      :aws_fixed_price=>1000.0},
-    #      ...
-    #     {:aws_instance_type=>"m1.xlarge",
-    #      :aws_availability_zone=>"us-east-1a",
-    #      :aws_duration=>31536000,
-    #      :aws_product_description=>"Linux/UNIX",
-    #      :aws_id=>"c48ab04c-63ab-4cd6-b8f5-978a29eb9bcc",
-    #      :aws_usage_price=>0.24,
-    #      :aws_fixed_price=>2600.0}]
-    #
+    #      :aws_availability_zone=>"us-east-1a"},
+    #     {:currency_code=>"USD",
+    #      :aws_fixed_price=>700.0,
+    #      :aws_id=>"c48ab04c-7e03-46b2-891a-2df1116e51a3",
+    #      :aws_product_description=>"Linux/UNIX (Amazon VPC)",
+    #      :aws_instance_type=>"c1.medium",
+    #      :aws_duration=>94608000,
+    #      :instance_tenancy=>"default",
+    #      :aws_usage_price=>0.06,
+    #      :aws_availability_zone=>"us-east-1a"}, ... ]
+    #      
     #  ec2.describe_reserved_instances_offerings(:filters => {'availability-zone' => 'us-east-1c'})
     #
     # P.S. filters: http://docs.amazonwebservices.com/AWSEC2/latest/APIReference/index.html?ApiReference-query-DescribeReservedInstancesOfferings.html
@@ -123,6 +129,8 @@ module RightAws
         when 'productDescription'  then @item[:aws_product_description] = @text
         when 'state'               then @item[:aws_state]               = @text
         when 'start'               then @item[:aws_start]               = @text
+        when 'instanceTenancy'     then @item[:instance_tenancy]        = @text
+        when 'currencyCode'        then @item[:currency_code]           = @text
         else
           case full_tag_name
           when %r{/tagSet/item/key$}           then @aws_tag[:key]               = @text
@@ -149,9 +157,11 @@ module RightAws
         when 'duration'                    then @item[:aws_duration]            = @text.to_i
         when 'usagePrice'                  then @item[:aws_usage_price]         = @text.to_f
         when 'fixedPrice'                  then @item[:aws_fixed_price]         = @text.to_f
+        when 'instanceTenancy'             then @item[:instance_tenancy]        = @text
+        when 'currencyCode'                then @item[:currency_code]           = @text
         when 'productDescription'          then @item[:aws_product_description] = @text
-          when 'item'                        then @result << @item
-          end
+        when 'item'                        then @result << @item
+        end
         end
       def reset
         @result = []

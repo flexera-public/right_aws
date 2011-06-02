@@ -30,6 +30,7 @@ module RightAws
     #-----------------------------------------------------------------
 
     # Retrieve Security Groups information.
+    # Options: By default this methods expects security group ids but if you wanna pass their names then :describe_by => :group_name option must be set.
     #
     # Accepts a list of security groups and/or a set of filters as the last parameter.
     #
@@ -40,18 +41,28 @@ module RightAws
     #  ec2 = Rightscale::Ec2.new(AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY)
     #  ec2.describe_security_groups #=>
     #    [{:aws_perms=>
-    #       [{:group=>"default", :owner=>"048291609141"},
-    #        {:to_port=>"22",
-    #         :protocol=>"tcp",
-    #         :from_port=>"22",
-    #         :cidr_ips=>"0.0.0.0/0"},
-    #        {:to_port=>"9997",
-    #         :protocol=>"tcp",
-    #         :from_port=>"9997",
-    #         :cidr_ips=>"0.0.0.0/0"}],
-    #      :aws_group_name=>"photo_us",
-    #      :aws_description=>"default group",
-    #      :aws_owner=>"826693181925"}]
+    #        [{:protocol=>"-1", :cidr_ips=>"0.0.0.0/0", :direction=>:egress},
+    #        {:protocol=>"tcp",
+    #          :cidr_ips=>"127.0.0.2/32",
+    #          :direction=>:egress,
+    #          :from_port=>"1111",
+    #          :to_port=>"1111"},
+    #        {:protocol=>"tcp",
+    #          :cidr_ips=>"127.0.0.1/32",
+    #          :direction=>:egress,
+    #          :from_port=>"1111",
+    #          :to_port=>"1111"}],
+    #      :aws_group_name=>"kd-vpc-egress-test-1",
+    #      :vpc_id=>"vpc-e16cf988",
+    #      :aws_description=>"vpc test",
+    #      :aws_owner=>"826693181925",
+    #      :group_id=>"sg-b72032db"}]
+    #
+    #   # Describe by group ids
+    #   ec2.describe_security_groups("sg-a0b85dc9", "sg-00b05d39", "sg-a1b86dc8")
+    #
+    #   # Describe by group names
+    #   ec2.describe_security_groups("default", "default1", "kd", :describe_by => :group_name)
     #
     #  # Eucalyptus cloud:
     #  ec2 = Rightscale::Ec2.new(AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, :eucalyptus => true)
@@ -89,18 +100,23 @@ module RightAws
     # P.S. filters: http://docs.amazonwebservices.com/AWSEC2/latest/APIReference/ApiReference-query-DescribeSecurityGroups.html
     #
     def describe_security_groups(*list_and_options)
-      describe_resources_with_list_and_options('DescribeSecurityGroups', 'GroupName', QEc2DescribeSecurityGroupsParser, list_and_options) do |parser|
+      list, options = AwsUtils::split_items_and_params(list_and_options)
+      describe_by   = options.delete(:describe_by) == :group_name ? 'GroupName' : 'GroupId'
+      describe_resources_with_list_and_options('DescribeSecurityGroups', describe_by, QEc2DescribeSecurityGroupsParser, list_and_options) do |parser|
         result = []
         parser.result.each do |item|
           result_item = { :aws_owner       => item[:owner_id],
                           :aws_group_name  => item[:group_name],
                           :aws_description => item[:group_description] }
+          result_item[:group_id] = item[:group_id] unless item[:group_id].right_blank?
+          result_item[:vpc_id]   = item[:vpc_id]   unless item[:vpc_id].right_blank?
           aws_perms = []
           item[:ip_permissions].each do |permission|
             result_perm = {}
-            result_perm[:from_port] = permission[:from_port]
-            result_perm[:to_port]   = permission[:to_port]
+            result_perm[:from_port] = permission[:from_port]   unless permission[:from_port].right_blank?
+            result_perm[:to_port]   = permission[:to_port]     unless permission[:to_port].right_blank?
             result_perm[:protocol]  = permission[:ip_protocol]
+            result_perm[:direction] = permission[:direction]
             # IP permissions
             Array(permission[:ip_ranges]).each do |ip_range|
               perm = result_perm.dup
@@ -113,8 +129,9 @@ module RightAws
             # Group permissions
             Array(permission[:groups]).each do |group|
               perm = result_perm.dup
-              perm[:group] = group[:group_name]
-              perm[:owner] = group[:user_id]
+              perm[:group]    = group[:group_name]
+              perm[:group_id] = group[:group_id] unless group[:group_id].right_blank?
+              perm[:owner]    = group[:user_id]  unless group[:user_id].right_blank?
               aws_perms << perm
             end
           end
@@ -126,86 +143,57 @@ module RightAws
     end
 
     # Create new Security Group. Returns +true+ or an exception.
+    # Options: :vpc_id
     #
-    #  ec2.create_security_group('default-1',"Default allowing SSH, HTTP, and HTTPS ingress") #=> true
+    #  ec2.create_security_group('default-1',"Default allowing SSH, HTTP, and HTTPS ingress") #=>
+    #    { :group_id=>"sg-f0227599", :return=>true }
     #
-    def create_security_group(name, description=nil)
-      # EC2 doesn't like an empty description...
-      description = "-" if description.right_blank?
-      link = generate_request("CreateSecurityGroup",
-                              'GroupName'        => name.to_s,
-                              'GroupDescription' => description.to_s)
-      request_info(link, RightBoolResponseParser.new(:logger => @logger))
+    #  ec2.create_security_group('default-2',"my VPC group", :vpc_id => 'vpc-e16c0000') #=>
+    #    { :group_id=>"sg-76d1c31a", :return=>true }
+    #
+    def create_security_group(name, description = nil, options = {})
+      options = options.dup
+      options[:group_name]        = name      
+      options[:group_description] = description.right_blank? ? '-' : description # EC2 rejects an empty description...
+      link = generate_request("CreateSecurityGroup", map_api_keys_and_values(options, :group_name, :group_description, :vpc_id))
+      request_info(link, QEc2CreateSecurityGroupsParser.new(:logger => @logger))
     rescue Exception
       on_exception
     end
 
     # Remove Security Group. Returns +true+ or an exception.
+    # Options: :group_name, :group_id
     #
-    #  ec2.delete_security_group('default-1') #=> true
+    #  ec2.delete_security_group(:group_id => 'sg-90054ef9') #=> true
     #
-    def delete_security_group(name)
-      link = generate_request("DeleteSecurityGroup",
-                              'GroupName' => name.to_s)
+    def delete_security_group(options = {})
+      link = generate_request("DeleteSecurityGroup", map_api_keys_and_values(options, :group_name, :group_id))
       request_info(link, RightBoolResponseParser.new(:logger => @logger))
     rescue Exception
       on_exception
     end
 
-    # Edit AWS/Eucaliptus security group permissions.
-    #
-    #  Options:
-    #    action      - :authorize (or :grant) | :revoke (or :remove)
-    #    group_name  - security group name
-    #    permissions - a combination of options below:
-    #      :source_group_owner => UserId
-    #      :source_group       => GroupName
-    #      :from_port          => from port
-    #      :to_port            => to port
-    #      :port               => set both :from_port and to_port with the same value
-    #      :protocol           => :tcp | :udp | :icmp
-    #      :cidr_ip            => '0.0.0.0/0'
-    #
-    #  ec2.edit_security_group( :grant,
-    #                           'kd-sg-test',
-    #                           :source_group       => "sketchy",
-    #                           :source_group_owner => "600000000006",
-    #                           :protocol           => 'tcp',
-    #                           :port               => '80',
-    #                           :cidr_ip            => '127.0.0.1/32') #=> true
-    #
-    # P.S. This method is deprecated for AWS and but still good for Eucaliptus clouds.
-    # Use +modify_security_group_ingress+ method for AWS clouds.
-    #
-    def edit_security_group(action, group_name, params)
-      hash = {}
-      case action
-      when :authorize, :grant then action = "AuthorizeSecurityGroupIngress"
-      when :revoke, :remove   then action = "RevokeSecurityGroupIngress"
-      else raise "Unknown action #{action.inspect}!"
-      end
-      hash['GroupName']                  = group_name
-      hash['SourceSecurityGroupName']    = params[:source_group]                         unless params[:source_group].right_blank?
-      hash['SourceSecurityGroupOwnerId'] = params[:source_group_owner].to_s.gsub(/-/,'') unless params[:source_group_owner].right_blank?
-      hash['IpProtocol']                 = params[:protocol]                             unless params[:protocol].right_blank?
-      unless params[:port].right_blank?
-        hash['FromPort'] = params[:port]
-        hash['ToPort']   = params[:port]
-      end
-      hash['FromPort']   = params[:from_port] unless params[:from_port].right_blank?
-      hash['ToPort']     = params[:to_port]   unless params[:to_port].right_blank?
-      hash['CidrIp']     = params[:cidr_ip]   unless params[:cidr_ip].right_blank?
-      #
-      link = generate_request(action, hash)
-      request_info(link, RightBoolResponseParser.new(:logger => @logger))
-    rescue Exception
-      on_exception
+    def grant_security_group_ingress(group_id, permissions)
+      modify_security_group(:grant, :ingress, group_id, permissions)
+    end
+
+    def revoke_security_group_ingress(group_id, permissions)
+      modify_security_group(:revoke, :ingress, group_id, permissions)
+    end
+
+    def grant_security_group_egress(group_id, permissions)
+      modify_security_group(:grant, :egress, group_id, permissions)
+    end
+
+    def revoke_security_group_egress(group_id, permissions)
+      modify_security_group(:revoke, :egress, group_id, permissions)
     end
 
     # Modify AWS security group permissions.
     #
     #  Options:
     #    action      - :authorize (or :grant) | :revoke (or :remove)
+    #    direction   - :ingress | :egress
     #    group_name  - security group name
     #    permissions - a combination of options below:
     #      # Ports:
@@ -267,16 +255,18 @@ module RightAws
     #                                       :port          => 812,
     #                                       :protocol      => 'tcp' }]) #=> true
     #
-    def modify_security_group_ingress(action, group_name, permissions)
+    def modify_security_group(action, direction, group_id, permissions)
       hash = {}
-      case action
-      when :authorize, :grant then action = "AuthorizeSecurityGroupIngress"
-      when :revoke, :remove   then action = "RevokeSecurityGroupIngress"
-      else                         raise "Unknown action #{action.inspect}!"
-      end
+      raise "Unknown action #{action.inspect}!"       unless [:authorize, :grant, :revoke, :remove].include?(action)
+      raise "Unknown direction #{direction.inspect}!" unless [:ingress, :egress].include?(direction)
+      # Remote action
+      remote_action = case action
+                      when :authorize, :grant  then direction == :ingress ? "AuthorizeSecurityGroupIngress" : "AuthorizeSecurityGroupEgress"
+                      when :revoke,    :remove then direction == :ingress ? "RevokeSecurityGroupIngress"    : "RevokeSecurityGroupEgress"
+                      end
       # Group Name
-      hash["GroupName"] = group_name
-      #
+      hash["GroupId"] = group_id
+      # Permissions
       permissions = [permissions] unless permissions.is_a?(Array)
       permissions.each_with_index do |permission, idx|
         pid = idx+1
@@ -290,29 +280,76 @@ module RightAws
           hash["IpPermissions.#{pid}.FromPort"] = permission[:from_port]
           hash["IpPermissions.#{pid}.ToPort"]   = permission[:to_port]
         end
-        # Source Group(s)
-        # Old way (if it is used):
-        # :source_group_owner => UserId, :source_group => GroupName 
-        if !permission[:source_group].right_blank? && !permission[:source_group_owner].right_blank?
-          permission[:source_groups] = { permission[:source_group_owner] => permission[:source_group]} 
+        # Groups
+        case direction
+        when :ingress
+          #  :source_groups => {UserId1 => GroupId1, ... UserIdN => GroupIdN}
+          #  or (this allows using same UserId multiple times )
+          #  :source_groups => [[UserId1, GroupId1], ... [UserIdN, GroupIdN]]
+          hash.merge!(amazonize_list( ["IpPermissions.#{pid}.Groups.?.UserId", "IpPermissions.#{pid}.Groups.?.GroupId"], permission[:source_groups] ))
+        when :egress
+          #  :source_groups => [GroupId1, ... GroupIdN]
+          hash.merge!(amazonize_list( "IpPermissions.#{pid}.Groups.?.GroupId", permission[:source_groups] ))
         end
-#        # Fix UserId(s): '0000-0000-0000' => '000000000000'
-#        permission[:source_groups] = Array(permission[:source_groups])
-#        permission[:source_groups].each do |item|
-#          item[0] = item[0].to_s.gsub(/-/,'')
-#        end
-        # New way:
-        #  :source_groups => {UserId1 => GroupName1, ... UserIdN => GroupNameN}
-        #  or (this allows using same UserId multiple times )
-        #  :source_groups => [[UserId1, GroupName1], ... [UserIdN, GroupNameN]]  
-        hash.merge!(amazonize_list( ["IpPermissions.#{pid}.Groups.?.UserId",
-                                     "IpPermissions.#{pid}.Groups.?.GroupName"],
-                                      permission[:source_groups] ))
         # CidrIp(s)
         cidr_ips   = permission[:cidr_ips] unless permission[:cidr_ips].right_blank?
         cidr_ips ||= permission[:cidr_ip]  unless permission[:cidr_ip].right_blank?
         hash.merge!(amazonize_list("IpPermissions.1.IpRanges.?.CidrIp", cidr_ips))
       end
+      #
+      link = generate_request(remote_action, hash)
+      request_info(link, RightBoolResponseParser.new(:logger => @logger))
+    rescue Exception
+      on_exception
+    end
+
+    #-----------------------------------------------------------------
+    #   Eucalyptus
+    #-----------------------------------------------------------------
+
+    # Edit AWS/Eucaliptus security group permissions.
+    #
+    #  Options:
+    #    action      - :authorize (or :grant) | :revoke (or :remove)
+    #    group_name  - security group name
+    #    permissions - a combination of options below:
+    #      :source_group_owner => UserId
+    #      :source_group       => GroupName
+    #      :from_port          => from port
+    #      :to_port            => to port
+    #      :port               => set both :from_port and to_port with the same value
+    #      :protocol           => :tcp | :udp | :icmp
+    #      :cidr_ip            => '0.0.0.0/0'
+    #
+    #  ec2.edit_security_group( :grant,
+    #                           'kd-sg-test',
+    #                           :source_group       => "sketchy",
+    #                           :source_group_owner => "600000000006",
+    #                           :protocol           => 'tcp',
+    #                           :port               => '80',
+    #                           :cidr_ip            => '127.0.0.1/32') #=> true
+    #
+    # P.S. This method is deprecated for AWS and but still good for Eucaliptus clouds.
+    # Use +modify_security_group_ingress+ method for AWS clouds.
+    #
+    def edit_security_group(action, group_name, params)
+      hash = {}
+      case action
+      when :authorize, :grant then action = "AuthorizeSecurityGroupIngress"
+      when :revoke, :remove   then action = "RevokeSecurityGroupIngress"
+      else raise "Unknown action #{action.inspect}!"
+      end
+      hash['GroupName']                  = group_name
+      hash['SourceSecurityGroupName']    = params[:source_group]                         unless params[:source_group].right_blank?
+      hash['SourceSecurityGroupOwnerId'] = params[:source_group_owner].to_s.gsub(/-/,'') unless params[:source_group_owner].right_blank?
+      hash['IpProtocol']                 = params[:protocol]                             unless params[:protocol].right_blank?
+      unless params[:port].right_blank?
+        hash['FromPort'] = params[:port]
+        hash['ToPort']   = params[:port]
+      end
+      hash['FromPort']   = params[:from_port] unless params[:from_port].right_blank?
+      hash['ToPort']     = params[:to_port]   unless params[:to_port].right_blank?
+      hash['CidrIp']     = params[:cidr_ip]   unless params[:cidr_ip].right_blank?
       #
       link = generate_request(action, hash)
       request_info(link, RightBoolResponseParser.new(:logger => @logger))
@@ -358,35 +395,52 @@ module RightAws
     #      PARSERS: Security Groups
     #-----------------------------------------------------------------
 
+    class QEc2CreateSecurityGroupsParser < RightAWSParser #:nodoc:
+      def tagend(name)
+        case name
+        when 'groupId' then @result[:group_id] = @text
+        when 'return'  then @result[:return]   = @text == 'true'
+        end
+      end
+      def reset
+        @result = {}
+      end
+    end
+
     class QEc2DescribeSecurityGroupsParser < RightAWSParser #:nodoc:
       def tagstart(name, attributes)
         if name == 'item'
-          case
-          when @xmlpath[/securityGroupInfo$/] then @item = { :ip_permissions => [] }
-          when @xmlpath[/ipPermissions$/]     then @ip_permission = { :groups => [], :ip_ranges => [] }
-          when @xmlpath[/groups$/]            then @group = {}
+          case full_tag_name
+          when %r{securityGroupInfo/item$}                  then @item    = { :ip_permissions => [] }
+          when %r{ipPermissions/item$}                      then @ip_perm = { :groups => [], :ip_ranges => [], :direction => :ingress }
+          when %r{ipPermissionsEgress/item$}                then @ip_perm = { :groups => [], :ip_ranges => [], :direction => :egress  }
+          when %r{ipPermissions(Egress)?/item/groups/item$} then @group   = {}
           end
         end
       end
       def tagend(name)
         case name
-        when 'ownerId'          then @item[:owner_id]             = @text
-        when 'groupDescription' then @item[:group_description]    = @text
-        when 'ipProtocol'       then @ip_permission[:ip_protocol] = @text
-        when 'fromPort'         then @ip_permission[:from_port]   = @text
-        when 'toPort'           then @ip_permission[:to_port]     = @text
-        when 'cidrIp'           then @ip_permission[:ip_ranges]  << @text
-        when 'userId'           then @group[:user_id]             = @text
-        when 'groupName'
-          case
-          when @xmlpath[/securityGroupInfo\/item$/] then @item[:group_name]  = @text
-          when @xmlpath[/groups\/item$/]            then @group[:group_name] = @text
-          end
-        when 'item'
-          case
-          when @xmlpath[/groups$/]           then @ip_permission[:groups] << @group
-          when @xmlpath[/ipPermissions$/]    then @item[:ip_permissions] << @ip_permission
-          when @xmlpath[/securityGroupInfo$/]then @result << @item
+        when 'ownerId'          then @item[:owner_id]          = @text
+        when 'groupDescription' then @item[:group_description] = @text
+        when 'vpcId'            then @item[:vpc_id]            = @text
+        else
+          case full_tag_name
+          when %r{securityGroupInfo/item/groupName$}                  then @item[:group_name]      = @text
+          when %r{securityGroupInfo/item/groupId$}                    then @item[:group_id]        = @text
+          # ipPermission[Egress]
+          when %r{ipPermissions(Egress)?/item/ipProtocol$}            then @ip_perm[:ip_protocol]  = @text
+          when %r{ipPermissions(Egress)?/item/fromPort$}              then @ip_perm[:from_port]    = @text
+          when %r{ipPermissions(Egress)?/item/toPort$}                then @ip_perm[:to_port]      = @text
+          when %r{ipPermissions(Egress)?/item/ipRanges/item/cidrIp$}  then @ip_perm[:ip_ranges]   << @text
+          # ipPermissions[Egress]/Groups
+          when %r{ipPermissions(Egress)?/item/groups/item/groupName$} then @group[:group_name]     = @text
+          when %r{ipPermissions(Egress)?/item/groups/item/groupId$}   then @group[:group_id]       = @text
+          when %r{ipPermissions(Egress)?/item/groups/item/userId$}    then @group[:user_id]        = @text
+          # Sets
+          when %r{ipPermissions(Egress)?/item/groups/item$}           then @ip_perm[:groups]      << @group
+          when %r{ipPermissions/item$}                                then @item[:ip_permissions] << @ip_perm
+          when %r{ipPermissionsEgress/item$}                          then @item[:ip_permissions] << @ip_perm
+          when %r{securityGroupInfo/item$}                            then @result                << @item
           end
         end
       end

@@ -180,7 +180,7 @@ module RightAws
       params['KernelId']       = options[:kernel_id]        if options[:kernel_id]
       params['RamdiskId']      = options[:ramdisk_id]       if options[:ramdisk_id]
       params['RootDeviceName'] = options[:root_device_name] if options[:root_device_name]
-      params['VirtualizationType'] = options[:virtualization_type] if options[:virtualization_type] 
+      params['VirtualizationType'] = options[:virtualization_type] if options[:virtualization_type]
 #      params['SnapshotId']     = options[:snapshot_id]      if options[:snapshot_id]
       params.merge!(amazonize_block_device_mappings(options[:block_device_mappings]))
       link = generate_request("RegisterImage", params)
@@ -201,9 +201,19 @@ module RightAws
       on_exception
     end
 
-    # Describe image attributes. Currently 'launchPermission', 'productCodes', 'kernel', 'ramdisk' and 'blockDeviceMapping'  are supported.
+    # Describe image attributes.
+    # 
+    # Returns: String (or nil) for 'description', 'kernel', 'ramdisk'; Hash for 'launchPermission'; Array for 'productCodes', 'blockDeviceMapping'
     #
-    #  ec2.describe_image_attribute('ami-e444444d') #=> {:groups=>["all"], :users=>["000000000777"]}
+    #  ec2.describe_image_attribute('ami-00000000', 'description')        #=> 'My cool Image'
+    #  ec2.describe_image_attribute('ami-00000000', 'launchPermission')   #=> {:user_ids=>["443739700000", "115864000000", "309179000000", "857501300000"]}
+    #  ec2.describe_image_attribute('ami-00000000', 'productCodes')       #=> ["8ED10000"]
+    #  ec2.describe_image_attribute('ami-00000000', 'kernel')             #=> "aki-9b00e5f2"
+    #  ec2.describe_image_attribute('ami-00000000', 'ramdisk')            #=> nil
+    #  ec2.describe_image_attribute('ami-00000000', 'blockDeviceMapping') #=> [{:device_name=>"sda2", :virtual_name=>"ephemeral0"},
+    #                                                                          {:device_name=>"sda1", :virtual_name=>"ami"},
+    #                                                                          {:device_name=>"/dev/sda1", :virtual_name=>"root"},
+    #                                                                          {:device_name=>"sda3", :virtual_name=>"swap"}]
     #
     def describe_image_attribute(image_id, attribute='launchPermission')
       link = generate_request("DescribeImageAttribute",
@@ -232,19 +242,23 @@ module RightAws
     # instead of modify_image_attribute because the signature of
     # modify_image_attribute may change with EC2 service changes.
     #
-    #  attribute      : currently, only 'launchPermission' is supported.
-    #  operation_type : currently, only 'add' & 'remove' are supported.
-    #  vars:
-    #    :user_group  : currently, only 'all' is supported.
-    #    :user_id
-    #    :product_code
-    def modify_image_attribute(image_id, attribute, operation_type = nil, vars = {})
-      params =  {'ImageId'   => image_id,
-                 'Attribute' => attribute}
-      params['OperationType'] = operation_type if operation_type
-      params.update(amazonize_list('UserId',      vars[:user_id]))      if vars[:user_id]
-      params.update(amazonize_list('UserGroup',   vars[:user_group]))   if vars[:user_group]
-      params.update(amazonize_list('ProductCode', vars[:product_code])) if vars[:product_code]
+    #  Attribute can take next values: 'launchPermission', 'productCode', 'description'.
+    #  Value is a String for'description'. is a String or an Array for 'productCode' and
+    #  is a Hash {:add_user_ids, :add_groups, :remove_user_ids, :remove_groups } for 'launchPermission'.
+    #
+    def modify_image_attribute(image_id, attribute, value)
+      params = { 'ImageId' => image_id }
+      case attribute.to_s
+      when 'launchPermission'
+        params.update(amazonize_list('LaunchPermission.Add.?.UserId',    value[:add_user_ids]))
+        params.update(amazonize_list('LaunchPermission.Add.?.Group',     value[:add_groups]))
+        params.update(amazonize_list('LaunchPermission.Remove.?.UserId', value[:remove_user_ids]))
+        params.update(amazonize_list('LaunchPermission.Remove.?.Group',  value[:remove_groups]))
+      when 'productCode'
+        params.update(amazonize_list('ProductCode', value))
+      when 'description'
+        params['Description.Value'] = value
+      end
       link = generate_request("ModifyImageAttribute", params)
       request_info(link, RightBoolResponseParser.new(:logger => @logger))
     rescue Exception
@@ -256,16 +270,16 @@ module RightAws
     # Returns +true+ or an exception.
     #
     #  ec2.modify_image_launch_perm_add_users('ami-e444444d',['000000000777','000000000778']) #=> true
-    def modify_image_launch_perm_add_users(image_id, user_id=[])
-      modify_image_attribute(image_id, 'launchPermission', 'add', :user_id => user_id)
+    def modify_image_launch_perm_add_users(image_id, *user_ids)
+      modify_image_attribute(image_id, 'launchPermission', :add_user_ids => user_ids.flatten)
     end
 
     # Revokes image launch permissions for users. +user_id+ is a list of users AWS accounts ids. Returns +true+ or an exception.
     #
     #  ec2.modify_image_launch_perm_remove_users('ami-e444444d',['000000000777','000000000778']) #=> true
     #
-    def modify_image_launch_perm_remove_users(image_id, user_id=[])
-      modify_image_attribute(image_id, 'launchPermission', 'remove', :user_id => user_id)
+    def modify_image_launch_perm_remove_users(image_id, *user_ids)
+      modify_image_attribute(image_id, 'launchPermission', :remove_user_ids => user_ids.flatten)
     end
 
     # Add image launch permissions for users groups (currently only 'all' is supported, which gives public launch permissions).
@@ -273,24 +287,32 @@ module RightAws
     #
     #  ec2.modify_image_launch_perm_add_groups('ami-e444444d') #=> true
     #
-    def modify_image_launch_perm_add_groups(image_id, user_group=['all'])
-      modify_image_attribute(image_id, 'launchPermission', 'add', :user_group => user_group)
+    def modify_image_launch_perm_add_groups(image_id, *groups)
+      modify_image_attribute(image_id, 'launchPermission', :add_groups => groups.flatten)
     end
 
     # Remove image launch permissions for users groups (currently only 'all' is supported, which gives public launch permissions).
     #
     #  ec2.modify_image_launch_perm_remove_groups('ami-e444444d') #=> true
     #
-    def modify_image_launch_perm_remove_groups(image_id, user_group=['all'])
-      modify_image_attribute(image_id, 'launchPermission', 'remove', :user_group => user_group)
+    def modify_image_launch_perm_remove_groups(image_id, *groups)
+      modify_image_attribute(image_id, 'launchPermission', :remove_groups => groups.flatten)
     end
 
     # Add product code to image
     #
     #  ec2.modify_image_product_code('ami-e444444d','0ABCDEF') #=> true
     #
-    def modify_image_product_code(image_id, product_code=[])
-      modify_image_attribute(image_id, 'productCodes', nil, :product_code => product_code)
+    def modify_image_product_code(image_id, product_codes=[])
+      modify_image_attribute(image_id, 'productCodes',product_codes)
+    end
+
+    # Modify image description
+    #
+    #  ec2.modify_image_product_code('ami-e444444d','My cool image') #=> true
+    #
+    def modify_image_description(image_id, description)
+      modify_image_attribute(image_id, 'description', description)
     end
 
     # Create a new image.
@@ -345,6 +367,7 @@ module RightAws
         when 'rootDeviceName'  then @item[:root_device_name]  = @text
         when 'imageClass'      then @item[:image_class]       = @text
         when 'virtualizationType' then @item[:virtualization_type] = @text
+        when 'hypervisor'      then @item [:hypervisor]       = @text
         else
           case full_tag_name
           when %r{/stateReason/code$}    then @item[:state_reason_code]    = @text.to_i
@@ -382,29 +405,35 @@ module RightAws
 
     class QEc2DescribeImageAttributeParser < RightAWSParser #:nodoc:
       def tagstart(name, attributes)
-        case name
-          when 'launchPermission'
-            @result[:groups] = []
-            @result[:users]  = []
-          when 'productCodes'
-            @result[:aws_product_codes] = []
+        case full_tag_name
+        when %r{launchPermission$}        then @result = {}
+        when %r{productCodes$}            then @result = []
+        when %r{blockDeviceMapping$}      then @result = []
+        when %r{blockDeviceMapping/item$} then @block_device_mapping = {}
         end
       end
       def tagend(name)
-          # right now only 'launchPermission' is supported by Amazon.
-          # But nobody know what will they xml later as attribute. That is why we
-          # check for 'group' and 'userId' inside of 'launchPermission/item'
-        case name
-          when 'imageId'            then @result[:aws_id] = @text
-          when 'group'              then @result[:groups] << @text if @xmlpath == 'DescribeImageAttributeResponse/launchPermission/item'
-          when 'userId'             then @result[:users]  << @text if @xmlpath == 'DescribeImageAttributeResponse/launchPermission/item'
-          when 'productCode'        then @result[:aws_product_codes] << @text
-          when 'kernel'             then @result[:aws_kernel]  = @text
-          when 'ramdisk'            then @result[:aws_ramdisk] = @text
+        case full_tag_name
+        when %r{/kernel/value$}                then @result = @text
+        when %r{/ramdisk/value$}               then @result = @text
+        when %r{/description/value$}           then @result = @text
+        when %r{/productCode$}                 then @result << @text
+        when %r{launchPermission/item/group$}  then (@result[:groups]  ||=[])   << @text
+        when %r{launchPermission/item/userId$} then (@result[:user_ids]||=[]) << @text
+        when %r{/blockDeviceMapping/item} # no trailing $
+          case name
+          when 'deviceName'          then @block_device_mapping[:device_name]                = @text
+          when 'virtualName'         then @block_device_mapping[:virtual_name]               = @text
+          when 'noDevice'            then @block_device_mapping[:no_device]                  = @text
+          when 'snapshotId'          then @block_device_mapping[:ebs_snapshot_id]            = @text
+          when 'volumeSize'          then @block_device_mapping[:ebs_volume_size]            = @text
+          when 'deleteOnTermination' then @block_device_mapping[:ebs_delete_on_termination]  = @text == 'true' ? true : false
+          when 'item'                then @result                                           << @block_device_mapping
+          end
         end
       end
       def reset
-        @result = {}
+        @result = nil
       end
     end
 

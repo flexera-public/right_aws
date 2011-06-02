@@ -304,7 +304,14 @@ the source key.
   - this gem requires right_http_connection 0bc3343232133bdb38c237d8285525d74495d3f5 or later
   - "Raise On Timeout On Action" feature added to avoid duplicate resources creation if a timeout error occures and a retry is performed
 
-=== 2.1.0
+=== next
   Release Notes:
   - Fixed:
     - ClientToken (launch_instances, run_instances) is not used for Eucalyptus clouds
+  - VPC2, stage1. Next methods were updated:
+    - associate_address, modify_security_group, create_security_group, create_vpc, delete_security_group,
+      describe_addresses, describe_images, describe_instance_attribute, describe_regions, describe_reserved_instances_offerings,
+      describe_security_groups, describe_snapshots, describe_spot_instance_requests, describe_spot_price_history,
+      describe_vpcs, disassociate_address, modify_image_attribute, modify_snapshot_attribute, release_address,
+      request_spot_instances, stop_instances
+
