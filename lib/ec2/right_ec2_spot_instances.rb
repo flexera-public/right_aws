@@ -81,7 +81,7 @@ module RightAws
       request_hash['EndTime']            = AwsUtils::utc_iso8601(options[:end_time])        unless options[:end_time].right_blank?
       request_hash['ProductDescription'] = options[:product_description]                   unless options[:product_description].right_blank?
       request_hash.merge!(amazonize_list('InstanceType', Array(options[:instance_types]))) unless options[:instance_types].right_blank?
-      link = generate_request("DescribeSpotPriceHistory", request_hash)
+      link = generate_request("DescribeSpotPriceHistory", request_hash, :api_version => '2011-05-15')
       request_info(link, QEc2DescribeSpotPriceHistoryParser.new)
     rescue Exception
       on_exception
@@ -316,6 +316,7 @@ module RightAws
         when 'productDescription' then @item[:product_description] = @text
         when 'spotPrice'          then @item[:spot_price]          = @text.to_f
         when 'timestamp'          then @item[:timestamp]           = @text
+        when 'availabilityZone'   then @item[:availability_zone]   = @text
         when 'item'               then @result                    << @item
         end
       end
