@@ -130,8 +130,8 @@ module RightAws
       #end
     end
 
-    def generate_request(action, params={}) #:nodoc:
-      generate_request_impl(:get, action, params )
+    def generate_request(action, params={}, custom_options={}) #:nodoc:
+      generate_request_impl(:get, action, params, custom_options)
     end
 
       # Sends request to Amazon and parses the response
