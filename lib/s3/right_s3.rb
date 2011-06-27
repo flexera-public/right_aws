@@ -220,18 +220,19 @@ module RightAws
         #
       def keys_and_service(options={}, head=false)
         opt = {}; options.each{ |key, value| opt[key.to_s] = value }
-        thislist = {}
-        list = []
-        @s3.interface.incrementally_list_bucket(@name, opt) do |thislist|
-          thislist[:contents].each do |entry|
+        service = {}
+        keys = []
+        @s3.interface.incrementally_list_bucket(@name, opt) do |_service|
+          service = _service
+          service[:contents].each do |entry|
             owner = Owner.new(entry[:owner_id], entry[:owner_display_name])
             key = Key.new(self, entry[:key], nil, {}, {}, entry[:last_modified], entry[:e_tag], entry[:size], entry[:storage_class], owner)
             key.head if head
-            list << key
+            keys << key
           end
         end
-        thislist.delete(:contents)
-        [list, thislist]
+        service.delete(:contents)
+        [keys, service]
       end
 
         # Retrieve key information from Amazon. 
