@@ -24,7 +24,6 @@
 # Test
 module RightAws
   require 'digest/md5'
-  require 'pp'
   
   class AwsUtils #:nodoc:
     @@digest1   = OpenSSL::Digest::Digest.new("sha1")
@@ -337,7 +336,8 @@ module RightAws
         # get rid of requestId (this bad boy was added for API 2008-08-08+ and it is uniq for every response)
         # feb 04, 2009 (load balancer uses 'RequestId' hence use 'i' modifier to hit it also)
         response = response.sub(%r{<requestId>.+?</requestId>}i, '')
-        response_md5 = MD5.md5(response).to_s
+        # this should work for both ruby 1.8.x and 1.9.x
+        response_md5 = Digest::MD5::new.update(response).to_s
         # check for changes
         unless @cache[function] && @cache[function][:response_md5] == response_md5
           # well, the response is new, reset cache data
