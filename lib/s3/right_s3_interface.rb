@@ -1171,7 +1171,7 @@ module RightAws
       def headers_to_string(headers)
         result = {}
         headers.each do |key, value|
-          value       = value.to_s if value.is_a?(Array) && value.size<2
+          value       = value[0].to_s if value.is_a?(Array) && value.size<2
           result[key] = value
         end
         result
