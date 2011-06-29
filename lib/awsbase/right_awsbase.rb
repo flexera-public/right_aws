@@ -292,7 +292,7 @@ module RightAws
         default_port         = @params[:protocol] == 'https' ? 443 : 80
       end
       # build a host name to sign
-      @params[:host_to_sign]  = @params[:server]
+      @params[:host_to_sign]  = @params[:server].dup
       @params[:host_to_sign] << ":#{@params[:port]}" unless default_port == @params[:port].to_i
       # a set of options to be passed to RightHttpConnection object
       @params[:connection_options] = {} unless @params[:connection_options].is_a?(Hash) 
