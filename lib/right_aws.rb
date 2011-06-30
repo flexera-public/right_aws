@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2007-2008 RightScale Inc
+# Copyright (c) 2007-2011 RightScale Inc
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -47,6 +47,7 @@ require 'ec2/right_ec2_spot_instances'
 require 'ec2/right_ec2_ebs'
 require 'ec2/right_ec2_reserved_instances'
 require 'ec2/right_ec2_vpc'
+require 'ec2/right_ec2_vpc2'
 require 'ec2/right_ec2_monitoring'
 require 'ec2/right_ec2_placement_groups'
 require 'ec2/right_ec2_windows_mobility'

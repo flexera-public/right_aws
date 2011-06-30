@@ -13,6 +13,7 @@ lib/ec2/right_ec2_spot_instances.rb
 lib/ec2/right_ec2_ebs.rb
 lib/ec2/right_ec2_reserved_instances.rb
 lib/ec2/right_ec2_vpc.rb
+lib/ec2/right_ec2_vpc2.rb
 lib/ec2/right_ec2_monitoring.rb
 lib/ec2/right_ec2_placement_groups.rb
 lib/ec2/right_ec2_windows_mobility.rb
