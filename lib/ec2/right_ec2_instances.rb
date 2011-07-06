@@ -589,6 +589,7 @@ module RightAws
         when 'virtualizationType'    then @item[:virtualization_type]      = @text
         when 'clientToken'           then @item[:client_token]      = @text
         when 'sourceDestCheck'       then @item[:source_dest_check] = @text == 'true' ? true : false
+        when 'tenancy'               then @item[:placement_tenancy] = @text
         when 'hypervisor'            then @item[:hypervisor]        = @text
         else
           case full_tag_name
