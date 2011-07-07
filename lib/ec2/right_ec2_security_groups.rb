@@ -69,17 +69,17 @@ module RightAws
     #  ec2.describe_security_groups #=>
     #    [{:aws_perms=>
     #       [{:to_port=>"65535",
-    #         :group=>"default",
+    #         :group_name=>"default",
     #         :protocol=>"tcp",
     #         :owner=>"048291609141",
     #         :from_port=>"1"},
     #        {:to_port=>"65535",
-    #         :group=>"default",
+    #         :group_name=>"default",
     #         :protocol=>"udp",
     #         :owner=>"048291609141",
     #         :from_port=>"1"},
     #        {:to_port=>"-1",
-    #         :group=>"default",
+    #         :group_name=>"default",
     #         :protocol=>"icmp",
     #         :owner=>"048291609141",
     #         :from_port=>"-1"},
@@ -129,9 +129,9 @@ module RightAws
             # Group permissions
             Array(permission[:groups]).each do |group|
               perm = result_perm.dup
-              perm[:group]    = group[:group_name]
-              perm[:group_id] = group[:group_id] unless group[:group_id].right_blank?
-              perm[:owner]    = group[:user_id]  unless group[:user_id].right_blank?
+              perm[:group_name] = group[:group_name]
+              perm[:group_id]   = group[:group_id] unless group[:group_id].right_blank?
+              perm[:owner]      = group[:user_id]  unless group[:user_id].right_blank?
               aws_perms << perm
             end
           end
