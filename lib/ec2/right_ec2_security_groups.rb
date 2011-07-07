@@ -142,6 +142,10 @@ module RightAws
       end
     end
 
+    def describe_security_groups_by_name(*list)
+      describe_security_groups(list, :describe_by => :group_name)
+    end
+
     # Create new Security Group. Returns +true+ or an exception.
     # Options: :vpc_id
     #
@@ -201,59 +205,50 @@ module RightAws
     #      :to_port            => to port
     #      :port               => set both :from_port and to_port with the same value
     #      # Protocol
-    #      :protocol           => :tcp | :udp | :icmp
-    #      # Group(s)
-    #      :source_group_owner => UserId
-    #      :source_group       => GroupName
+    #      :protocol           => :tcp | :udp | :icmp | -1
     #      # or
-    #      :source_groups      => { UserId1 => GroupName1, UserName2 => GroupName2 }
-    #      :source_groups      => [ [ UserId1, GroupName1 ], [ UserName2 => GroupName2 ] ]
+    #      :source_groups      => { UserId1 => GroupId1, UserName2 => GroupId2 }
+    #      :source_groups      => [ [ UserId1, GroupId1 ], [ UserName2 => GroupId2 ] ]
     #      # CidrIp(s)
     #      :cidr_ip            => '0.0.0.0/0'
     #      :cidr_ips           => ['1.1.1.1/1', '2.2.2.2/2']
     #
     #  # CidrIP based permissions:
     #
-    #  ec2.modify_security_group_ingress(:authorize, 'my_cool_group',
-    #                                    :cidr_ip  =>  "127.0.0.0/31",
-    #                                    :port     => 811,
-    #                                    :protocol => 'tcp' ) #=> true
+    #  ec2.modify_security_group(:authorize, :ingress, 'sg-75d1c319',
+    #                            :cidr_ip  =>  "127.0.0.0/31",
+    #                            :port     => 811,
+    #                            :protocol => 'tcp' ) #=> true
     #
-    #  ec2.modify_security_group_ingress(:revoke, 'my_cool_group',
-    #                                    :cidr_ips =>  ["127.0.0.1/32", "127.0.0.2/32"],
-    #                                    :port     => 812,
-    #                                    :protocol => 'tcp' ) #=> true
+    #  ec2.modify_security_group(:revoke, 'sg-75d1c319',
+    #                            :cidr_ips =>  ["127.0.0.1/32", "127.0.0.2/32"],
+    #                            :port     => 812,
+    #                            :protocol => 'tcp' ) #=> true
     #
     #  # Group based permissions:
     #
-    #  ec2.modify_security_group_ingress(:authorize, 'my_cool_group',
-    #                                    :source_group_owner => "586789340000",
-    #                                    :source_group =>  "sketchy-us",
-    #                                    :port         => 800,
-    #                                    :protocol     => 'tcp' ) #=> true
+    #  ec2.modify_security_group(:authorize, :ingress, 'sg-75d1c319',
+    #                            :source_groups => { "586789340000" => "sg-75d1c300",
+    #                                                "635201710000" => "sg-75d1c301" },
+    #                            :port          => 801,
+    #                            :protocol      => 'tcp' ) #=> true
     #
-    #  ec2.modify_security_group_ingress(:authorize, 'my_cool_group',
-    #                                    :source_groups => { "586789340000" => "sketchy-us",
-    #                                                        "635201710000" => "sketchy" },
-    #                                    :port          => 801,
-    #                                    :protocol      => 'tcp' ) #=> true
-    #
-    #  ec2.modify_security_group_ingress(:revoke, 'my_cool_group',
-    #                                    :source_groups => [[ "586789340000", "sketchy-us" ],
-    #                                                       [ "586789340000", "default" ]],
-    #                                    :port          => 809,
-    #                                    :protocol      => 'tcp' ) #=> true
+    #  ec2.modify_security_group(:revoke, :ingress, 'sg-75d1c319',
+    #                            :source_groups => [[ "586789340000", "sg-75d1c300" ],
+    #                                               [ "586789340000", "sg-75d1c302" ]],
+    #                            :port          => 809,
+    #                            :protocol      => 'tcp' ) #=> true
     #
     #  # +Permissions+ can be an array of permission hashes:
     #
-    #  ec2.modify_security_group_ingress(:authorize, 'my_cool_group',
-    #                                    [{ :source_groups => { "586789340000" => "sketchy-us",
-    #                                                           "635201710000" => "sketchy" },
-    #                                       :port          => 803,
-    #                                       :protocol      => 'tcp'},
-    #                                     { :cidr_ips      =>  ["127.0.0.1/32", "127.0.0.2/32"],
-    #                                       :port          => 812,
-    #                                       :protocol      => 'tcp' }]) #=> true
+    #  ec2.modify_security_group(:authorize, :ingress, 'sg-75d1c319',
+    #                            [{ :source_groups => { "586789340000" => "sg-75d1c300",
+    #                                                   "635201710000" => "sg-75d1c301" },
+    #                                                   :port          => 803,
+    #                                                   :protocol      => 'tcp'},
+    #                             { :cidr_ips      =>  ["127.0.0.1/32", "127.0.0.2/32"],
+    #                               :port          => 812,
+    #                               :protocol      => 'tcp' }]) #=> true
     #
     def modify_security_group(action, direction, group_id, permissions)
       hash = {}
