@@ -129,9 +129,9 @@ module RightAws
             # Group permissions
             Array(permission[:groups]).each do |group|
               perm = result_perm.dup
-              perm[:group_name] = group[:group_name]
-              perm[:group_id]   = group[:group_id] unless group[:group_id].right_blank?
-              perm[:owner]      = group[:user_id]  unless group[:user_id].right_blank?
+              perm[:group_name] = group[:group_name] unless group[:group_name].right_blank?
+              perm[:group_id]   = group[:group_id]   unless group[:group_id].right_blank?
+              perm[:owner]      = group[:user_id]    unless group[:user_id].right_blank?
               aws_perms << perm
             end
           end
