@@ -206,9 +206,11 @@ module RightAws
     #      :port               => set both :from_port and to_port with the same value
     #      # Protocol
     #      :protocol           => :tcp | :udp | :icmp | -1
-    #      # or
-    #      :source_groups      => { UserId1 => GroupId1, UserName2 => GroupId2 }
-    #      :source_groups      => [ [ UserId1, GroupId1 ], [ UserName2 => GroupId2 ] ]
+    #      # or (ingress)
+    #      :groups             => { UserId1 => GroupId1, UserName2 => GroupId2 }
+    #      :groups             => [ [ UserId1, GroupId1 ], [ UserName2 => GroupId2 ] ]
+    #      # or (egress)
+    #      :groups             => [ GroupId1, GroupId2 ]
     #      # CidrIp(s)
     #      :cidr_ip            => '0.0.0.0/0'
     #      :cidr_ips           => ['1.1.1.1/1', '2.2.2.2/2']
@@ -220,7 +222,7 @@ module RightAws
     #                            :port     => 811,
     #                            :protocol => 'tcp' ) #=> true
     #
-    #  ec2.modify_security_group(:revoke, 'sg-75d1c319',
+    #  ec2.modify_security_group(:revoke, :ingress, 'sg-75d1c319',
     #                            :cidr_ips =>  ["127.0.0.1/32", "127.0.0.2/32"],
     #                            :port     => 812,
     #                            :protocol => 'tcp' ) #=> true
@@ -228,27 +230,27 @@ module RightAws
     #  # Group based permissions:
     #
     #  ec2.modify_security_group(:authorize, :ingress, 'sg-75d1c319',
-    #                            :source_groups => { "586789340000" => "sg-75d1c300",
-    #                                                "635201710000" => "sg-75d1c301" },
-    #                            :port          => 801,
-    #                            :protocol      => 'tcp' ) #=> true
+    #                            :groups   => { "586789340000" => "sg-75d1c300",
+    #                                           "635201710000" => "sg-75d1c301" },
+    #                            :port     => 801,
+    #                            :protocol => 'tcp' ) #=> true
     #
     #  ec2.modify_security_group(:revoke, :ingress, 'sg-75d1c319',
-    #                            :source_groups => [[ "586789340000", "sg-75d1c300" ],
-    #                                               [ "586789340000", "sg-75d1c302" ]],
-    #                            :port          => 809,
-    #                            :protocol      => 'tcp' ) #=> true
+    #                            :groups   => [[ "586789340000", "sg-75d1c300" ],
+    #                                          [ "586789340000", "sg-75d1c302" ]],
+    #                            :port     => 809,
+    #                            :protocol => 'tcp' ) #=> true
     #
     #  # +Permissions+ can be an array of permission hashes:
     #
     #  ec2.modify_security_group(:authorize, :ingress, 'sg-75d1c319',
-    #                            [{ :source_groups => { "586789340000" => "sg-75d1c300",
-    #                                                   "635201710000" => "sg-75d1c301" },
-    #                                                   :port          => 803,
-    #                                                   :protocol      => 'tcp'},
-    #                             { :cidr_ips      =>  ["127.0.0.1/32", "127.0.0.2/32"],
-    #                               :port          => 812,
-    #                               :protocol      => 'tcp' }]) #=> true
+    #                            [{ :groups   => { "586789340000" => "sg-75d1c300",
+    #                                              "635201710000" => "sg-75d1c301" },
+    #                                              :port          => 803,
+    #                                              :protocol      => 'tcp'},
+    #                             { :cidr_ips =>  ["127.0.0.1/32", "127.0.0.2/32"],
+    #                               :port     => 812,
+    #                               :protocol => 'tcp' }]) #=> true
     #
     def modify_security_group(action, direction, group_id, permissions)
       hash = {}
@@ -278,13 +280,13 @@ module RightAws
         # Groups
         case direction
         when :ingress
-          #  :source_groups => {UserId1 => GroupId1, ... UserIdN => GroupIdN}
+          #  :groups => {UserId1 => GroupId1, ... UserIdN => GroupIdN}
           #  or (this allows using same UserId multiple times )
-          #  :source_groups => [[UserId1, GroupId1], ... [UserIdN, GroupIdN]]
-          hash.merge!(amazonize_list( ["IpPermissions.#{pid}.Groups.?.UserId", "IpPermissions.#{pid}.Groups.?.GroupId"], permission[:source_groups] ))
+          #  :groups => [[UserId1, GroupId1], ... [UserIdN, GroupIdN]]
+          hash.merge!(amazonize_list( ["IpPermissions.#{pid}.Groups.?.UserId", "IpPermissions.#{pid}.Groups.?.GroupId"], permission[:groups] ))
         when :egress
-          #  :source_groups => [GroupId1, ... GroupIdN]
-          hash.merge!(amazonize_list( "IpPermissions.#{pid}.Groups.?.GroupId", permission[:source_groups] ))
+          #  :groups => [GroupId1, ... GroupIdN]
+          hash.merge!(amazonize_list( "IpPermissions.#{pid}.Groups.?.GroupId", permission[:groups] ))
         end
         # CidrIp(s)
         cidr_ips   = permission[:cidr_ips] unless permission[:cidr_ips].right_blank?
