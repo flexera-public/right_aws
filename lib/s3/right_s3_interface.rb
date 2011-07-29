@@ -107,13 +107,18 @@ module RightAws
       s3_headers.sort { |a, b| a[0] <=> b[0] }.each do |key, value|
         out_string << (key[/^#{AMAZON_HEADER_PREFIX}/o] ? "#{key}:#{value}\n" : "#{value}\n")
       end
-        # ignore everything after the question mark...
-      out_string << path.gsub(/\?.*$/, '')
-       # ...unless there is an acl or torrent parameter
-      out_string << '?acl'      if path[/[&?]acl($|&|=)/]
-      out_string << '?torrent'  if path[/[&?]torrent($|&|=)/]
-      out_string << '?location' if path[/[&?]location($|&|=)/]
-      out_string << '?logging'  if path[/[&?]logging($|&|=)/]  # this one is beta, no support for now
+        # append the full path if this is a multipart init, upload_part, or complete request.  Or...
+      if path[/[&?](uploads|partNumber|uploadId)($|&|=)/]
+        out_string << path
+      else
+          # ...ignore everything after the question mark...
+        out_string << path.gsub(/\?.*$/, '')
+         # ...unless there is an acl or torrent parameter
+        out_string << '?acl'      if path[/[&?]acl($|&|=)/]
+        out_string << '?torrent'  if path[/[&?]torrent($|&|=)/]
+        out_string << '?location' if path[/[&?]location($|&|=)/]
+        out_string << '?logging'  if path[/[&?]logging($|&|=)/]  # this one is beta, no support for now
+      end
       out_string
     end
 
@@ -151,6 +156,20 @@ module RightAws
 
       # Generates request hash for REST API.
       # Assumes that headers[:url] is URL encoded (use CGI::escape)
+      #
+      # RJG 01/07/2011
+      # It isn't immediately obvious but the headers[:url] value is assumed to be prefixed with <bucket_name>/.  So when you call this method
+      # it looks like generate_rest_connection('POST', [:url=>"#{bucket}/#{actual_api_request_url}"])
+      #
+      # This can prove confusing when looking at the Amazon API documentation which shows the URL usually starting in /ObjectName
+      #
+      # TODO: Maybe document this a scoche better? Or, since this is already in a class expressly for S3, and all S3 commands require the bucket name, just
+      # accept the bucket as a separate key in the hash, rather than encoding it in the url?
+      #
+      # I.E. For getting ACL info
+      # generate_rest_connection('GET', [:bucket=>params[:bucket], :url=>"/#{ObjectName}?acl")
+      #
+      # /RJG 01/07/2011
     def generate_rest_request(method, headers)  # :nodoc:
         # calculate request data
       server, path, path_to_sign = fetch_request_params(headers)
@@ -502,6 +521,123 @@ module RightAws
       AwsUtils.mandatory_arguments([:md5], params)
       r = store_object(params)
       r[:verified_md5] ? (return r) : (raise AwsError.new("Uploaded object failed MD5 checksum verification: #{r.inspect}"))
+    end
+
+      # Experimental: Stores an object in an S3 bucket using multipart uploading.  The file will be broken up into parts of the size specified (in bytes) and uploaded
+      # using the specified number of concurrent threads.
+      #
+      # Since this method opens the file several times (once for each thread, and once to check the size) the input file can only be specified by it's absolute path
+      # on the filesystem, a file stream may not be specified.
+      #
+      # The minumum part size is 5MB or 5 * 1024 * 1024 bytes
+      #
+      # If a file smaller than the :part_size is supplied
+      #
+      # You can also run this method with a block which will be called when each part finishes uploading.  The single parameter for that block is a hash containing the following keys;
+      # { :part_num, :parts_finished, :total_parts }
+      # Note: More stuff may get returned later, which is why we're calling the block with a single hash with many values.  This allows consumers to write their code once and
+      # have it be backward compatible should we add more values.  I.E. No changing method signature.
+      #
+      # Upload a file in 10MB chunks using 10 threads, and logging to Chef at the end of each part.
+      # s3.store_object_multipart(:bucket => "foobucket", :key => "foo", :file_path => "/path/to/file" :part_size => 10 * 1024 * 1024, :threads => 10) { |info_hash|
+      #   Chef::Log.info("Uploaded #{info_hash[:parts_finished]}/#{info_hash[:total_parts]} parts.. We're #{(info_hash[:parts_finished].to_f / info_hash[:total_parts].to_f)*100}% finished!"
+      # }
+      #
+    def store_object_multipart(params)
+      AwsUtils.allow_only([:bucket, :key, :file_path, :part_size, :threads, :headers], params)
+      AwsUtils.mandatory_arguments([:bucket, :key, :file_path, :part_size, :threads], params)
+      params[:headers] = {} unless params[:headers]
+
+      unless File.exist? params[:file_path]
+        raise AwsError.new("File path parameter provided does not refer to an actual file: #{params[:file_path]}")
+      end
+
+      if params[:part_size] < 5 * 1024 * 1024
+        raise AwsError.new("Part size for a multipart upload must be greater than or equal to #{5 * 1024 * 1024} bytes.  #{params[:part_size]} bytes was provided.")
+      end
+
+      file_size = File.size(params[:file_path])
+
+      if (params[:part_size] >= USE_100_CONTINUE_PUT_SIZE) &&
+        (file_size >= USE_100_CONTINUE_PUT_SIZE)
+        params[:headers]['expect'] = '100-continue'
+      end
+
+      if file_size > params[:part_size]
+        init_req_hash = generate_rest_request('POST', params[:headers].merge(:url=>"#{params[:bucket]}/#{CGI::escape params[:key]}?uploads"))
+        init_resp = request_info(init_req_hash, S3InitMultipartParser.new)
+
+        upload_id = init_resp[:upload_id]
+        part_count = (file_size.to_f / params[:part_size].to_f).to_i + 1
+
+        threads = []
+        part_etags = []
+        mutex = Mutex.new
+        cursor = 0
+        parts_started_idx = 0
+
+        (0..params[:threads]).each do
+          threads << Thread.new do
+            # Initialize some stuff for the thread
+            offset = 0
+            part_num = 0
+            loop = true
+
+            while loop do
+              # Read and update shared stuff atomically
+              mutex.synchronize do
+                offset = cursor
+                cursor += params[:part_size]
+                part_num = parts_started_idx = parts_started_idx + 1
+              end
+
+              if offset > file_size
+                  loop = false
+                  next
+                end
+
+              # Read a params[:part_size] chunk, or to the end of the file, whichever is smaller
+              if file_size <= (offset + params[:part_size])
+                data = IO.read(params[:file_path], file_size - offset, offset)
+              else
+                data = IO.read(params[:file_path], params[:part_size], offset)
+              end
+
+              part_req_hash = generate_rest_request('PUT', params[:headers].merge(:url=>"#{params[:bucket]}/#{CGI::escape params[:key]}?partNumber=#{part_num}&uploadId=#{upload_id}", :data => data))
+              part_resp = request_info(part_req_hash, S3HttpResponseHeadParser.new)
+
+              mutex.synchronize do
+                part_etags << {:part_num=>part_num,:e_tag=>part_resp['etag']}
+                yield :part_num=>part_num, :parts_finished=>part_etags.length, :total_parts=>part_count if block_given?
+              end
+            end
+          end
+        end
+
+        # Wait for everybody to finish
+        threads.each {|thread| thread.join() }
+
+        # S3 doesn't like it if we generate XML with the parts in the wrong order *shrug*
+        # TODO: Is there a more elegant ruby solution for this?
+        part_etags.sort {|x,y| x[:part_num] <=> y[:part_num] }
+        part_etags.reverse!
+
+        # Tell S3 we're all finished
+        complete_body = "<CompleteMultipartUpload>"
+        part_etags.each do |part_hash|
+          complete_body += "<Part><PartNumber>#{part_hash[:part_num]}</PartNumber><ETag>#{part_hash[:e_tag]}</ETag></Part>"
+        end
+        complete_body += "</CompleteMultipartUpload>"
+
+        complete_req_hash = generate_rest_request('POST', {:url=>"#{params[:bucket]}/#{CGI::escape params[:key]}?uploadId=#{upload_id}", :data => complete_body})
+        return request_info(complete_req_hash, S3CompleteMultipartParser.new)
+        # TODO: Should probably be prepared to handle errors and re-send failed parts.
+      else
+        # TODO: I'm actually not sure if I should be returning here?
+        return put(params[:bucket], params[:key], File.new(params[:file_path]), params[:headers])
+      end
+    rescue
+      on_exception
     end
     
       # Retrieves object data from Amazon. Returns a +hash+  or an exception.
@@ -1155,6 +1291,33 @@ module RightAws
         case name
         when 'LastModified' then @result[:last_modified] = @text
         when 'ETag'         then @result[:e_tag]         = @text
+        end
+      end
+    end
+
+    class S3InitMultipartParser < RightAWSParser  # :nodoc:
+      def reset
+        @result = {}
+      end
+      def tagend(name)
+        case name
+          when 'Bucket'   then @result[:bucket]    = @text
+          when 'Key'      then @result[:key]       = @text
+          when 'UploadId' then @result[:upload_id] = @text
+        end
+      end
+    end
+
+    class S3CompleteMultipartParser < RightAWSParser  # :nodoc:
+      def reset
+        @result = {}
+      end
+      def tagend(name)
+        case name
+          when 'Location' then @result[:location] = @text
+          when 'Bucket'   then @result[:bucket]   = @text
+          when 'Key'      then @result[:key]      = @text
+          when 'ETag'     then @result[:e_tag]    = @text
         end
       end
     end
