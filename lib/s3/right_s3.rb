@@ -273,12 +273,12 @@ module RightAws
         key.put(data, perms, headers)
       end
 
-        # Retrieve object data from Amazon. 
+        # Retrieve data object from Amazon. 
         # The +key+ is a +String+ or Key. 
-        # Returns Key instance. 
+        # Returns String instance. 
         #
-        #  key = bucket.get('logs/today/1.log') #=> 
-        #  puts key.data #=> 'sasfasfasdf'
+        #  data = bucket.get('logs/today/1.log') #=> 
+        #  puts data #=> 'sasfasfasdf'
         #
       def get(key, headers={})
         key = Key.create(self, key.to_s) unless key.is_a?(Key)
