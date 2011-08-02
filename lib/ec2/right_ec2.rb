@@ -316,7 +316,7 @@ module RightAws
     end
 
     # Disassociate the specified elastic IP address from the instance to which it is assigned.
-    # Options: :public_ip, :allocation_id.
+    # Options: :public_ip, :association_id.
     # Returns +true+ or an exception.
     # 
     #  ec2.disassociate_address(:public_ip => '75.101.154.140') #=> true
@@ -332,6 +332,7 @@ module RightAws
     end
 
     # Release an elastic IP address associated with your account.
+    # Options: :public_ip, :allocation_id.
     # Returns +true+ or an exception.
     #
     #  ec2.release_address(:public_ip => '75.101.154.140') #=> true
