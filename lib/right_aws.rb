@@ -35,16 +35,22 @@ require 'rubygems'
 require 'right_http_connection'
 
 $:.unshift(File.dirname(__FILE__))
-require 'awsbase/benchmark_fix'
+require 'awsbase/version'
 require 'awsbase/support'
+require 'awsbase/benchmark_fix'
 require 'awsbase/right_awsbase'
 require 'ec2/right_ec2'
 require 'ec2/right_ec2_images'
 require 'ec2/right_ec2_instances'
+require 'ec2/right_ec2_security_groups'
+require 'ec2/right_ec2_spot_instances'
 require 'ec2/right_ec2_ebs'
 require 'ec2/right_ec2_reserved_instances'
 require 'ec2/right_ec2_vpc'
 require 'ec2/right_ec2_monitoring'
+require 'ec2/right_ec2_placement_groups'
+require 'ec2/right_ec2_windows_mobility'
+require 'ec2/right_ec2_tags'
 require 'elb/right_elb_interface'
 require 'acw/right_acw_interface'
 require 'as/right_as_interface'
@@ -56,18 +62,16 @@ require 'sqs/right_sqs_gen2_interface'
 require 'sqs/right_sqs_gen2'
 require 'sdb/right_sdb_interface'
 require 'acf/right_acf_interface'
+require 'acf/right_acf_streaming_interface'
+require 'acf/right_acf_origin_access_identities'
+require 'acf/right_acf_invalidations'
 require 'rds/right_rds_interface'
-
-
-module RightAws #:nodoc:
-  module VERSION #:nodoc:
-    MAJOR = 1
-    MINOR = 11
-    TINY  = 0
-
-    STRING = [MAJOR, MINOR, TINY].join('.')
-  end
-end
+require 'iam/right_iam_interface'
+require 'iam/right_iam_groups'
+require 'iam/right_iam_users'
+require 'iam/right_iam_access_keys'
+require 'iam/right_iam_mfa_devices'
+require 'route_53/right_route_53_interface'
 
 #-
 

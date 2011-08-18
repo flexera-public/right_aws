@@ -63,14 +63,13 @@ module RightAws
 
       # Creates new RightS3 instance.
       #
-      #  s3 = RightAws::S3Interface.new('1E3GDYEOGFJPIT7XXXXXX','hgTHt68JY07JKUY08ftHYtERkjgtfERn57XXXXXX', {:multi_thread => true, :logger => Logger.new('/tmp/x.log')}) #=> #<RightAws::S3Interface:0xb7b3c27c>
+      #  s3 = RightAws::S3Interface.new('1E3GDYEOGFJPIT7XXXXXX','hgTHt68JY07JKUY08ftHYtERkjgtfERn57XXXXXX', {:logger => Logger.new('/tmp/x.log')}) #=> #<RightAws::S3Interface:0xb7b3c27c>
       #  
       # Params is a hash:
       #
       #    {:server       => 's3.amazonaws.com'   # Amazon service host: 's3.amazonaws.com'(default)
       #     :port         => 443                  # Amazon service port: 80 or 443(default)
       #     :protocol     => 'https'              # Amazon service protocol: 'http' or 'https'(default)
-      #     :multi_thread => true|false           # Multi-threaded (connection per each thread): true or false(default)
       #     :logger       => Logger Object}       # Logger instance: logs to STDOUT if omitted }
       #
     def initialize(aws_access_key_id=nil, aws_secret_access_key=nil, params={})
@@ -93,7 +92,11 @@ module RightAws
       s3_headers = {}
       headers.each do |key, value|
         key = key.downcase
-        s3_headers[key] = value.to_s.strip if key[/^#{AMAZON_HEADER_PREFIX}|^content-md5$|^content-type$|^date$/o]
+        value = case
+                when value.is_a?(Array) then value.join('')
+                else                         value.to_s
+                end
+        s3_headers[key] = value.strip if key[/^#{AMAZON_HEADER_PREFIX}|^content-md5$|^content-type$|^date$/o]
       end
       s3_headers['content-type'] ||= ''
       s3_headers['content-md5']  ||= ''
@@ -158,7 +161,7 @@ module RightAws
       headers['content-type'] ||= ''
       headers['date']           = Time.now.httpdate
         # create request
-      request      = "Net::HTTP::#{method.capitalize}".constantize.new(path)
+      request      = "Net::HTTP::#{method.capitalize}".right_constantize.new(path)
       request.body = data if data
         # set request headers and meta headers
       headers.each      { |key, value| request[key.to_s] = value }
@@ -210,7 +213,7 @@ module RightAws
                  else                headers[:location].to_s
                  end
       
-      unless location.blank?
+      unless location.right_blank?
         data = "<CreateBucketConfiguration><LocationConstraint>#{location}</LocationConstraint></CreateBucketConfiguration>"
       end
       req_hash = generate_rest_request('PUT', headers.merge(:url=>bucket, :data => data))
@@ -296,7 +299,7 @@ module RightAws
       #                  'max-keys'     => "5"}, ..., {...}]
       #
     def list_bucket(bucket, options={}, headers={})
-      bucket  += '?'+options.map{|k, v| "#{k.to_s}=#{CGI::escape v.to_s}"}.join('&') unless options.blank?
+      bucket  += '?'+options.map{|k, v| "#{k.to_s}=#{CGI::escape v.to_s}"}.join('&') unless options.right_blank?
       req_hash = generate_rest_request('GET', headers.merge(:url=>bucket))
       request_info(req_hash, S3ListBucketParser.new(:logger => @logger))
     rescue
@@ -331,10 +334,10 @@ module RightAws
     #     ]
     #   }
     def incrementally_list_bucket(bucket, options={}, headers={}, &block)
-      internal_options = options.symbolize_keys
+      internal_options = options.right_symbolize_keys
       begin 
         internal_bucket = bucket.dup
-        internal_bucket  += '?'+internal_options.map{|k, v| "#{k.to_s}=#{CGI::escape v.to_s}"}.join('&') unless internal_options.blank?
+        internal_bucket  += '?'+internal_options.map{|k, v| "#{k.to_s}=#{CGI::escape v.to_s}"}.join('&') unless internal_options.right_blank?
         req_hash = generate_rest_request('GET', headers.merge(:url=>internal_bucket))
         response = request_info(req_hash, S3ImprovedListBucketParser.new(:logger => @logger))
         there_are_more_keys = response[:is_truncated]
@@ -697,7 +700,7 @@ module RightAws
       #                  <Permission>FULL_CONTROL</Permission></Grant></AccessControlList></AccessControlPolicy>" }
       #
     def get_acl(bucket, key='', headers={})
-      key = key.blank? ? '' : "/#{CGI::escape key}"
+      key = key.right_blank? ? '' : "/#{CGI::escape key}"
       req_hash = generate_rest_request('GET', headers.merge(:url=>"#{bucket}#{key}?acl"))
       request_info(req_hash, S3HttpResponseBodyParser.new) 
     rescue
@@ -727,7 +730,7 @@ module RightAws
       #       :display_name=>"root"}}
       #
     def get_acl_parse(bucket, key='', headers={})
-      key = key.blank? ? '' : "/#{CGI::escape key}"
+      key = key.right_blank? ? '' : "/#{CGI::escape key}"
       req_hash = generate_rest_request('GET', headers.merge(:url=>"#{bucket}#{key}?acl"))
       acl = request_info(req_hash, S3AclParser.new(:logger => @logger))
       result = {}
@@ -740,7 +743,7 @@ module RightAws
         else
           result[:grantees][key] = 
             { :display_name => grantee[:display_name] || grantee[:uri].to_s[/[^\/]*$/],
-              :permissions  => grantee[:permissions].to_a,
+              :permissions  => Array(grantee[:permissions]),
               :attributes   => grantee[:attributes] }
         end
       end
@@ -751,7 +754,7 @@ module RightAws
     
       # Sets the ACL on a bucket or object.
     def put_acl(bucket, key, acl_xml_doc, headers={})
-      key = key.blank? ? '' : "/#{CGI::escape key}"
+      key = key.right_blank? ? '' : "/#{CGI::escape key}"
       req_hash = generate_rest_request('PUT', headers.merge(:url=>"#{bucket}#{key}?acl", :data=>acl_xml_doc))
       request_info(req_hash, S3HttpResponseBodyParser.new)
     rescue
@@ -885,7 +888,7 @@ module RightAws
       #  s3.list_bucket_link('my_awesome_bucket') #=> url string
       #
     def list_bucket_link(bucket, options=nil, expires=nil, headers={})
-      bucket += '?' + options.map{|k, v| "#{k.to_s}=#{CGI::escape v.to_s}"}.join('&') unless options.blank?
+      bucket += '?' + options.map{|k, v| "#{k.to_s}=#{CGI::escape v.to_s}"}.join('&') unless options.right_blank?
       generate_link('GET', headers.merge(:url=>bucket), expires)
     rescue
       on_exception
@@ -1168,7 +1171,7 @@ module RightAws
       def headers_to_string(headers)
         result = {}
         headers.each do |key, value|
-          value       = value.to_s if value.is_a?(Array) && value.size<2
+          value       = value.first if value.is_a?(Array) && value.size<2
           result[key] = value
         end
         result

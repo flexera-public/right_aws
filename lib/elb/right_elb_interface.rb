@@ -62,11 +62,13 @@ module RightAws
     include RightAwsBaseInterface
 
     # Amazon ELB API version being used
-    API_VERSION       = "2009-05-15"
+    API_VERSION       = "2010-07-01"
     DEFAULT_HOST      = "elasticloadbalancing.amazonaws.com"
     DEFAULT_PATH      = '/'
     DEFAULT_PROTOCOL  = 'https'
     DEFAULT_PORT      = 443
+
+    LISTENER_PROTOCOLS = [ 'HTTP', 'HTTPS', 'TCP', 'SSL' ]
 
     @@bench = AwsBenchmarkingBlock.new
     def self.bench_xml
@@ -83,7 +85,6 @@ module RightAws
     # * <tt>:server</tt>: ELB service host, default: DEFAULT_HOST
     # * <tt>:port</tt>: ELB service port, default: DEFAULT_PORT
     # * <tt>:protocol</tt>: 'http' or 'https', default: DEFAULT_PROTOCOL
-    # * <tt>:multi_thread</tt>: true=HTTP connection per thread, false=per process
     # * <tt>:logger</tt>: for log messages, default: RAILS_DEFAULT_LOGGER else STDOUT
     # * <tt>:signature_version</tt>:  The signature version : '0','1' or '2'(default)
     # * <tt>:cache</tt>: true/false(default): caching works for: describe_load_balancers
@@ -128,43 +129,71 @@ module RightAws
     #        :listeners =>
     #         [ { :protocol => "HTTP", :load_balancer_port => "80",  :instance_port => "80" },
     #           { :protocol => "TCP",  :load_balancer_port => "443", :instance_port => "443" } ],
-    #        :created_time => Wed May 27 11:59:11 UTC 2009,
+    #        :created_time => "2009-05-27T11:59:11.000Z",
     #        :dns_name => "test-kd1-1519253964.us-east-1.elb.amazonaws.com",
     #        :instances => [] } ]
+    #
+    #  elb.describe_load_balancers("test-kd1") #=>
+    #    [{:load_balancer_name=>"test-kd1",
+    #      :instances=>["i-9fc056f4", "i-b3debfd8"],
+    #      :health_check=>
+    #       {:interval=>30,
+    #        :healthy_threshold=>10,
+    #        :target=>"TCP:80",
+    #        :unhealthy_threshold=>2,
+    #        :timeout=>5},
+    #      :dns_name=>"test-kd1-869291821.us-east-1.elb.amazonaws.com",
+    #      :listeners=>
+    #       [{:load_balancer_port=>"80",
+    #         :policy_names=>["my-policy-1"],
+    #         :instance_port=>"80",
+    #         :protocol=>"HTTP"},
+    #        {:load_balancer_port=>"8080",
+    #         :policy_names=>["my-policy-lb-1"],
+    #         :instance_port=>"8080",
+    #         :protocol=>"HTTP"},
+    #        {:load_balancer_port=>"443",
+    #         :policy_names=>[],
+    #         :instance_port=>"443",
+    #         :protocol=>"TCP"}],
+    #      :created_time=>"2010-04-15T12:04:49.000Z",
+    #      :availability_zones=>["us-east-1a", "us-east-1b"],
+    #      :app_cookie_stickiness_policies=>
+    #       [{:policy_name=>"my-policy-1", :cookie_name=>"my-cookie-1"}],
+    #      :lb_cookie_stickiness_policies=>
+    #       [{:cookie_expiration_period=>60, :policy_name=>"my-policy-lb-1"}]}]
     #
     def describe_load_balancers(*load_balancers)
       load_balancers = load_balancers.flatten.compact
       request_hash = amazonize_list("LoadBalancerNames.member", load_balancers)
       link = generate_request("DescribeLoadBalancers", request_hash)
-      request_cache_or_info(:describe_load_balancers, link,  DescribeLoadBalancersParser, @@bench, load_balancers.blank?)
+      request_cache_or_info(:describe_load_balancers, link,  DescribeLoadBalancersParser, @@bench, load_balancers.right_blank?)
     end
 
     # Create new load balancer.
     # Returns a new load balancer DNS name.
     #
-    #  lb = elb.create_load_balancer( 'test-kd1',
-    #                                ['us-east-1a', 'us-east-1b'],
-    #                                [ { :protocol => :http, :load_balancer_port => 80,  :instance_port => 80 },
-		#						                    	 { :protocol => :tcp,  :load_balancer_port => 443, :instance_port => 443 } ])
-    #	 puts lb #=> "test-kd1-1519253964.us-east-1.elb.amazonaws.com"
+    # Listener options: :protocol, :load_balancer_port, :instance_port and :ssl_certificate_id
+    # Protocols: :tcp, :http, :https or :ssl
+    # 
+    #  elb.create_load_balancer( 'test-kd1',
+    #                            ['us-east-1a', 'us-east-1b'],
+    #                            [ { :protocol => :http,  :load_balancer_port => 80,  :instance_port => 80 },
+		#                              { :protocol => :https, :load_balancer_port => 443, :instance_port => 443,
+    #                                :ssl_certificate_id => 'arn:aws:iam::123456789012:user/division_abc/subdivision_xyz/Bob' } ])
+    #                                #=> "test-kd1-1519253964.us-east-1.elb.amazonaws.com"
     #
     def create_load_balancer(load_balancer_name, availability_zones=[], listeners=[])
       request_hash = { 'LoadBalancerName' => load_balancer_name }
       # merge zones
-      request_hash.merge!( amazonize_list("AvailabilityZones.member", availability_zones.to_a) )
+      request_hash.merge!( amazonize_list("AvailabilityZones.member", availability_zones) )
       # merge listeners
-      if listeners.blank?
+      if listeners.right_blank?
         listeners = { :protocol           => :http,
                       :load_balancer_port => 80,
                       :instance_port      => 80 }
       end
-      listeners = [listeners] unless listeners.is_a?(Array)
-      request_hash.merge!( amazonize_list( ['Listeners.member.?.Protocol',
-                                            'Listeners.member.?.LoadBalancerPort',
-                                            'Listeners.member.?.InstancePort'],
-                                             listeners.map{|i| [ (i[:protocol] || 'HTTP').to_s.upcase,
-                                                                 (i[:load_balancer_port] || 80),
-                                                                 (i[:instance_port] || 80) ] } ) )
+      request_hash = merge_listeners_into_request_hash(request_hash, listeners)
       link = generate_request("CreateLoadBalancer", request_hash)
       request_info(link, CreateLoadBalancerParser.new(:logger => @logger))
     end
@@ -179,6 +208,37 @@ module RightAws
     #
     def delete_load_balancer(load_balancer_name)
       link = generate_request("DeleteLoadBalancer", 'LoadBalancerName' => load_balancer_name)
+      request_info(link, DeleteLoadBalancerParser.new(:logger => @logger))
+    end
+
+    # Creates one or more new listeners on a LoadBalancer for the specified port. If a listener with the given
+    # port does not already exist, it will be created; otherwise, the properties of the new listener must match
+    # the the properties of the existing listener.
+    #
+    # Listener options: :protocol, :load_balancer_port, :instance_port and :ssl_certificate_id
+    # Protocols: :tcp, :http, :https or :ssl
+    #
+    #  elb.create_load_balancer_listeners( 'test-kd1',
+    #                                      [ { :protocol => :http,  :load_balancer_port => 80,  :instance_port => 80 },
+		#                                        { :protocol => :https, :load_balancer_port => 443, :instance_port => 443,
+    #                                          :ssl_certificate_id => 'arn:aws:iam::123456789012:user/division_abc/subdivision_xyz/Bob' } ]) #=> true
+    #
+    def create_load_balancer_listeners(load_balancer_name, listeners)
+      request_hash = { 'LoadBalancerName' => load_balancer_name }
+      request_hash = merge_listeners_into_request_hash(request_hash, listeners)
+      link = generate_request("CreateLoadBalancerListeners", request_hash)
+      request_info(link, RightHttp2xxParser.new(:logger => @logger))
+    end
+
+    # Removes listeners from the load balancer for the specified port number.
+    #
+    #  elb.delete_load_balancer_listeners( 'kd_test', 80, 443) #=> true
+    #
+    def delete_load_balancer_listeners(load_balancer_name, *load_balancer_ports)
+      load_balancer_ports.flatten!
+      request_hash = { 'LoadBalancerName' => load_balancer_name }
+      request_hash.merge!( amazonize_list("LoadBalancerPorts.member", load_balancer_ports ) )
+      link = generate_request("DeleteLoadBalancerListeners", request_hash )
       request_info(link, DeleteLoadBalancerParser.new(:logger => @logger))
     end
 
@@ -221,7 +281,7 @@ module RightAws
     #
     def configure_health_check(load_balancer_name, health_check)
       request_hash = { 'LoadBalancerName' => load_balancer_name }
-      health_check.each{ |key, value| request_hash["HealthCheck.#{key.to_s.camelize}"] = value }
+      health_check.each{ |key, value| request_hash["HealthCheck.#{key.to_s.right_camelize}"] = value }
       link = generate_request("ConfigureHealthCheck", request_hash)
       request_info(link, HealthCheckParser.new(:logger => @logger))
     end
@@ -278,27 +338,119 @@ module RightAws
     end
 
     #-----------------------------------------------------------------
+    #      Cookies
+    #-----------------------------------------------------------------
+
+    # Generates a stickiness policy with sticky session lifetimes that follow
+    # that of an application-generated cookie.
+    # This policy can only be associated with HTTP listeners.
+    #
+    #  elb.create_app_cookie_stickiness_policy('my-load-balancer', 'MyLoadBalancerPolicy', 'MyCookie') #=> true
+    #
+    def create_app_cookie_stickiness_policy(load_balancer_name, policy_name, cookie_name)
+      request_hash = { 'LoadBalancerName' => load_balancer_name,
+                       'PolicyName'       => policy_name,
+                       'CookieName'       => cookie_name }
+      link = generate_request("CreateAppCookieStickinessPolicy", request_hash)
+      request_info(link, RightHttp2xxParser.new(:logger => @logger))
+    end
+
+    # Generates a stickiness policy with sticky session lifetimes controlled by the
+    # lifetime of the browser (user-agent) or a specified expiration period.
+    # This policy can only be associated only with HTTP listeners.
+    #
+    #  elb.create_lb_cookie_stickiness_policy('my-load-balancer', 'MyLoadBalancerPolicy', 60) #=> true
+    #
+    def create_lb_cookie_stickiness_policy(load_balancer_name, policy_name, cookie_expiration_period)
+      request_hash = { 'LoadBalancerName'        => load_balancer_name,
+                       'PolicyName'              => policy_name,
+                       'CookieExpirationPeriod'  => cookie_expiration_period }
+      link = generate_request("CreateLBCookieStickinessPolicy", request_hash)
+      request_info(link, RightHttp2xxParser.new(:logger => @logger))
+    end
+
+    # Associates, updates, or disables a policy with a listener on the load balancer.
+    # Only zero(0) or one(1) policy can be associated with a listener.
+    #
+    #  elb.set_load_balancer_policies_of_listener('my-load-balancer', 80, 'MyLoadBalancerPolicy') #=> true
+    #
+    def set_load_balancer_policies_of_listener(load_balancer_name, load_balancer_port, *policy_names)
+      policy_names.flatten!
+      request_hash = { 'LoadBalancerName' => load_balancer_name,
+                       'LoadBalancerPort' => load_balancer_port }
+      if policy_names.right_blank?
+        request_hash['PolicyNames'] = ''
+      else
+        request_hash.merge!(amazonize_list('PolicyNames.member', policy_names))
+      end
+      link = generate_request("SetLoadBalancerPoliciesOfListener", request_hash)
+      request_info(link, RightHttp2xxParser.new(:logger => @logger))
+    end
+
+    # Deletes a policy from the load balancer. The specified policy must not be enabled for any listeners.
+    #
+    #  elb.delete_load_balancer_policy('my-load-balancer', 'MyLoadBalancerPolicy') #=> true
+    #
+    def delete_load_balancer_policy(load_balancer_name, policy_name)
+      request_hash = { 'LoadBalancerName'        => load_balancer_name,
+                       'PolicyName'              => policy_name }
+      link = generate_request("DeleteLoadBalancerPolicy", request_hash)
+      request_info(link, RightHttp2xxParser.new(:logger => @logger))
+    end
+
+    def set_load_balancer_listener_ssl_certificate(load_balancer_name, load_balancer_port, ssl_sertificate_id)
+      request_hash = { 'LoadBalancerName' => load_balancer_name,
+                       'LoadBalancerPort' => load_balancer_port,
+                       'SSLCertificateId' => ssl_sertificate_id }
+      link = generate_request("SetLoadBalancerListenerSSLCertificate", request_hash)
+      request_info(link, RightHttp2xxParser.new(:logger => @logger))
+    end
+
+    #-----------------------------------------------------------------
+    #      Helpers
+    #-----------------------------------------------------------------
+
+    def merge_listeners_into_request_hash(request_hash, listeners) # :nodoc:
+      listeners = [listeners] unless listeners.is_a?(Array)
+      request_hash.merge(amazonize_list( ['Listeners.member.?.Protocol',
+                                          'Listeners.member.?.LoadBalancerPort',
+                                          'Listeners.member.?.InstancePort',
+                                          'Listeners.member.?.SSLCertificateId'],
+                                          listeners.map{ |i|
+                                            [ (i[:protocol]           || 'HTTP').to_s.upcase,
+                                               i[:load_balancer_port] || 80,
+                                               i[:instance_port]      || 80,
+                                               i[:ssl_certificate_id]]
+                                          },
+                                          :default => :skip_nils
+                                       )
+                        )
+    end
+
+    #-----------------------------------------------------------------
     #      PARSERS: Load Balancers
     #-----------------------------------------------------------------
  
     class DescribeLoadBalancersParser < RightAWSParser #:nodoc:
       def tagstart(name, attributes)
-        case name
-        when 'member'
-          case @xmlpath
-            when @p then @item = { :availability_zones => [],
-                                    :health_check       => {},
-                                    :listeners          => [],
-                                    :instances          => [] }
-            when "#@p/member/Listeners" then @listener = {}
-          end
+        case full_tag_name
+        when %r{LoadBalancerDescriptions/member$}
+          @item = { :availability_zones => [],
+                    :health_check       => {},
+                    :listeners          => [],
+                    :instances          => [],
+                    :app_cookie_stickiness_policies => [],
+                    :lb_cookie_stickiness_policies  => []}
+        when %r{ListenerDescriptions/member$}        then @listener = {:policy_names => []}
+        when %r{AppCookieStickinessPolicies/member$} then @app_cookie_stickiness_policy = {}
+        when %r{LBCookieStickinessPolicies/member$}  then @lb_cookie_stickiness_policy = {}
         end
       end
       def tagend(name)
         case name
         when 'LoadBalancerName'   then @item[:load_balancer_name]   = @text
         when 'DNSName'            then @item[:dns_name]             = @text
-        when 'CreatedTime'        then @item[:created_time]         = Time::parse(@text)
+        when 'CreatedTime'        then @item[:created_time]         = @text
         when 'Interval'           then @item[:health_check][:interval]            = @text.to_i
         when 'Target'             then @item[:health_check][:target]              = @text
         when 'HealthyThreshold'   then @item[:health_check][:healthy_threshold]   = @text.to_i
@@ -307,20 +459,32 @@ module RightAws
         when 'Protocol'           then @listener[:protocol]           = @text
         when 'LoadBalancerPort'   then @listener[:load_balancer_port] = @text
         when 'InstancePort'       then @listener[:instance_port]      = @text
-        when 'member'
-          case @xmlpath
-          when @p then
-            @item[:availability_zones].sort!
-            @item[:instances].sort!
-            @result << @item
-          when "#@p/member/AvailabilityZones" then @item[:availability_zones] << @text
-          when "#@p/member/Instances"         then @item[:instances]          << @text
-          when "#@p/member/Listeners"         then @item[:listeners]          << @listener
+        when 'SSLCertificateId'   then @listener[:ssl_certificate_id] = @text
+        end
+        case full_tag_name
+        when %r{AvailabilityZones/member$}    then @item[:availability_zones] << @text
+        when %r{Instances/member/InstanceId$} then @item[:instances]          << @text
+        when %r{ListenerDescriptions/member$} then @item[:listeners]          << @listener
+        when %r{ListenerDescriptions/member/PolicyNames/member$} then @listener[:policy_names] << @text
+        when %r{AppCookieStickinessPolicies/member}
+          case name
+          when 'PolicyName' then @app_cookie_stickiness_policy[:policy_name] = @text
+          when 'CookieName' then @app_cookie_stickiness_policy[:cookie_name] = @text
+          when 'member'     then @item[:app_cookie_stickiness_policies] << @app_cookie_stickiness_policy
           end
+        when %r{LBCookieStickinessPolicies/member}
+          case name
+          when 'PolicyName'             then @lb_cookie_stickiness_policy[:policy_name] = @text
+          when 'CookieExpirationPeriod' then @lb_cookie_stickiness_policy[:cookie_expiration_period] = @text.to_i
+          when 'member'                 then @item[:lb_cookie_stickiness_policies] << @lb_cookie_stickiness_policy
+          end
+        when %r{LoadBalancerDescriptions/member$}
+          @item[:availability_zones].sort!
+          @item[:instances].sort!
+          @result << @item
         end
       end
       def reset
-        @p      = 'DescribeLoadBalancersResponse/DescribeLoadBalancersResult/LoadBalancerDescriptions'
         @result = []
       end
     end

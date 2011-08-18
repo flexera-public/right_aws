@@ -81,15 +81,17 @@ class TestS3Stubbed < Test::Unit::TestCase
   def test_116_move_key
     # move a key
     Rightscale::HttpConnection.push(413, 'not found') 
-    assert @s3.move(@bucket, @key1, @bucket, @key1_new_name)
-    
+    assert_raise RightAws::AwsError do
+      @s3.move(@bucket, @key1, @bucket, @key1_new_name)
+    end
   end
 
   def test_117_rename_key
     # rename a key
     Rightscale::HttpConnection.push(500, 'not found') 
-    assert @s3.rename(@bucket, @key2, @key2_new_name)
-    
+    assert_raise RightAws::AwsError do
+      @s3.rename(@bucket, @key2, @key2_new_name)
+    end
   end
 
 end

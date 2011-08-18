@@ -47,8 +47,18 @@ module RightAws
       on_exception
     end
 
-    # Retrieve information about EC2 instances. If +list+ is omitted then returns the
-    # list of all instances.
+    # Retrieve information about EC2 instances.
+    #
+    # Accepts a list of instances and/or a set of filters as the last parameter.
+    # 
+    # Filters: architecture, availability-zone, block-device-mapping.attach-time, block-device-mapping.delete-on-termination,
+    # block-device-mapping.device-name, block-device-mapping.status, block-device-mapping.volume-id, client-token, dns-name,
+    # group-id, image-id, instance-id, instance-lifecycle, instance-state-code, instance-state-name, instance-type, ip-address,
+    # kernel-id, key-name, launch-index, launch-time, monitoring-state, owner-id, placement-group-name, platform,
+    # private-dns-name, private-ip-address, product-code, ramdisk-id, reason, requester-id, reservation-id, root-device-name,
+    # root-device-type, spot-instance-request-id, state-reason-code, state-reason-message, subnet-id, tag-key, tag-value,
+    # tag:key, virtualization-type, vpc-id,
+    #
     #
     #  ec2.describe_instances #=>
     #    [{:private_ip_address=>"10.240.7.99",
@@ -84,13 +94,15 @@ module RightAws
     #         :ebs_volume_id=>"vol-f900f990"}],
     #      :aws_instance_id=>"i-8ce84ae4"} , ... ]
     #
-    def describe_instances(list=[])
-      link = generate_request("DescribeInstances", amazonize_list('InstanceId',list.to_a))
-      request_cache_or_info(:describe_instances, link,  QEc2DescribeInstancesParser, @@bench, list.blank?) do |parser|
+    #   ec2.describe_instances("i-8ce84ae6", "i-8ce84ae8", "i-8ce84ae0")
+    #   ec2.describe_instances(:filters => { 'availability-zone' => 'us-east-1a', 'instance-type' => 'c1.medium' })
+    #
+    # P.S. filters: http://docs.amazonwebservices.com/AWSEC2/latest/APIReference/index.html?ApiReference-query-DescribeInstances.html
+    #
+    def describe_instances(*list_and_options)
+      describe_resources_with_list_and_options('DescribeInstances', 'InstanceId', QEc2DescribeInstancesParser, list_and_options) do |parser|
         get_desc_instances(parser.result)
       end
-    rescue Exception
-      on_exception
     end
 
     # Return the product code attached to instance or +nil+ otherwise.
@@ -130,7 +142,8 @@ module RightAws
                       addressing_type = nil, instance_type = nil,
                       kernel_id = nil, ramdisk_id = nil, availability_zone = nil,
                       monitoring_enabled = nil, subnet_id = nil, disable_api_termination = nil,
-                      instance_initiated_shutdown_behavior = nil, block_device_mappings = nil)
+                      instance_initiated_shutdown_behavior = nil, block_device_mappings = nil,
+                      placement_group_name = nil, client_token = nil)
  	    launch_instances(image_id, { :min_count                            => min_count,
  	                                 :max_count                            => max_count,
  	                                 :user_data                            => user_data,
@@ -145,14 +158,16 @@ module RightAws
                                    :subnet_id                            => subnet_id,
                                    :disable_api_termination              => disable_api_termination,
                                    :instance_initiated_shutdown_behavior => instance_initiated_shutdown_behavior,
-                                   :block_device_mappings                =>  block_device_mappings
+                                   :block_device_mappings                => block_device_mappings,
+                                   :placement_group_name                 => placement_group_name,
+                                   :client_token                         => client_token
                                  })
     end
 
     # Launch new EC2 instances.
     # Options: :image_id, :addressing_type, :min_count, max_count, :key_name, :kernel_id, :ramdisk_id,
     # :availability_zone, :monitoring_enabled, :subnet_id, :disable_api_termination, :instance_initiated_shutdown_behavior,
-    # :block_device_mappings
+    # :block_device_mappings, :placement_group_name, :license_pool
     # 
     # Returns a list of launched instances or an exception.
     #
@@ -190,12 +205,12 @@ module RightAws
     #      :aws_instance_id=>"i-8ce84ae4"}]
     #
     def launch_instances(image_id, options={})
-      @logger.info("Launching instance of image #{image_id} for #{@aws_access_key_id}, " +
-                   "key: #{options[:key_name]}, groups: #{(options[:group_ids]).to_a.join(',')}")
       options[:image_id]    = image_id
       options[:min_count] ||= 1
       options[:max_count] ||= options[:min_count]
       params = prepare_instance_launch_params(options)
+      # Log debug information
+      @logger.info("Launching instance of image #{image_id}. Options: #{params.inspect}")
       link = generate_request("RunInstances", params)
       instances = request_info(link, QEc2DescribeInstancesParser.new(:logger => @logger))
       get_desc_instances(instances)
@@ -203,47 +218,39 @@ module RightAws
       on_exception
     end
 
-=begin
-    # TODO: API does not support this call yet
-    def create_instance(options={})
-      @logger.info("Creating instance #{@aws_access_key_id}, " +
-                   "key: #{options[:key_name]}, groups: #{(options[:group_ids]).to_a.join(',')}")
-      params = prepare_instance_launch_params(options)
-      link = generate_request("CreateInstance", params)
-      instances = request_info(link, QEc2DescribeInstancesParser.new(:logger => @logger))
-      get_desc_instances(instances).first
-    rescue Exception
-      on_exception
-    end
-=end
-
     def prepare_instance_launch_params(options={}) # :nodoc:
-      params = amazonize_list('SecurityGroup', options[:group_ids].to_a)
+      params = amazonize_list('SecurityGroup', Array(options[:group_ids]))
       params['InstanceType']                      = options[:instance_type] || DEFAULT_INSTANCE_TYPE
-      params['ImageId']                           = options[:image_id]                             unless options[:image_id].blank?
-      params['AddressingType']                    = options[:addressing_type]                      unless options[:addressing_type].blank?
-      params['MinCount']                          = options[:min_count]                            unless options[:min_count].blank?
-      params['MaxCount']                          = options[:max_count]                            unless options[:max_count].blank?
-      params['KeyName']                           = options[:key_name]                             unless options[:key_name].blank?
-      params['KernelId']                          = options[:kernel_id]                            unless options[:kernel_id].blank?
-      params['RamdiskId']                         = options[:ramdisk_id]                           unless options[:ramdisk_id].blank?
-      params['Placement.AvailabilityZone']        = options[:availability_zone]                    unless options[:availability_zone].blank?
+      params['ImageId']                           = options[:image_id]                             unless options[:image_id].right_blank?
+      params['AddressingType']                    = options[:addressing_type]                      unless options[:addressing_type].right_blank?
+      params['MinCount']                          = options[:min_count]                            unless options[:min_count].right_blank?
+      params['MaxCount']                          = options[:max_count]                            unless options[:max_count].right_blank?
+      params['KeyName']                           = options[:key_name]                             unless options[:key_name].right_blank?
+      params['KernelId']                          = options[:kernel_id]                            unless options[:kernel_id].right_blank?
+      params['RamdiskId']                         = options[:ramdisk_id]                           unless options[:ramdisk_id].right_blank?
+      params['Placement.AvailabilityZone']        = options[:availability_zone]                    unless options[:availability_zone].right_blank?
       params['Monitoring.Enabled']                = options[:monitoring_enabled].to_s              if     options[:monitoring_enabled]
-      params['SubnetId']                          = options[:subnet_id]                            unless options[:subnet_id].blank?
-      params['AdditionalInfo']                    = options[:additional_info]                      unless options[:additional_info].blank?
+      params['SubnetId']                          = options[:subnet_id]                            unless options[:subnet_id].right_blank?
+      params['AdditionalInfo']                    = options[:additional_info]                      unless options[:additional_info].right_blank?
       params['DisableApiTermination']             = options[:disable_api_termination].to_s         unless options[:disable_api_termination].nil?
-      params['InstanceInitiatedShutdownBehavior'] = options[:instance_initiated_shutdown_behavior] unless options[:instance_initiated_shutdown_behavior].blank?
-#     params['VolumeId']                          = options[:volume_id]                            unless options[:volume_id].blank?
-#     params['RootDeviceName']                    = options[:root_device_name]                     unless options[:root_device_name].blank?
-#     params['RootDeviceType']                    = options[:root_device_type]                     unless options[:root_device_type].blank?
+      params['InstanceInitiatedShutdownBehavior'] = options[:instance_initiated_shutdown_behavior] unless options[:instance_initiated_shutdown_behavior].right_blank?
+      params['Placement.GroupName']               = options[:placement_group_name]                 unless options[:placement_group_name].right_blank?
+      params['License.Pool']                      = options[:license_pool]                         unless options[:license_pool].right_blank?
+      # Client token: do not set it automatically for Euca clouds (but let it go if it was set by a user)
+      client_token          = options[:client_token]
+      client_token        ||= AwsUtils::generate_unique_token unless @params[:eucalyptus]
+      params['ClientToken'] = client_token                    if     client_token
+      #
       params.merge!(amazonize_block_device_mappings(options[:block_device_mappings]))
-      unless options[:user_data].blank?
-        options[:user_data].strip!
-          # Do not use CGI::escape(encode64(...)) as it is done in Amazons EC2 library.
-          # Amazon 169.254.169.254 does not like escaped symbols!
-          # And it doesn't like "\n" inside of encoded string! Grrr....
-          # Otherwise, some of UserData symbols will be lost...
-        params['UserData'] = Base64.encode64(options[:user_data]).delete("\n") unless options[:user_data].blank?
+      # KD: https://github.com/rightscale/right_aws/issues#issue/11
+      # Do not modify user data and pass it as is: one may pass there a hex-binary data
+      options[:user_data] = options[:user_data].to_s
+      unless options[:user_data].empty?
+        # Do not use CGI::escape(encode64(...)) as it is done in Amazons EC2 library.
+        # Amazon 169.254.169.254 does not like escaped symbols!
+        # And it doesn't like "\n" inside of encoded string! Grrr....
+        # Otherwise, some of UserData symbols will be lost...
+        params['UserData'] = Base64.encode64(options[:user_data]).delete("\n")
       end
       params
     end
@@ -313,8 +320,9 @@ module RightAws
     #
     #  ec2.reboot_instances(['i-f222222d','i-f222222e']) #=> true
     #
-    def reboot_instances(list)
-      link = generate_request("RebootInstances", amazonize_list('InstanceId', list.to_a))
+    def reboot_instances(*instances)
+      instances = instances.flatten
+      link = generate_request("RebootInstances", amazonize_list('InstanceId', instances))
       request_info(link, RightBoolResponseParser.new(:logger => @logger))
     rescue Exception
       on_exception
@@ -431,6 +439,25 @@ module RightAws
       on_exception
     end
 
+    # Get Initial windows instance password using Amazon API call GetPasswordData.
+    #
+    #  puts ec2.get_initial_password_v2(my_awesome_instance[:aws_instance_id], my_awesome_key[:aws_material]) #=> "MhjWcgZuY6"
+    #
+    # P.S. To say the truth there is absolutely no any speedup if to compare to the old get_initial_password method... ;(
+    #
+    def get_initial_password_v2(instance_id, private_key)
+      link = generate_request('GetPasswordData',
+                              'InstanceId' => instance_id )
+      response = request_info(link, QEc2GetPasswordDataParser.new(:logger => @logger))
+      if response[:password_data].right_blank?
+        raise AwsError.new("Initial password is not yet created for #{instance_id}")
+      else
+        OpenSSL::PKey::RSA.new(private_key).private_decrypt(Base64.decode64(response[:password_data]))
+      end
+    rescue Exception
+      on_exception
+    end
+
     # Bundle a Windows image.
     # Internally, it queues the bundling task and shuts down the instance.
     # It then takes a snapshot of the Windows volume bundles it, and uploads it to
@@ -455,7 +482,7 @@ module RightAws
       s3_owner_aws_secret_access_key ||= @aws_secret_access_key
       s3_expires = Time.now.utc + s3_expires if s3_expires.is_a?(Fixnum) && (s3_expires < S3Interface::ONE_YEAR_IN_SECONDS)
       # policy
-      policy = { 'expiration' => s3_expires.strftime('%Y-%m-%dT%H:%M:%SZ'),
+      policy = { 'expiration' => AwsUtils::utc_iso8601(s3_expires),
                  'conditions' => [ { 'bucket' => s3_bucket },
                                    { 'acl'    => s3_upload_policy },
                                    [ 'starts-with', '$key', s3_prefix ] ] }.to_json
@@ -476,9 +503,13 @@ module RightAws
     end
 
     # Describe the status of the Windows AMI bundlings.
-    # If +list+ is omitted the returns the whole list of tasks.
     #
-    #  ec2.describe_bundle_tasks(['bun-4fa74226']) #=>
+    # Accepts a list of tasks and/or a set of filters as the last parameter.
+    #
+    # Filters" bundle-id, error-code, error-message, instance-id, progress, s3-aws-access-key-id, s3-bucket, s3-prefix,
+    # start-time, state, update-time
+    #
+    #  ec2.describe_bundle_tasks('bun-4fa74226') #=>
     #    [{:s3_bucket         => "my-awesome-bucket"
     #      :aws_id            => "bun-0fa70206",
     #      :s3_prefix         => "win1pr",
@@ -490,11 +521,12 @@ module RightAws
     #      :aws_state         => "failed",
     #      :aws_instance_id   => "i-e3e24e8a"}]
     #
-    def describe_bundle_tasks(list=[])
-      link = generate_request("DescribeBundleTasks", amazonize_list('BundleId', list.to_a))
-      request_info(link, QEc2DescribeBundleTasksParser.new)
-    rescue Exception
-      on_exception
+    #   ec2.describe_bundle_tasks(:filters => { 'state' => 'pending' })
+    #
+    # P.S. filters: http://docs.amazonwebservices.com/AWSEC2/latest/APIReference/ApiReference-query-DescribeBundleTasks.html
+    #
+    def describe_bundle_tasks(*list_and_options)
+      describe_resources_with_list_and_options('DescribeBundleTasks', 'BundleId', QEc2DescribeBundleTasksParser, list_and_options)
     end
 
     # Cancel an in‐progress or pending bundle task by id.
@@ -518,35 +550,6 @@ module RightAws
     end
 
     #-----------------------------------------------------------------
-    #      Helpers
-    #-----------------------------------------------------------------
-
-    BLOCK_DEVICE_KEY_MAPPING = {                               # :nodoc:
-      :device_name               => 'DeviceName',
-      :virtual_name              => 'VirtualName',
-      :no_device                 => 'NoDevice',
-      :ebs_snapshot_id           => 'Ebs.SnapshotId',
-      :ebs_volume_size           => 'Ebs.VolumeSize',
-      :ebs_delete_on_termination => 'Ebs.DeleteOnTermination' }
-
-    def amazonize_block_device_mappings(block_device_mappings) # :nodoc:
-      result = {}
-      unless block_device_mappings.blank?
-        block_device_mappings = [block_device_mappings] unless block_device_mappings.is_a?(Array)
-        block_device_mappings.each_with_index do |b, idx|
-          BLOCK_DEVICE_KEY_MAPPING.each do |local_name, remote_name|
-            value = b[local_name]
-            case local_name
-            when :no_device then value = value ? '' : nil   # allow to pass :no_device as boolean
-            end
-            result["BlockDeviceMapping.#{idx+1}.#{remote_name}"] = value unless value.nil?
-          end
-        end
-      end
-      result
-    end
-
-    #-----------------------------------------------------------------
     #      PARSERS: Instances
     #-----------------------------------------------------------------
 
@@ -566,10 +569,13 @@ module RightAws
                     :ami_launch_index => '',
                     :ssh_key_name     => '',
                     :aws_state        => '',
-                    :aws_product_codes => [] }
+                    :aws_product_codes => [],
+                    :tags              => {} }
         when %r{blockDeviceMapping/item$}
           @item[:block_device_mappings] ||= []
           @block_device_mapping = {}
+        when %r{/tagSet/item$}
+          @aws_tag = {}
         end
       end
       def tagend(name)
@@ -599,13 +605,20 @@ module RightAws
         when 'rootDeviceType'   then @item[:root_device_type]      = @text
         when 'rootDeviceName'   then @item[:root_device_name]      = @text
         when 'instanceClass'    then @item[:instance_class]        = @text
+        when 'instanceLifecycle'     then @item[:instance_lifecycle]       = @text
+        when 'spotInstanceRequestId' then @item[:spot_instance_request_id] = @text
+        when 'requesterId'           then @item[:requester_id]             = @text
+        when 'groupName'             then @item[:placement_group_name]     = @text 
+        when 'virtualizationType'    then @item[:virtualization_type]      = @text
+        when 'clientToken'           then @item[:client_token]     = @text
         else
           case full_tag_name
-          when %r{/stateReason/code$}    then @item[:state_reason_code]    = @text.to_i
+          when %r{/stateReason/code$}    then @item[:state_reason_code]    = @text
           when %r{/stateReason/message$} then @item[:state_reason_message] = @text
           when %r{/instanceState/code$}  then @item[:aws_state_code]       = @text.to_i
           when %r{/instanceState/name$}  then @item[:aws_state]            = @text
           when %r{/monitoring/state$}    then @item[:monitoring_state]     = @text
+          when %r{/license/pool$}        then @item[:license_pool]         = @text
           when %r{/blockDeviceMapping/item} # no trailing $
             case name
             when 'deviceName'          then @block_device_mapping[:device_name]                = @text
@@ -617,6 +630,9 @@ module RightAws
             when 'item'                then @item[:block_device_mappings]                     << @block_device_mapping
             end
           when %r{/instancesSet/item$} then @reservation[:instances_set] << @item
+          when %r{/tagSet/item/key$}   then @aws_tag[:key]               = @text
+          when %r{/tagSet/item/value$} then @aws_tag[:value]             = @text
+          when %r{/tagSet/item$}       then @item[:tags][@aws_tag[:key]] = @aws_tag[:value]
           when 'DescribeInstancesResponse/reservationSet/item',
                'RunInstancesResponse'
             @result << @reservation
@@ -748,6 +764,19 @@ module RightAws
         when 'progress'   then @result[:aws_progress]      = @text
         when 'code'       then @result[:aws_error_code]    = @text
         when 'message'    then @result[:aws_error_message] = @text
+        end
+      end
+      def reset
+        @result = {}
+      end
+    end
+
+    class QEc2GetPasswordDataParser < RightAWSParser #:nodoc:
+      def tagend(name)
+        case name
+        when 'instanceId'   then @result[:aws_instance_id] = @text
+        when 'timestamp'    then @result[:timestamp]       = @text
+        when 'passwordData' then @result[:password_data]   = @text
         end
       end
       def reset

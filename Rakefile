@@ -3,34 +3,37 @@
 require 'rubygems'
 require "rake/testtask"
 require 'rcov/rcovtask'
+require 'rake/gempackagetask'
+require 'rake/clean'
 $: << File.dirname(__FILE__)
-require 'lib/right_aws.rb'
-
 testglobs =     ["test/ts_right_aws.rb"]
 
 begin
-  require 'jeweler'
-  Jeweler::Tasks.new do |gem|
-    gem.name = "icehouse-right_aws"
-    gem.summary = "Interface classes for the Amazon EC2, SQS, and S3 Web Services"
-    gem.email = "support@rightscale.com"
-    gem.homepage = "http://github.com/icehouse/right_aws"
-    gem.authors = ["RightScale, Inc."]
-    gem.files =  Dir["[A-Z]*", "lib/**/*"]
-    
-    gem.add_dependency('right_http_connection',  '>= 1.2.1')
-  end
-  Jeweler::GemcutterTasks.new
-rescue LoadError
-  puts "Jeweler (or a dependency) not available. Install it with: sudo gem install jeweler"
+  require 'bundler'
+rescue LoadError => e
+  STDERR.puts("Bundler is not available, some rake tasks will not be defined: #{e.message}")
+else
+  Bundler::GemHelper.install_tasks
 end
+
+# == Gem == #
+
+gemtask = Rake::GemPackageTask.new(Gem::Specification.load("right_aws.gemspec")) do |package|
+  package.package_dir = ENV['PACKAGE_DIR'] || 'pkg'
+  package.need_zip = true
+  package.need_tar = true
+end
+
+directory gemtask.package_dir
+
+CLEAN.include(gemtask.package_dir)
 
 desc "Analyze code coverage of the unit tests."
 Rcov::RcovTask.new do |t|
   t.test_files = FileList[testglobs]
   #t.verbose = true     # uncomment to see the executed command
 end
- 
+
 desc "Test just the SQS interface"
 task :testsqs do
   require 'test/test_credentials'

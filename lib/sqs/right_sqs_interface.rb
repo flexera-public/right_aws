@@ -49,13 +49,12 @@ module RightAws
 
       # Creates a new SqsInterface instance.
       #
-      #  sqs = RightAws::SqsInterface.new('1E3GDYEOGFJPIT75KDT40','hgTHt68JY07JKUY08ftHYtERkjgtfERn57DFE379', {:multi_thread => true, :logger => Logger.new('/tmp/x.log')}) 
+      #  sqs = RightAws::SqsInterface.new('1E3GDYEOGFJPIT75KDT40','hgTHt68JY07JKUY08ftHYtERkjgtfERn57DFE379', {:logger => Logger.new('/tmp/x.log')}) 
       #  
       # Params is a hash:
       #
       #    {:server       => 'queue.amazonaws.com' # Amazon service host: 'queue.amazonaws.com'(default)
       #     :port         => 443                   # Amazon service port: 80 or 443(default)
-      #     :multi_thread => true|false            # Multi-threaded (connection per each thread): true or false(default)
       #     :signature_version => '0'              # The signature version : '0', '1' or '2'(default)
       #     :logger       => Logger Object}        # Logger instance: logs to STDOUT if omitted }
       #
@@ -104,8 +103,8 @@ module RightAws
       param.each{ |key, value| param.delete(key) if (value.nil? || key.is_a?(Symbol)) }
         # created request
       param_to_str = param.to_a.collect{|key,val| key.to_s + "=" + CGI::escape(val.to_s) }.join("&")
-      param_to_str = "?#{param_to_str}" unless param_to_str.blank?
-      request = "Net::HTTP::#{method.capitalize}".constantize.new("#{queue_uri}#{param_to_str}")
+      param_to_str = "?#{param_to_str}" unless param_to_str.right_blank?
+      request = "Net::HTTP::#{method.capitalize}".right_constantize.new("#{queue_uri}#{param_to_str}")
       request.body = message if message
         # set main headers
       request['content-md5']  = ''
@@ -311,7 +310,7 @@ module RightAws
     def peek_message(queue_url, message_id)
       req_hash = generate_rest_request('GET', :queue_url => "#{queue_url}/#{CGI::escape message_id}" )
       messages = request_info(req_hash, SqsReceiveMessagesParser.new(:logger => @logger))
-      messages.blank? ? nil : messages[0]
+      messages.right_blank? ? nil : messages[0]
     rescue
       on_exception
     end
@@ -452,7 +451,7 @@ module RightAws
       #
     def receive_message(queue_url, visibility_timeout=nil)
       result = receive_messages(queue_url, 1, visibility_timeout)
-      result.blank? ? nil : result[0]
+      result.right_blank? ? nil : result[0]
     rescue
       on_exception
     end
@@ -482,7 +481,7 @@ module RightAws
       #
     def pop_message(queue_url)
       messages = pop_messages(queue_url)
-      messages.blank? ? nil : messages[0]
+      messages.right_blank? ? nil : messages[0]
     rescue
       on_exception
     end

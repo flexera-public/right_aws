@@ -1,0 +1,22 @@
+GIT
+  remote: git@github.com:rightscale/right_http_connection.git
+  revision: 0bc3343232133bdb38c237d8285525d74495d3f5
+  specs:
+    right_http_connection (1.2.5)
+
+GEM
+  specs:
+    libxml-ruby (0.5.2.0)
+    rake (0.8.7)
+    rcov (0.8.1.2.0)
+    uuidtools (1.0.7)
+
+PLATFORMS
+  ruby
+
+DEPENDENCIES
+  libxml-ruby (~> 0.5.2)
+  rake
+  rcov
+  right_http_connection (= 1.2.5)!
+  uuidtools (~> 1.0.7)

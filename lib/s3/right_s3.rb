@@ -59,7 +59,6 @@ module RightAws
     #    {:server       => 's3.amazonaws.com'   # Amazon service host: 's3.amazonaws.com'(default)
     #     :port         => 443                  # Amazon service port: 80 or 443(default)
     #     :protocol     => 'https'              # Amazon service protocol: 'http' or 'https'(default)
-    #     :multi_thread => true|false           # Multi-threaded (connection per each thread): true or false(default)
     #     :logger       => Logger Object}       # Logger instance: logs to STDOUT if omitted }
     def initialize(aws_access_key_id=nil, aws_secret_access_key=nil, params={})
       @interface = S3Interface.new(aws_access_key_id, aws_secret_access_key, params)
@@ -217,11 +216,10 @@ module RightAws
         #
         #  keys, service = bucket.keys_and_service({'max-keys'=> 2, 'prefix' => 'logs'})
         #  p keys    #=> # 2 keys array
-        #  p service #=> {"max-keys"=>"2", "prefix"=>"logs", "name"=>"my_awesome_bucket", "marker"=>"", "is_truncated"=>true}
+        #  p service #=> {"max-keys"=>"2", "prefix"=>"logs", "name"=>"my_awesome_bucket", "marker"=>"", "is_truncated"=>true, :common_prefixes=>[]}
         #
       def keys_and_service(options={}, head=false)
         opt = {}; options.each{ |key, value| opt[key.to_s] = value }
-        service_data = {}
         thislist = {}
         list = []
         @s3.interface.incrementally_list_bucket(@name, opt) do |thislist|
@@ -232,10 +230,8 @@ module RightAws
             list << key
           end
         end
-        thislist.each_key do |key|
-          service_data[key] = thislist[key] unless (key == :contents || key == :common_prefixes)
-        end
-        [list, service_data]
+        thislist.delete(:contents)
+        [list, thislist]
       end
 
         # Retrieve key information from Amazon. 
@@ -249,7 +245,7 @@ module RightAws
         #  key.head
         #
       def key(key_name, head=false)
-        raise 'Key name can not be empty.' if key_name.blank?
+        raise 'Key name can not be empty.' if key_name.right_blank?
         key_instance = nil
           # if this key exists - find it ....
         keys({'prefix'=>key_name}, head).each do |key|
@@ -346,9 +342,10 @@ module RightAws
         # If +force+ is set, clears and deletes the bucket. 
         # Returns +true+. 
         #
-        #  bucket.delete(true) #=> true
+        #  bucket.delete(:force => true) #=> true
         #
-      def delete(force=false)
+      def delete(options={})
+        force = options.is_a?(Hash) && options[:force]==true
         force ? @s3.interface.force_delete_bucket(@name) : @s3.interface.delete_bucket(@name)
       end
 
@@ -459,6 +456,30 @@ module RightAws
       def data
         get if !@data and exists?
         @data
+      end
+        
+        # Getter for the 'content-type' metadata
+      def content_type
+        @headers['content-type'] if @headers
+      end
+      
+        # Helper to get and URI-decode a header metadata.
+        # Metadata have to be HTTP encoded (rfc2616) as we use the Amazon S3 REST api
+        # see http://docs.amazonwebservices.com/AmazonS3/latest/index.html?UsingMetadata.html
+      def decoded_meta_headers(key = nil)
+        if key
+          # Get one metadata value by its key
+          URI.decode(@meta_headers[key.to_s])
+        else
+          # Get a hash of all metadata with a decoded value
+          @decoded_meta_headers ||= begin
+            metadata = {}
+            @meta_headers.each do |key, value|
+              metadata[key.to_sym] = URI.decode(value)
+            end
+            metadata
+          end
+        end
       end
       
         # Retrieve object data and attributes from Amazon. 
@@ -626,7 +647,7 @@ module RightAws
         #  key.delete #=> true
         #
       def delete
-        raise 'Key name must be specified.' if @name.blank?
+        raise 'Key name must be specified.' if @name.right_blank?
         @bucket.s3.interface.delete(@bucket, @name) 
       end
       
@@ -759,7 +780,7 @@ module RightAws
         @thing = thing
         @id    = id
         @name  = name
-        @perms = perms.to_a
+        @perms = Array(perms)
         case action
           when :apply             then apply
           when :refresh           then refresh
@@ -1062,7 +1083,7 @@ module RightAws
         @bucket       = bucket
         @name         = name.to_s
         @meta_headers = meta_headers
-        raise 'Key name can not be empty.' if @name.blank?
+        raise 'Key name can not be empty.' if @name.right_blank?
       end
       
         # Generate link to PUT key data. 

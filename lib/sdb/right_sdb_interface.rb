@@ -49,13 +49,12 @@ module RightAws
     #      :port         => 443                  # Amazon service port: 80 or 443(default)
     #      :protocol     => 'https'              # Amazon service protocol: 'http' or 'https'(default)
     #      :signature_version => '0'             # The signature version : '0','1 or '2'(default)
-    #      :multi_thread => true|false           # Multi-threaded (connection per each thread): true or false(default)
     #      :logger       => Logger Object        # Logger instance: logs to STDOUT if omitted 
     #      :nil_representation => 'mynil'}       # interpret Ruby nil as this string value; i.e. use this string in SDB to represent Ruby nils (default is the string 'nil')
     #      
     # Example:
     # 
-    #  sdb = RightAws::SdbInterface.new('1E3GDYEOGFJPIT7XXXXXX','hgTHt68JY07JKUY08ftHYtERkjgtfERn57XXXXXX', {:multi_thread => true, :logger => Logger.new('/tmp/x.log')}) #=> #<RightSdb:0xa6b8c27c>
+    #  sdb = RightAws::SdbInterface.new('1E3GDYEOGFJPIT7XXXXXX','hgTHt68JY07JKUY08ftHYtERkjgtfERn57XXXXXX', {:logger => Logger.new('/tmp/x.log')}) #=> #<RightSdb:0xa6b8c27c>
     #  
     # see: http://docs.amazonwebservices.com/AmazonSimpleDB/2007-11-07/DeveloperGuide/
     #
@@ -89,24 +88,42 @@ module RightAws
 
     # Prepare attributes for putting.
     # (used by put_attributes)
-    def pack_attributes(attributes, replace = false) #:nodoc:
+    def pack_attributes(items_or_attributes, replace = false, batch = false) #:nodoc:
+      if batch
+        index = 0
+        items_or_attributes.inject({}){|result, (item_name, attributes)|
+          item_prefix = "Item.#{index}."
+          result["#{item_prefix}ItemName"] = item_name.to_s
+          result.merge!(
+            pack_single_item_attributes(attributes, replace, item_prefix))
+          index += 1
+          result
+        }
+      else
+        pack_single_item_attributes(items_or_attributes, replace)
+      end
+    end
+
+    def pack_single_item_attributes(attributes, replace, prefix = "")
       result = {}
       if attributes
         idx = 0
         skip_values = attributes.is_a?(Array)
         attributes.each do |attribute, values|
           # set replacement attribute
-          result["Attribute.#{idx}.Replace"] = 'true' if replace
+          result["#{prefix}Attribute.#{idx}.Replace"] = 'true' if replace
           # pack Name/Value
           unless values.nil?
-            Array(values).each do |value|
-              result["Attribute.#{idx}.Name"]  = attribute
-              result["Attribute.#{idx}.Value"] = ruby_to_sdb(value) unless skip_values
+            # Array(values) does not work here:
+            #  - Array('') => [] but we wanna get here ['']
+            [values].flatten.each do |value|
+              result["#{prefix}Attribute.#{idx}.Name"]  = attribute
+              result["#{prefix}Attribute.#{idx}.Value"] = ruby_to_sdb(value) unless skip_values
               idx += 1
             end
           else
-            result["Attribute.#{idx}.Name"] = attribute
-            result["Attribute.#{idx}.Value"] = ruby_to_sdb(nil) unless skip_values
+            result["#{prefix}Attribute.#{idx}.Name"] = attribute
+            result["#{prefix}Attribute.#{idx}.Value"] = ruby_to_sdb(nil) unless skip_values
             idx += 1
           end
         end
@@ -152,7 +169,7 @@ module RightAws
     # (similar to ActiveRecord::Base#find using :conditions => ['query', param1, .., paramN])
     #
     def query_expression_from_array(params) #:nodoc:
-      return '' if params.blank?
+      return '' if params.right_blank?
       query = params.shift.to_s
       query.gsub(/(\\)?(\?)/) do
         if $1 # if escaped '\?' is found - replace it by '?' without backslash
@@ -164,7 +181,7 @@ module RightAws
     end
 
     def query_expression_from_hash(hash)
-      return '' if hash.blank?
+      return '' if hash.right_blank?
       expression = []
       hash.each do |key, value|
         expression << "#{key}=#{escape(value)}"
@@ -237,6 +254,27 @@ module RightAws
       on_exception
     end
 
+    # Query Metadata for Domain
+    #
+    # Returns a hash on success or an exception on error.
+    #
+    # example: 
+    # sdb = RightAWS:::SdbInterface.new
+    # sdb.domain_metadata('toys') # => {:attribute_values_size_bytes=>"2754",
+    #                                   :item_count=>"25",
+    #                                   :item_names_size_bytes=>"900",
+    #                                   :timestamp=>"1291890409",
+    #                                   :attribute_name_count=>"7",
+    #                                   :box_usage=>"0.0000071759",
+    #                                   :attribute_names_size_bytes=>"48",
+    #                                   :attribute_value_count=>"154",
+    #                                   :request_id=>"79bbfe8f-f0c9-59a2-0963-16d5fc6c3c52"}
+    # see http://docs.amazonwebservices.com/AmazonSimpleDB/latest/DeveloperGuide/index.html?SDB_API_DomainMetadata.html
+    def domain_metadata(domain)
+      link = generate_request("DomainMetadata","DomainName"=>domain)
+      request_info(link,QSdbGenericParser.new)
+    end
+
     # Delete SDB domain at Amazon.
     # 
     # Returns a hash: { :box_usage, :request_id } on success or an exception on error.
@@ -304,6 +342,37 @@ module RightAws
                  'ItemName'   => item_name }.merge(pack_attributes(attributes, replace))
       link = generate_request("PutAttributes", params)
       request_info( link, QSdbSimpleParser.new )
+    rescue Exception
+      on_exception
+    end
+
+    # Add/Replace attributes for multiple items at a time.
+    #
+    # Params:
+    #   domain_name = DomainName
+    #   items       = {
+    #     'Item1' => {
+    #       'nameA'  => [valueA1, valueA2,..., valueAN],
+    #       ...
+    #       'nameB'  => [valueB1, valueB2,..., valueBN]
+    #     },
+    #     'Item2' => {
+    #       'nameC'  => [valueC1, valueC2,..., valueCN],
+    #       ...
+    #       'nameD'  => [valueD1, valueD2,..., valueDN]
+    #     }
+    #   }
+    #   replace = :replace | any other value to skip replacement
+    #
+    # Usage of batch_put_attributes is similar to put_attributes except that
+    # instead of supplying an item_name and a hash of attributes, you supply a
+    # hash of item names to attributes.
+    #
+    # See: http://docs.amazonwebservices.com/AmazonSimpleDB/latest/DeveloperGuide/index.html?SDB_API_BatchPutAttributes.html
+    def batch_put_attributes(domain_name, items, replace = false)
+      params = { 'DomainName' => domain_name }.merge(pack_attributes(items, replace, true))
+      link = generate_request("BatchPutAttributes", params)
+      request_info( link, QSdbSimpleParser.new)
     rescue Exception
       on_exception
     end
@@ -476,7 +545,7 @@ module RightAws
     # see: http://docs.amazonwebservices.com/AmazonSimpleDB/2007-11-07/DeveloperGuide/index.html?SDB_API_QueryWithAttributes.html
     #
     def query_with_attributes(domain_name, attributes=[], query_expression = nil, max_number_of_items = nil, next_token = nil)
-      attributes = attributes.to_a
+      attributes = Array(attributes)
       query_expression = query_expression_from_array(query_expression) if query_expression.is_a?(Array)
       @last_query_expression = query_expression
       #
@@ -566,6 +635,18 @@ module RightAws
     #-----------------------------------------------------------------
     #      PARSERS:
     #-----------------------------------------------------------------
+    class QSdbGenericParser < RightAWSParser #:nodoc:
+      def reset
+        @result = {}
+      end
+      def tagend(name)
+        case full_tag_name
+        when %r{/(DomainMetadataResult|ResponseMetadata)/}
+          @result[name.right_underscore.to_sym] = @text
+        end
+      end
+    end
+      
     class QSdbListDomainParser < RightAWSParser #:nodoc:
       def reset
         @result = { :domains => [] }

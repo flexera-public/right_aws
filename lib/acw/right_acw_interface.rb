@@ -54,7 +54,6 @@ module RightAws
     # * <tt>:server</tt>: ACW service host, default: DEFAULT_HOST
     # * <tt>:port</tt>: ACW service port, default: DEFAULT_PORT
     # * <tt>:protocol</tt>: 'http' or 'https', default: DEFAULT_PROTOCOL
-    # * <tt>:multi_thread</tt>: true=HTTP connection per thread, false=per process
     # * <tt>:logger</tt>: for log messages, default: RAILS_DEFAULT_LOGGER else STDOUT
     # * <tt>:signature_version</tt>:  The signature version : '0','1' or '2'(default)
     # * <tt>:cache</tt>: true/false(default): list_metrics
@@ -144,8 +143,8 @@ module RightAws
       # Period (60 sec by default)
       period = (options[:period] && options[:period].to_i) || 60
       # Statistics ('Average' by default)
-      statistics = options[:statistics].to_a.flatten
-      statistics = statistics.blank? ? ['Average'] : statistics.map{|statistic| statistic.to_s.capitalize }
+      statistics = Array(options[:statistics]).flatten
+      statistics = statistics.right_blank? ? ['Average'] : statistics.map{|statistic| statistic.to_s.capitalize }
       # Times (5.min.ago up to now by default)
       start_time = options[:start_time] || (Time.now.utc - 5*60)
       start_time = start_time.utc.strftime("%Y-%m-%dT%H:%M:%S+00:00") if start_time.is_a?(Time)
@@ -167,7 +166,7 @@ module RightAws
       # dimentions
       dim = []
       dimentions.each do |key, values|
-        values.to_a.each { |value|  dim << [key, value] }
+        Array(values).each { |value|  dim << [key, value] }
       end
       request_hash.merge!(amazonize_list(['Dimensions.member.?.Name', 'Dimensions.member.?.Value'], dim))
       #
@@ -199,7 +198,7 @@ module RightAws
       end
       def tagend(name)
         case name
-        when 'Timestamp'  then @item[:timestamp]   = Time.parse(@text)
+        when 'Timestamp'  then @item[:timestamp]   = @text
         when 'Unit'       then @item[:unit]        = @text
         when 'CustomUnit' then @item[:custom_unit] = @text
         when 'Samples'    then @item[:samples]     = @text.to_f

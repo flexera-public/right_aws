@@ -273,12 +273,6 @@ class TestSqs < Test::Unit::TestCase
     assert_nil(Rightscale::SqsInterface.amazon_problems)
   end
 
-  def test_28_check_threading_model
-    assert(!@sqs.multi_thread)
-    newsqs = Rightscale::SqsInterface.new(TestCredentials.aws_access_key_id, TestCredentials.aws_secret_access_key, {:multi_thread => true})
-    assert(newsqs.multi_thread)
-  end
-
   def test_29_signature_version_0
     sqs = Rightscale::SqsInterface.new(TestCredentials.aws_access_key_id, TestCredentials.aws_secret_access_key, :signature_version => '0')
     assert_nothing_raised do

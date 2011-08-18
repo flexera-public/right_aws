@@ -24,13 +24,19 @@
 # Test
 module RightAws
   require 'digest/md5'
-  require 'pp'
   
   class AwsUtils #:nodoc:
     @@digest1   = OpenSSL::Digest::Digest.new("sha1")
     @@digest256 = nil
     if OpenSSL::OPENSSL_VERSION_NUMBER > 0x00908000
       @@digest256 = OpenSSL::Digest::Digest.new("sha256") rescue nil # Some installation may not support sha256
+    end
+
+    def self.utc_iso8601(time)
+      if    time.is_a?(Fixnum) then time = Time::at(time)
+      elsif time.is_a?(String) then time = Time::parse(time)
+      end
+      time.utc.strftime("%Y-%m-%dT%H:%M:%S.000Z")
     end
     
     def self.sign(aws_secret_access_key, auth_string)
@@ -45,9 +51,17 @@ module RightAws
       end
     end
 
+    def self.xml_escape(text) # :nodoc:
+      REXML::Text::normalize(text)
+    end
+
+    def self.xml_unescape(text) # :nodoc:
+      REXML::Text::unnormalize(text)
+    end
+
     # Set a timestamp and a signature version
     def self.fix_service_params(service_hash, signature)
-      service_hash["Timestamp"] ||= Time.now.utc.strftime("%Y-%m-%dT%H:%M:%S.000Z") unless service_hash["Expires"]
+      service_hash["Timestamp"] ||= utc_iso8601(Time.now) unless service_hash["Expires"]
       service_hash["SignatureVersion"] = signature
       service_hash
     end
@@ -124,9 +138,23 @@ module RightAws
     end
 
     def self.split_items_and_params(array)
-      items  = array.to_a.flatten.compact
+      items  = Array(array).flatten.compact
       params = items.last.kind_of?(Hash) ? items.pop : {}
       [items, params]
+    end
+
+    # Generates a token in format of:
+    #  1. "1dd8d4e4-db6b-11df-b31d-0025b37efad0 (if UUID gem is loaded)
+    #  2. "1287483761-855215-zSv2z-bWGj2-31M5t-ags9m" (if UUID gem is not loaded)
+    TOKEN_GENERATOR_CHARSET = ('a'..'z').to_a + ('A'..'Z').to_a + ('0'..'9').to_a
+    def self.generate_unique_token
+      time  = Time.now
+      token = "%d-%06d" % [time.to_i, time.usec]
+      4.times do
+        token << "-"
+        5.times { token << TOKEN_GENERATOR_CHARSET[rand(TOKEN_GENERATOR_CHARSET.size)] }
+      end
+      token
     end
   end
 
@@ -173,7 +201,31 @@ module RightAws
     def self.amazon_problems=(problems_list)
       @@amazon_problems = problems_list
     end
-    
+
+    # Raise an exception if a timeout occures while an API call is in progress.
+    # This helps to avoid a duplicate resources creation when Amazon hangs for some time and
+    # RightHttpConnection is forced to use retries to get a response from it.
+    #
+    # If an API call action is in the list then no attempts to retry are performed.
+    #
+    RAISE_ON_TIMEOUT_ON_ACTIONS = %w{ 
+      AllocateAddress
+      CreateSnapshot
+      CreateVolume
+      PurchaseReservedInstancesOffering
+      RequestSpotInstances
+      RunInstances
+    }
+    @@raise_on_timeout_on_actions = RAISE_ON_TIMEOUT_ON_ACTIONS.dup
+
+    def self.raise_on_timeout_on_actions
+      @@raise_on_timeout_on_actions
+    end
+
+    def self.raise_on_timeout_on_actions=(actions_list)
+      @@raise_on_timeout_on_actions = actions_list
+    end
+
   end
 
   module RightAwsBaseInterface
@@ -214,33 +266,42 @@ module RightAws
       @params = params
       # If one defines EC2_URL he may forget to use a single slash as an "empty service" path.
       # Amazon does not like this therefore add this bad boy if he is missing...
-      service_info[:default_service] = '/' if service_info[:default_service].blank?
+      service_info[:default_service] = '/' if service_info[:default_service].right_blank?
       raise AwsError.new("AWS access keys are required to operate on #{service_info[:name]}") \
-        if aws_access_key_id.blank? || aws_secret_access_key.blank?
+        if aws_access_key_id.right_blank? || aws_secret_access_key.right_blank?
       @aws_access_key_id     = aws_access_key_id
       @aws_secret_access_key = aws_secret_access_key
       # if the endpoint was explicitly defined - then use it
       if @params[:endpoint_url]
-        @params[:server]   = URI.parse(@params[:endpoint_url]).host
-        @params[:port]     = URI.parse(@params[:endpoint_url]).port
-        @params[:service]  = URI.parse(@params[:endpoint_url]).path
+        uri = URI.parse(@params[:endpoint_url])
+        @params[:server]   = uri.host
+        @params[:port]     = uri.port
+        @params[:service]  = uri.path
+        @params[:protocol] = uri.scheme
         # make sure the 'service' path is not empty
-        @params[:service]  = service_info[:default_service] if @params[:service].blank?
-        @params[:protocol] = URI.parse(@params[:endpoint_url]).scheme
+        @params[:service]  = service_info[:default_service] if @params[:service].right_blank?
         @params[:region]   = nil
+        default_port       = uri.default_port
       else
         @params[:server]   ||= service_info[:default_host]
         @params[:server]     = "#{@params[:region]}.#{@params[:server]}" if @params[:region]
         @params[:port]     ||= service_info[:default_port]
         @params[:service]  ||= service_info[:default_service]
         @params[:protocol] ||= service_info[:default_protocol]
+        default_port         = @params[:protocol] == 'https' ? 443 : 80
       end
-#      @params[:multi_thread] ||= defined?(AWS_DAEMON)
+      # build a host name to sign
+      @params[:host_to_sign]  = @params[:server].dup
+      @params[:host_to_sign] << ":#{@params[:port]}" unless default_port == @params[:port].to_i
+      # a set of options to be passed to RightHttpConnection object
+      @params[:connection_options] = {} unless @params[:connection_options].is_a?(Hash) 
+      @with_connection_options = {}
       @params[:connections] ||= :shared # || :dedicated
       @params[:max_connections] ||= 10
       @params[:connection_lifetime] ||= 20*60
       @params[:api_version]  ||= service_info[:default_api_version]
       @logger = @params[:logger]
+      @logger = ::Rails.logger       if !@logger && defined?(::Rails) && ::Rails.respond_to?(:logger)
       @logger = RAILS_DEFAULT_LOGGER if !@logger && defined?(RAILS_DEFAULT_LOGGER)
       @logger = Logger.new(STDOUT)   if !@logger
       @logger.info "New #{self.class.name} using #{@params[:connections]} connections mode"
@@ -275,7 +336,8 @@ module RightAws
         # get rid of requestId (this bad boy was added for API 2008-08-08+ and it is uniq for every response)
         # feb 04, 2009 (load balancer uses 'RequestId' hence use 'i' modifier to hit it also)
         response = response.sub(%r{<requestId>.+?</requestId>}i, '')
-        response_md5 = MD5.md5(response).to_s
+        # this should work for both ruby 1.8.x and 1.9.x
+        response_md5 = Digest::MD5::new.update(response).to_s
         # check for changes
         unless @cache[function] && @cache[function][:response_md5] == response_md5
           # well, the response is new, reset cache data
@@ -306,11 +368,57 @@ module RightAws
       raise if $!.is_a?(AwsNoChange)
       AwsError::on_aws_exception(self, options)
     end
-    
-#      # Return +true+ if this instance works in multi_thread mode and +false+ otherwise.
-#    def multi_thread
-#      @params[:multi_thread]
-#    end
+
+    #----------------------------
+    # HTTP Connections handling
+    #----------------------------
+
+    def get_server_url(request) # :nodoc:
+      "#{request[:protocol]}://#{request[:server]}:#{request[:port]}"
+    end
+
+    def get_connections_storage(aws_service) # :nodoc:
+      case @params[:connections].to_s
+      when 'dedicated' then @connections_storage        ||= {}
+      else                  Thread.current[aws_service] ||= {}
+      end
+    end
+
+    def destroy_connection(request, reason) # :nodoc:
+      connections = get_connections_storage(request[:aws_service])
+      server_url  = get_server_url(request)
+      if connections[server_url]
+        connections[server_url][:connection].finish(reason)
+        connections.delete(server_url)
+      end
+    end
+
+    # Expire the connection if it has expired.
+    def get_connection(request) # :nodoc:
+      server_url         = get_server_url(request)
+      connection_storage = get_connections_storage(request[:aws_service])
+      life_time_scratch  = Time.now-@params[:connection_lifetime]
+      # Delete out-of-dated connections
+      connections_in_list = 0
+      connection_storage.to_a.sort{|conn1, conn2| conn2[1][:last_used_at] <=> conn1[1][:last_used_at]}.each do |serv_url, conn_opts|
+        if    @params[:max_connections] <= connections_in_list
+          conn_opts[:connection].finish('out-of-limit')
+          connection_storage.delete(server_url)
+        elsif conn_opts[:last_used_at] < life_time_scratch
+          conn_opts[:connection].finish('out-of-date')
+          connection_storage.delete(server_url)
+        else
+          connections_in_list += 1
+        end
+      end
+      connection = (connection_storage[server_url] ||= {})
+      connection[:last_used_at] = Time.now
+      connection[:connection] ||= Rightscale::HttpConnection.new(:exception => RightAws::AwsError, :logger => @logger)
+    end
+
+    #----------------------------
+    # HTTP Requests handling
+    #----------------------------
 
     # ACF, AMS, EC2, LBS and SDB uses this guy
     # SQS and S3 use their own methods
@@ -325,13 +433,13 @@ module RightAws
                       "Version"        => @params[:api_version] }
       service_hash.merge!(options)
       # Sign request options
-      service_params = signed_service_params(@aws_secret_access_key, service_hash, http_verb, @params[:server], @params[:service])
+      service_params = signed_service_params(@aws_secret_access_key, service_hash, http_verb, @params[:host_to_sign], @params[:service])
       # Use POST if the length of the query string is too large
       # see http://docs.amazonwebservices.com/AmazonSimpleDB/2007-11-07/DeveloperGuide/MakingRESTRequests.html
       if http_verb != 'POST' && service_params.size > 2000
         http_verb = 'POST'
         if signature_version == '2'
-          service_params = signed_service_params(@aws_secret_access_key, service_hash, http_verb, @params[:server], @params[:service])
+          service_params = signed_service_params(@aws_secret_access_key, service_hash, http_verb, @params[:host_to_sign], @params[:service])
         end
       end
       # create a request
@@ -341,48 +449,31 @@ module RightAws
       when 'POST'
         request      = Net::HTTP::Post.new(@params[:service])
         request.body = service_params
-        request['Content-Type'] = 'application/x-www-form-urlencoded'
+        request['Content-Type'] = 'application/x-www-form-urlencoded; charset=utf-8'
       else
         raise "Unsupported HTTP verb #{verb.inspect}!"
       end
       # prepare output hash
-      { :request  => request,
-        :server   => @params[:server],
-        :port     => @params[:port],
-        :protocol => @params[:protocol] }
-    end
+      request_hash = { :request  => request,
+                       :server   => @params[:server],
+                       :port     => @params[:port],
+                       :protocol => @params[:protocol] }
+      request_hash.merge!(@params[:connection_options])
+      request_hash.merge!(@with_connection_options)
+      
+      # If an action is marked as "non-retryable" and there was no :raise_on_timeout option set
+      # explicitly then do set that option
+      if Array(RightAwsBase::raise_on_timeout_on_actions).include?(action) && !request_hash.has_key?(:raise_on_timeout)
+        request_hash.merge!(:raise_on_timeout => true)
+      end
 
-    def get_connection(aws_service, request) #:nodoc
-      server_url = "#{request[:protocol]}://#{request[:server]}:#{request[:port]}}"
-      #
-      case @params[:connections].to_s
-      when 'dedicated'
-        @connections_storage ||= {}
-      else # 'dedicated'
-        @connections_storage = (Thread.current[aws_service] ||= {})
-      end
-      #
-      @connections_storage[server_url] ||= {}
-      @connections_storage[server_url][:last_used_at] = Time.now
-      @connections_storage[server_url][:connection] ||= Rightscale::HttpConnection.new(:exception => RightAws::AwsError, :logger => @logger)
-      # keep X most recent connections (but were used not far than Y minutes ago)
-      connections = 0
-      @connections_storage.to_a.sort{|i1, i2| i2[1][:last_used_at] <=> i1[1][:last_used_at]}.to_a.each do |i|
-        if i[0] != server_url && (@params[:max_connections] <= connections  || i[1][:last_used_at] < Time.now - @params[:connection_lifetime])
-          # delete the connection from the list
-          @connections_storage.delete(i[0])
-          # then finish it
-          i[1][:connection].finish((@params[:max_connections] <= connections) ? "out-of-limit" : "out-of-date") rescue nil
-        else
-          connections += 1
-        end
-      end
-      @connections_storage[server_url][:connection]
+      request_hash
     end
 
     # All services uses this guy.
     def request_info_impl(aws_service, benchblock, request, parser, &block) #:nodoc:
-      @connection    = get_connection(aws_service, request)
+      request[:aws_service] = aws_service
+      @connection    = get_connection(request)
       @last_request  = request[:request]
       @last_response = nil
       response = nil
@@ -397,25 +488,31 @@ module RightAws
         # Exceptions can originate from code directly in the block, or from user
         # code called in the other block which is passed to response.read_body.
         benchblock.service.add! do
-          responsehdr = @connection.request(request) do |response|
-          #########
-            begin
-              @last_response = response
-              if response.is_a?(Net::HTTPSuccess)
-                @error_handler = nil
-                response.read_body(&block)
-              else
-                @error_handler = AWSErrorHandler.new(self, parser, :errors_list => self.class.amazon_problems) unless @error_handler
-                check_result   = @error_handler.check(request)
-                if check_result
+          begin
+            responsehdr = @connection.request(request) do |response|
+            #########
+              begin
+                @last_response = response
+                if response.is_a?(Net::HTTPSuccess)
                   @error_handler = nil
-                  return check_result 
+                  response.read_body(&block)
+                else
+                  @error_handler = AWSErrorHandler.new(self, parser, :errors_list => self.class.amazon_problems) unless @error_handler
+                  check_result   = @error_handler.check(request)
+                  if check_result
+                    @error_handler = nil
+                    return check_result
+                  end
+                  raise AwsError.new(@last_errors, @last_response.code, @last_request_id)
                 end
-                raise AwsError.new(@last_errors, @last_response.code, @last_request_id)
+              rescue Exception => e
+                blockexception = e
               end
-            rescue Exception => e
-              blockexception = e
             end
+          rescue Exception => e
+            # Kill a connection if we run into a low level connection error
+            destroy_connection(request, "error: #{e.message}")
+            raise e
           end
           #########
 
@@ -429,7 +526,15 @@ module RightAws
           return parser.result
         end
       else
-        benchblock.service.add!{ response = @connection.request(request) }
+        benchblock.service.add! do
+          begin
+            response = @connection.request(request)
+          rescue Exception => e
+            # Kill a connection if we run into a low level connection error
+            destroy_connection(request, "error: #{e.message}")
+            raise e
+          end
+        end
           # check response for errors...
         @last_response = response
         if response.is_a?(Net::HTTPSuccess)
@@ -451,7 +556,7 @@ module RightAws
       raise
     end
 
-    def request_cache_or_info(method, link, parser_class, benchblock, use_cache=true) #:nodoc:
+    def request_cache_or_info(method, link, parser_class, benchblock, use_cache=true, &block) #:nodoc:
       # We do not want to break the logic of parsing hence will use a dummy parser to process all the standard
       # steps (errors checking etc). The dummy parser does nothig - just returns back the params it received.
       # If the caching is enabled and hit then throw  AwsNoChange.
@@ -461,7 +566,7 @@ module RightAws
       cache_hits?(method.to_sym, response.body) if use_cache
       parser = parser_class.new(:logger => @logger)
       benchblock.xml.add!{ parser.parse(response, params) }
-      result = block_given? ? yield(parser) : parser.result
+      result = block ? block.call(parser) : parser.result
       # update parsed data
       update_cache(method.to_sym, :parsed => result) if use_cache
       result
@@ -472,7 +577,24 @@ module RightAws
       @last_response && @last_response.body.to_s[%r{<requestId>(.+?)</requestId>}i] && $1
     end
 
+    # Incrementally lists something.
+    def incrementally_list_items(action, parser_class, params={}, &block) # :nodoc:
+      params = params.dup
+      params['MaxItems'] = params.delete(:max_items) if params[:max_items]
+      params['Marker']   = params.delete(:marker)    if params[:marker]
+      last_response = nil
+      loop do
+        last_response    = request_info( generate_request(action, params), parser_class.new(:logger => @logger))
+        params['Marker'] = last_response[:marker]
+        break unless block && block.call(last_response) && !last_response[:marker].right_blank?
+      end
+      last_response
+    end
+
     # Format array of items into Amazons handy hash ('?' is a place holder):
+    # Options:
+    #   :default => "something"   : Set a value to "something" when it is nil
+    #   :default => :skip_nils    : Skip nil values
     #
     #  amazonize_list('Item', ['a', 'b', 'c']) =>
     #    { 'Item.1' => 'a', 'Item.2' => 'b', 'Item.3' => 'c' }
@@ -496,21 +618,113 @@ module RightAws
     #     "Filter.2.Key"=>"B",
     #     "Filter.2.Value.1"=>"ba",
     #     "Filter.2.Value.2"=>"bb"}
-    def amazonize_list(masks, list) #:nodoc:
+    def amazonize_list(masks, list, options={}) #:nodoc:
       groups = {}
-      list.to_a.each_with_index do |list_item, i|
-        masks.to_a.each_with_index do |mask, mask_idx|
+      Array(list).each_with_index do |list_item, i|
+        Array(masks).each_with_index do |mask, mask_idx|
           key = mask[/\?/] ? mask.dup : mask.dup + '.?'
           key.sub!('?', (i+1).to_s)
-          value = list_item.to_a[mask_idx]
+          value = Array(list_item)[mask_idx]
           if value.is_a?(Array)
-            groups.merge!(amazonize_list(key, value))
+            groups.merge!(amazonize_list(key, value, options))
           else
+            if value.nil?
+              next if options[:default] == :skip_nils
+              value = options[:default]
+            end
+            # Hack to avoid having unhandled '?' in keys : do replace them all with '1':
+            #  bad:  ec2.amazonize_list(['Filter.?.Key', 'Filter.?.Value.?'], { a: => :b }) => {"Filter.1.Key"=>:a, "Filter.1.Value.?"=>1}
+            #  good: ec2.amazonize_list(['Filter.?.Key', 'Filter.?.Value.?'], { a: => :b }) => {"Filter.1.Key"=>:a, "Filter.1.Value.1"=>1}
+            key.gsub!('?', '1')
             groups[key] = value
           end
         end
       end
       groups
+    end
+
+    BLOCK_DEVICE_KEY_MAPPING = {                                                           # :nodoc:
+      :device_name               => 'DeviceName',
+      :virtual_name              => 'VirtualName',
+      :no_device                 => 'NoDevice',
+      :ebs_snapshot_id           => 'Ebs.SnapshotId',
+      :ebs_volume_size           => 'Ebs.VolumeSize',
+      :ebs_delete_on_termination => 'Ebs.DeleteOnTermination' }
+
+    def amazonize_block_device_mappings(block_device_mappings, key = 'BlockDeviceMapping') # :nodoc:
+      result = {}
+      unless block_device_mappings.right_blank?
+        block_device_mappings = [block_device_mappings] unless block_device_mappings.is_a?(Array)
+        block_device_mappings.each_with_index do |b, idx|
+          BLOCK_DEVICE_KEY_MAPPING.each do |local_name, remote_name|
+            value = b[local_name]
+            case local_name
+            when :no_device then value = value ? '' : nil   # allow to pass :no_device as boolean
+            end
+            result["#{key}.#{idx+1}.#{remote_name}"] = value unless value.nil?
+          end
+        end
+      end
+      result
+    end
+
+    # Execute a block of code with custom set of settings for right_http_connection.
+    # Accepts next options (see Rightscale::HttpConnection for explanation):
+    #  :raise_on_timeout
+    #  :http_connection_retry_count
+    #  :http_connection_open_timeout
+    #  :http_connection_read_timeout
+    #  :http_connection_retry_delay
+    #  :user_agent
+    #  :exception
+    #
+    #  Example #1:
+    #
+    #  # Try to create a snapshot but stop with exception if timeout is received
+    #  # to avoid having a duplicate API calls that create duplicate snapshots.
+    #  ec2 = Rightscale::Ec2::new(aws_access_key_id, aws_secret_access_key)
+    #  ec2.with_connection_options(:raise_on_timeout => true) do
+    #    ec2.create_snapshot('vol-898a6fe0', 'KD: WooHoo!!')
+    #  end
+    #
+    #  Example #2:
+    #
+    #  # Opposite case when the setting is global:
+    #  @ec2 = Rightscale::Ec2::new(aws_access_key_id, aws_secret_access_key,
+    #                           :connection_options => { :raise_on_timeout => true })
+    #  # Create an SSHKey but do tries on timeout
+    #  ec2.with_connection_options(:raise_on_timeout => false) do
+    #    new_key = ec2.create_key_pair('my_test_key')
+    #  end
+    #
+    #  Example #3:
+    #
+    #  # Global settings (HttpConnection level):
+    #  Rightscale::HttpConnection::params[:http_connection_open_timeout] = 5
+    #  Rightscale::HttpConnection::params[:http_connection_read_timeout] = 250
+    #  Rightscale::HttpConnection::params[:http_connection_retry_count]  = 2
+    #
+    #  # Local setings (RightAws level)
+    #  ec2 = Rightscale::Ec2::new(AWS_ID, AWS_KEY,
+    #    :region => 'us-east-1',
+    #    :connection_options => {
+    #      :http_connection_read_timeout => 2,
+    #      :http_connection_retry_count  => 5,
+    #      :user_agent => 'Mozilla 4.0'
+    #    })
+    #
+    #  # Custom settings (API call level)
+    #  ec2.with_connection_options(:raise_on_timeout => true,
+    #                              :http_connection_read_timeout => 10,
+    #                              :user_agent => '') do
+    #    pp ec2.describe_images
+    #  end
+    #
+    def with_connection_options(options, &block)
+      @with_connection_options = options
+      block.call self
+    ensure
+      @with_connection_options = {}
     end
   end
 
@@ -632,7 +846,7 @@ module RightAws
       @reiteration_delay = @@reiteration_start_delay
       @retries       = 0
       # close current HTTP(S) connection on 5xx, errors from list and 4xx errors 
-      @close_on_error           = params[:close_on_error].nil? ? @@close_on_error : params[:close_on_error] 
+      @close_on_error           = params[:close_on_error].nil? ? @@close_on_error : params[:close_on_error]
       @close_on_4xx_probability = params[:close_on_4xx_probability] || @@close_on_4xx_probability       
     end
     
@@ -675,10 +889,17 @@ module RightAws
       # Ok, it is a redirect, find the new destination location
       if redirect_detected
         location = response['location']
+        # As for 301 ( Moved Permanently) Amazon does not return a 'Location' header but
+        # it is possible to extract a new endpoint from the response body
+        if location.right_blank? && response.code=='301' && response.body
+          new_endpoint = response.body[/<Endpoint>(.*?)<\/Endpoint>/] && $1
+          location     = "#{request[:protocol]}://#{new_endpoint}:#{request[:port]}#{request[:request].path}"
+        end
         # ... log information and ...
         @aws.logger.info("##### #{@aws.class.name} redirect requested: #{response.code} #{response.message} #####")
         @aws.logger.info("      Old location: #{request_text_data}")
         @aws.logger.info("      New location: #{location}")
+        @aws.logger.info("      Request Verb: #{request[:request].class.name}")
         # ... fix the connection data
         request[:server]   = URI.parse(location).host
         request[:protocol] = URI.parse(location).scheme
@@ -701,7 +922,7 @@ module RightAws
         # It may have a chance that one server is a semi-down and reconnection 
         # will help us to connect to the other server 
         if !redirect_detected && @close_on_error
-          @aws.connection.finish "#{self.class.name}: error match to pattern '#{error_match}'" 
+          @aws.destroy_connection(request, "#{self.class.name}: error match to pattern '#{error_match}'")
         end 
                  
         if (Time.now < @stop_at)
@@ -730,13 +951,13 @@ module RightAws
         end 
       # aha, this is unhandled error: 
       elsif @close_on_error 
-        # Is this a 5xx error ? 
-        if @aws.last_response.code.to_s[/^5\d\d$/] 
-          @aws.connection.finish "#{self.class.name}: code: #{@aws.last_response.code}: '#{@aws.last_response.message}'" 
+        # On 5xx(Server errors), 403(RequestTimeTooSkewed) and 408(Request Timeout) a conection has to be closed
+        if @aws.last_response.code.to_s[/^(5\d\d|403|408)$/]
+          @aws.destroy_connection(request, "#{self.class.name}: code: #{@aws.last_response.code}: '#{@aws.last_response.message}'")
         # Is this a 4xx error ? 
         elsif @aws.last_response.code.to_s[/^4\d\d$/] && @close_on_4xx_probability > rand(100) 
-          @aws.connection.finish "#{self.class.name}: code: #{@aws.last_response.code}: '#{@aws.last_response.message}', " + 
-                                 "probability: #{@close_on_4xx_probability}%"           
+          @aws.destroy_connection(request, "#{self.class.name}: code: #{@aws.last_response.code}: '#{@aws.last_response.message}', " +
+                                           "probability: #{@close_on_4xx_probability}%")
         end
       end
       result
@@ -747,21 +968,12 @@ module RightAws
 
   #-----------------------------------------------------------------
 
-  class RightSaxParserCallback #:nodoc:
-    def self.include_callback 
-      include XML::SaxParser::Callbacks       
-    end 
+  class RightSaxParserCallbackTemplate #:nodoc:
     def initialize(right_aws_parser) 
       @right_aws_parser = right_aws_parser 
     end 
-    def on_start_element(name, attr_hash) 
-      @right_aws_parser.tag_start(name, attr_hash) 
-    end   
     def on_characters(chars) 
       @right_aws_parser.text(chars)
-    end 
-    def on_end_element(name) 
-      @right_aws_parser.tag_end(name) 
     end 
     def on_start_document; end 
     def on_comment(msg); end 
@@ -769,7 +981,28 @@ module RightAws
     def on_cdata_block(cdata); end 
     def on_end_document; end 
   end 
- 
+
+  class RightSaxParserCallback < RightSaxParserCallbackTemplate
+    def self.include_callback
+      include XML::SaxParser::Callbacks
+    end
+    def on_start_element(name, attr_hash)
+      @right_aws_parser.tag_start(name, attr_hash)
+    end
+    def on_end_element(name)
+      @right_aws_parser.tag_end(name)
+    end
+  end
+
+  class RightSaxParserCallbackNs < RightSaxParserCallbackTemplate
+    def on_start_element_ns(name, attr_hash, prefix, uri, namespaces)
+      @right_aws_parser.tag_start(name, attr_hash)
+    end
+    def on_end_element_ns(name, prefix, uri)
+      @right_aws_parser.tag_end(name)
+    end
+  end
+
   class RightAWSParser  #:nodoc:
       # default parsing library 
     DEFAULT_XML_LIBRARY = 'rexml' 
@@ -830,27 +1063,35 @@ module RightAws
       if @xml_lib=='libxml' && !defined?(XML::SaxParser)
         begin
           require 'xml/libxml'
-          # is it new ? - Setup SaxParserCallback 
-          if XML::Parser::VERSION >= '0.5.1.0'
-            RightSaxParserCallback.include_callback 
+          # Setup SaxParserCallback 
+          if XML::Parser::VERSION >= '0.5.1' &&
+             XML::Parser::VERSION  < '0.9.7'
+            RightSaxParserCallback.include_callback
           end           
         rescue LoadError => e
-          @@supported_xml_libs.delete(@xml_lib) 
-          @xml_lib = DEFAULT_XML_LIBRARY           
+          @@supported_xml_libs.delete(@xml_lib)
+          @xml_lib = DEFAULT_XML_LIBRARY
           if @logger
             @logger.error e.inspect
             @logger.error e.backtrace
-            @logger.info "Can not load 'libxml' library. '#{DEFAULT_XML_LIBRARY}' is used for parsing." 
+            @logger.info "Can not load 'libxml' library. '#{DEFAULT_XML_LIBRARY}' is used for parsing."
           end
         end
       end
         # Parse the xml text
       case @xml_lib
-      when 'libxml'  
-        xml        = XML::SaxParser.new 
-        xml.string = xml_text 
+      when 'libxml'
+        if XML::Parser::VERSION >= '0.9.9'
+          # avoid warning on every usage
+          xml        = XML::SaxParser.string(xml_text)
+        else
+          xml        = XML::SaxParser.new
+          xml.string = xml_text 
+        end
         # check libxml-ruby version 
-        if XML::Parser::VERSION >= '0.5.1.0'
+        if    XML::Parser::VERSION >= '0.9.7'
+          xml.callbacks = RightSaxParserCallbackNs.new(self)
+        elsif XML::Parser::VERSION >= '0.5.1'
           xml.callbacks = RightSaxParserCallback.new(self) 
         else 
           xml.on_start_element{|name, attr_hash| self.tag_start(name, attr_hash)} 
@@ -926,6 +1167,12 @@ module RightAws
   class RightHttp2xxParser < RightAWSParser # :nodoc:
     def parse(response)
       @result = response.is_a?(Net::HTTPSuccess)
+    end
+  end
+
+  class RightBoolResponseParser < RightAWSParser #:nodoc:
+    def tagend(name)
+      @result = (@text=='true') if name == 'return'
     end
   end
 

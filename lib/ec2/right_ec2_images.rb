@@ -35,32 +35,28 @@ module RightAws
     #     'Owner'        => ['self', ..., 'userN'],
     #     'ExecutableBy' => ['self', 'all', ..., 'userN']
     #   }
-    def ec2_describe_images(params={}, image_type=nil, cache_for=nil) #:nodoc:
+    def ec2_describe_images(params={}, options={}, cache_for=nil) #:nodoc:
       request_hash = {}
-      params.each do |list_by, list|
-        request_hash.merge! amazonize_list(list_by, list.to_a)
-      end
-      request_hash['ImageType'] = image_type if image_type
+      params.each { |list_by, list| request_hash.merge! amazonize_list(list_by, Array(list)) }
+      request_hash.merge!(amazonize_list(['Filter.?.Name', 'Filter.?.Value.?'], options[:filters])) unless options[:filters].right_blank?
       link = generate_request("DescribeImages", request_hash)
       request_cache_or_info cache_for, link,  QEc2DescribeImagesParser, @@bench, cache_for
     rescue Exception
       on_exception
     end
 
-    # Retrieve a list of images. Returns array of hashes describing the images or an exception:
-    # +image_type+ = 'machine' || 'kernel' || 'ramdisk'
+    # Retrieve a list of images.
+    #
+    # Accepts a list of images and/or a set of filters as the last parameter.
+    # 
+    # Filters: architecture, block-device-mapping.delete-on-termination block-device-mapping.device-name,
+    # block-device-mapping.snapshot-id, block-device-mapping.volume-size, description, image-id, image-type,
+    # is-public, kernel-id, manifest-location, name, owner-alias, owner-id, platform, product-code,
+    # ramdisk-id, root-device-name, root-device-type, state, state-reason-code, state-reason-message,
+    # tag-key, tag-value, tag:key, virtualization-type
     #
     #  ec2.describe_images #=>
-    #    [{:aws_id=>"ami-b0a1f7a6",
-    #      :aws_image_type=>"machine",
-    #      :root_device_name=>"/dev/sda1",
-    #      :image_class=>"static",
-    #      :aws_owner=>"826693181925",
-    #      :aws_location=>"bucket_for_k_dzreyev/image_bundles/kd__CentOS_1_10_2009_10_21_13_30_43_MSD/image.manifest.xml",
-    #      :aws_state=>"available",
-    #      :aws_is_public=>false,
-    #      :aws_architecture=>"i386"},
-    #     {:description=>"EBS backed Fedora core 8 i386",
+    #    [{:description=>"EBS backed Fedora core 8 i386",
     #      :aws_architecture=>"i386",
     #      :aws_id=>"ami-c2a3f5d4",
     #      :aws_image_type=>"machine",
@@ -75,43 +71,79 @@ module RightAws
     #         :device_name=>"/dev/sda1"}],
     #      :name=>"EBS backed FC8 i386",
     #      :aws_is_public=>true}, ... ]
-    #      
-    # If +list+ param is set, then retrieve information about the listed images only:
     #
-    #  ec2.describe_images(['ami-5aa1f74c'])
+    #  ec2.describe_images(:filters => { 'image-type' => 'kernel', 'state' => 'available', 'tag:MyTag' => 'MyValue'})
     #
-    def describe_images(list=[], image_type=nil)
-      list = list.to_a
-      cache_for = list.empty? && !image_type ? :describe_images : nil
-      ec2_describe_images({ 'ImageId' => list }, image_type, cache_for)
+    #  ec2.describe_images("ari-fda54b94", "ami-2ee80247", "aki-00896a69",
+    #                      :filters => { 'image-type' => 'kernel', 'state' => 'available' }) #=>
+    #    [{:root_device_type=>"instance-store",
+    #      :aws_id=>"aki-00896a69",
+    #      :aws_image_type=>"kernel",
+    #      :aws_location=>
+    #       "karmic-kernel-zul/ubuntu-kernel-2.6.31-300-ec2-i386-20091002-test-04.manifest.xml",
+    #      :virtualization_type=>"paravirtual",
+    #      :aws_state=>"available",
+    #      :aws_owner=>"099720109477",
+    #      :tags=>{},
+    #      :aws_is_public=>true,
+    #      :aws_architecture=>"i386"}]
+    #
+    # P.S. filters: http://docs.amazonwebservices.com/AWSEC2/latest/APIReference/index.html?ApiReference-query-DescribeImages.html
+    #
+    def describe_images(*list_and_options)
+      list, options = AwsUtils::split_items_and_params(list_and_options)
+      cache_for     = (list.right_blank? && options[:filters].right_blank?) ? :describe_images : nil
+      ec2_describe_images( {'ImageId'=>list}, options, cache_for)
     end
 
-    #  Example:
+    # Retrieve a list of images by image owner.
+    #
+    # Accepts a list of images and/or a set of filters as the last parameter.
+    # 
+    # Filters: architecture, block-device-mapping.delete-on-termination block-device-mapping.device-name,
+    # block-device-mapping.snapshot-id, block-device-mapping.volume-size, description, image-id, image-type,
+    # is-public, kernel-id, manifest-location, name, owner-alias, owner-id, platform, product-code,
+    # ramdisk-id, root-device-name, root-device-type, state, state-reason-code, state-reason-message,
+    # tag-key, tag-value, tag:key, virtualization-type
     #
     #   ec2.describe_images_by_owner('522821470517')
-    #   ec2.describe_images_by_owner('self')
+    #   ec2.describe_images_by_owner('self', :filters => { 'block-device-mapping.delete-on-termination' => 'false' })
     #
-    def describe_images_by_owner(list=['self'], image_type=nil)
-      list = list.to_a
-      cache_for = list==['self'] && !image_type ? :describe_images_by_owner : nil
-      ec2_describe_images({ 'Owner' => list }, image_type, cache_for)
+    # P.S. filters: http://docs.amazonwebservices.com/AWSEC2/latest/APIReference/index.html?ApiReference-query-DescribeImages.html
+    #
+    def describe_images_by_owner(*list_and_options)
+      list, options = AwsUtils::split_items_and_params(list_and_options)
+      list          = ['self'] if list.right_blank?
+      cache_for     = (list==['self'] && options[:filters].right_blank?) ? :describe_images_by_owner : nil
+      ec2_describe_images( {'Owner'=>list}, options, cache_for)
     end
 
-    #  Example:
+    # Retrieve a list of images by image executable by.
+    # 
+    # Accepts a list of images and/or a set of filters as the last parameter.
+    # 
+    # Filters: architecture, block-device-mapping.delete-on-termination block-device-mapping.device-name,
+    # block-device-mapping.snapshot-id, block-device-mapping.volume-size, description, image-id, image-type,
+    # is-public, kernel-id, manifest-location, name, owner-alias, owner-id, platform, product-code,
+    # ramdisk-id, root-device-name, root-device-type, state, state-reason-code, state-reason-message,
+    # tag-key, tag-value, tag:key, virtualization-type
     #
     #   ec2.describe_images_by_executable_by('522821470517')
     #   ec2.describe_images_by_executable_by('self')
-    #   ec2.describe_images_by_executable_by('all')
+    #   ec2.describe_images_by_executable_by('all', :filters => { 'architecture' => 'i386' })
     #
-    def describe_images_by_executable_by(list=['self'], image_type=nil)
-      list = list.to_a
-      cache_for = list==['self'] && !image_type ? :describe_images_by_executable_by : nil
-      ec2_describe_images({ 'ExecutableBy' => list }, image_type, cache_for)
+    # P.S. filters: http://docs.amazonwebservices.com/AWSEC2/latest/APIReference/index.html?ApiReference-query-DescribeImages.html
+    #
+    def describe_images_by_executable_by(*list_and_options)
+      list, options = AwsUtils::split_items_and_params(list_and_options)
+      list          = ['self'] if list.right_blank?
+      cache_for     = (list==['self'] && options[:filters].right_blank?) ? :describe_images_by_executable_by : nil
+      ec2_describe_images( {'ExecutableBy'=>list}, options, cache_for)
     end
 
-
     # Register new image at Amazon.
-    # Options: :image_location, :name, :description, :architecture, :kernel_id, :ramdisk_id, :root_device_name, :block_device_mappings.
+    # Options: :image_location, :name, :description, :architecture, :kernel_id, :ramdisk_id,
+    #          :root_device_name, :block_device_mappings, :virtualizationt_type(hvm|paravirtual)
     #
     # Returns new image id.
     #
@@ -148,6 +180,7 @@ module RightAws
       params['KernelId']       = options[:kernel_id]        if options[:kernel_id]
       params['RamdiskId']      = options[:ramdisk_id]       if options[:ramdisk_id]
       params['RootDeviceName'] = options[:root_device_name] if options[:root_device_name]
+      params['VirtualizationType'] = options[:virtualization_type] if options[:virtualization_type] 
 #      params['SnapshotId']     = options[:snapshot_id]      if options[:snapshot_id]
       params.merge!(amazonize_block_device_mappings(options[:block_device_mappings]))
       link = generate_request("RegisterImage", params)
@@ -209,9 +242,9 @@ module RightAws
       params =  {'ImageId'   => image_id,
                  'Attribute' => attribute}
       params['OperationType'] = operation_type if operation_type
-      params.update(amazonize_list('UserId',      vars[:user_id].to_a))    if vars[:user_id]
-      params.update(amazonize_list('UserGroup',   vars[:user_group].to_a)) if vars[:user_group]
-      params.update(amazonize_list('ProductCode', vars[:product_code]))    if vars[:product_code]
+      params.update(amazonize_list('UserId',      vars[:user_id]))      if vars[:user_id]
+      params.update(amazonize_list('UserGroup',   vars[:user_group]))   if vars[:user_group]
+      params.update(amazonize_list('ProductCode', vars[:product_code])) if vars[:product_code]
       link = generate_request("ModifyImageAttribute", params)
       request_info(link, RightBoolResponseParser.new(:logger => @logger))
     rescue Exception
@@ -224,7 +257,7 @@ module RightAws
     #
     #  ec2.modify_image_launch_perm_add_users('ami-e444444d',['000000000777','000000000778']) #=> true
     def modify_image_launch_perm_add_users(image_id, user_id=[])
-      modify_image_attribute(image_id, 'launchPermission', 'add', :user_id => user_id.to_a)
+      modify_image_attribute(image_id, 'launchPermission', 'add', :user_id => user_id)
     end
 
     # Revokes image launch permissions for users. +user_id+ is a list of users AWS accounts ids. Returns +true+ or an exception.
@@ -232,7 +265,7 @@ module RightAws
     #  ec2.modify_image_launch_perm_remove_users('ami-e444444d',['000000000777','000000000778']) #=> true
     #
     def modify_image_launch_perm_remove_users(image_id, user_id=[])
-      modify_image_attribute(image_id, 'launchPermission', 'remove', :user_id => user_id.to_a)
+      modify_image_attribute(image_id, 'launchPermission', 'remove', :user_id => user_id)
     end
 
     # Add image launch permissions for users groups (currently only 'all' is supported, which gives public launch permissions).
@@ -241,7 +274,7 @@ module RightAws
     #  ec2.modify_image_launch_perm_add_groups('ami-e444444d') #=> true
     #
     def modify_image_launch_perm_add_groups(image_id, user_group=['all'])
-      modify_image_attribute(image_id, 'launchPermission', 'add', :user_group => user_group.to_a)
+      modify_image_attribute(image_id, 'launchPermission', 'add', :user_group => user_group)
     end
 
     # Remove image launch permissions for users groups (currently only 'all' is supported, which gives public launch permissions).
@@ -249,7 +282,7 @@ module RightAws
     #  ec2.modify_image_launch_perm_remove_groups('ami-e444444d') #=> true
     #
     def modify_image_launch_perm_remove_groups(image_id, user_group=['all'])
-      modify_image_attribute(image_id, 'launchPermission', 'remove', :user_group => user_group.to_a)
+      modify_image_attribute(image_id, 'launchPermission', 'remove', :user_group => user_group)
     end
 
     # Add product code to image
@@ -257,7 +290,7 @@ module RightAws
     #  ec2.modify_image_product_code('ami-e444444d','0ABCDEF') #=> true
     #
     def modify_image_product_code(image_id, product_code=[])
-      modify_image_attribute(image_id, 'productCodes', nil, :product_code => product_code.to_a)
+      modify_image_attribute(image_id, 'productCodes', nil, :product_code => product_code)
     end
 
     # Create a new image.
@@ -269,8 +302,8 @@ module RightAws
     #
     def create_image(instance_aws_id, options={})
       params = { 'InstanceId' => instance_aws_id }
-      params['Name']        = options[:name]            unless options[:name].blank?
-      params['Description'] = options[:description]     unless options[:description].blank?
+      params['Name']        = options[:name]            unless options[:name].right_blank?
+      params['Description'] = options[:description]     unless options[:description].right_blank?
       params['NoReboot']    = options[:no_reboot].to_s  unless options[:no_reboot].nil?
       link = generate_request("CreateImage", params)
       request_info(link, QEc2RegisterImageParser.new(:logger => @logger))
@@ -283,10 +316,13 @@ module RightAws
     class QEc2DescribeImagesParser < RightAWSParser #:nodoc:
       def tagstart(name, attributes)
         case full_tag_name
-        when %r{/imagesSet/item$}          then @item = {}
+        when %r{/imagesSet/item$}
+          @item = { :tags => {} }
         when %r{/blockDeviceMapping/item$}
           @item[:block_device_mappings] ||= []
           @block_device_mapping = {}
+        when %r{/tagSet/item$}
+          @aws_tag = {}
         end
       end
       def tagend(name)
@@ -308,6 +344,7 @@ module RightAws
         when 'rootDeviceType'  then @item[:root_device_type]  = @text
         when 'rootDeviceName'  then @item[:root_device_name]  = @text
         when 'imageClass'      then @item[:image_class]       = @text
+        when 'virtualizationType' then @item[:virtualization_type] = @text
         else
           case full_tag_name
           when %r{/stateReason/code$}    then @item[:state_reason_code]    = @text.to_i
@@ -321,7 +358,10 @@ module RightAws
             when 'deleteOnTermination' then @block_device_mapping[:ebs_delete_on_termination]  = @text == 'true' ? true : false
             when 'item'                then @item[:block_device_mappings]                    << @block_device_mapping
             end
-          when %r{/imagesSet/item$}    then @result << @item
+          when %r{/tagSet/item/key$}   then @aws_tag[:key]               = @text
+          when %r{/tagSet/item/value$} then @aws_tag[:value]             = @text
+          when %r{/tagSet/item$}       then @item[:tags][@aws_tag[:key]] = @aws_tag[:value]
+          when %r{/imagesSet/item$}    then @result                     << @item
           end
         end
       end

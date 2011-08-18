@@ -21,13 +21,6 @@
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
-begin
-  require 'uuidtools'
-rescue LoadError => e
-  STDERR.puts("RightSDB requires the uuidtools gem.  Run \'gem install uuidtools\' and try again.")
-  exit
-end
-
 module RightAws
 
   # = RightAws::ActiveSdb -- RightScale SDB interface (alpha release)
@@ -39,9 +32,6 @@ module RightAws
   #   require 'right_aws'
   #   require 'sdb/active_sdb'
   #   
-  # Additionally, the ActiveSdb class requires the 'uuidtools' gem; this gem is not normally required by RightAws and is not installed as a 
-  # dependency of RightAws.
-  #
   # Simple ActiveSdb usage example:
   #
   #  class Client < RightAws::ActiveSdb::Base 
@@ -92,6 +82,59 @@ module RightAws
   #  # remove domain
   #  Client.delete_domain
   #
+  #  # Dynamic attribute accessors
+  #
+  #  class KdClient < RightAws::ActiveSdb::Base
+  #  end
+  #
+  #  client = KdClient.select(:all, :order => 'expiration').first
+  #    pp client.attributes #=>
+  #      {"name"=>["Putin"],
+  #       "post"=>["president"],
+  #       "country"=>["Russia"],
+  #       "expiration"=>["2008"],
+  #       "id"=>"376d2e00-75b0-11dd-9557-001bfc466dd7",
+  #       "gender"=>["male"]}
+  #
+  #    pp client.name    #=> ["Putin"]
+  #    pp client.country #=> ["Russia"]
+  #    pp client.post    #=> ["president"]
+  #
+  # # Columns and simple typecasting
+  #
+  #  class Person < RightAws::ActiveSdb::Base
+  #    columns do
+  #      name
+  #      email
+  #      score         :Integer
+  #      is_active     :Boolean
+  #      registered_at :DateTime
+  #      created_at    :DateTime, :default => lambda{ Time.now }
+  #    end
+  #  end
+  #  Person::create( :name => 'Yetta E. Andrews', :email => 'nulla.facilisis@metus.com', :score => 100, :is_active => true, :registered_at => Time.local(2000, 1, 1) )
+  #
+  #  person = Person.find_by_email 'nulla.facilisis@metus.com'
+  #  person.reload
+  #
+  #  pp person.attributes #=>
+  #    {"name"=>["Yetta E. Andrews"],
+  #     "created_at"=>["2010-04-02T20:51:58+0400"],
+  #     "id"=>"0ee24946-3e60-11df-9d4c-0025b37efad0",
+  #     "registered_at"=>["2000-01-01T00:00:00+0300"],
+  #     "is_active"=>["T"],
+  #     "score"=>["100"],
+  #     "email"=>["nulla.facilisis@metus.com"]}
+  #  pp person.name                #=> "Yetta E. Andrews"
+  #  pp person.name.class          #=> String
+  #  pp person.registered_at.to_s  #=> "2000-01-01T00:00:00+03:00"
+  #  pp person.registered_at.class #=> DateTime
+  #  pp person.is_active           #=> true
+  #  pp person.is_active.class     #=> TrueClass
+  #  pp person.score               #=> 100
+  #  pp person.score.class         #=> Fixnum
+  #  pp person.created_at.to_s     #=> "2010-04-02T20:51:58+04:00"
+  #
   class ActiveSdb
     
     module ActiveSdbConnect
@@ -106,7 +149,6 @@ module RightAws
       #      :port         => 443                  # Amazon service port: 80 or 443(default)
       #      :protocol     => 'https'              # Amazon service protocol: 'http' or 'https'(default)
       #      :signature_version => '0'             # The signature version : '0' or '1'(default)
-      #      :multi_thread => true|false           # Multi-threaded (connection per each thread): true or false(default)
       #      :logger       => Logger Object        # Logger instance: logs to STDOUT if omitted 
       #      :nil_representation => 'mynil'}       # interpret Ruby nil as this string value; i.e. use this string in SDB to represent Ruby nils (default is the string 'nil')
 
@@ -242,7 +284,31 @@ module RightAws
         def delete_domain
           connection.delete_domain(domain)
         end
-        
+
+        def columns(&block)
+          @columns ||= ColumnSet.new
+          @columns.instance_eval(&block) if block
+          @columns
+        end
+
+        def column?(col_name)
+          columns.include?(col_name)
+        end
+
+        def type_of(col_name)
+          columns.type_of(col_name)
+        end
+
+        def serialize(attribute, value)
+          s = serialization_for_type(type_of(attribute))
+          s ? s.serialize(value) : value.to_s
+        end
+
+        def deserialize(attribute, value)
+          s = serialization_for_type(type_of(attribute))
+          s ? s.deserialize(value) : value
+        end
+
         # Perform a find request.
         #  
         # Single record: 
@@ -364,7 +430,7 @@ module RightAws
         end
 
         def generate_id # :nodoc:
-          UUIDTools::UUID.timestamp_create().to_s
+          AwsUtils::generate_unique_token
         end
 
       protected
@@ -376,13 +442,13 @@ module RightAws
           # detect amount of records requested
           bunch_of_records_requested = args.size > 1 || args.first.is_a?(Array)
           # flatten ids
-          args = args.to_a.flatten
+          args = Array(args).flatten
           args.each { |id| cond << "id=#{self.connection.escape(id)}" }
           ids_cond = "(#{cond.join(' OR ')})"
           # user defined :conditions to string (if it was defined)
           options[:conditions] = build_conditions(options[:conditions])
           # join ids condition and user defined conditions
-          options[:conditions] = options[:conditions].blank? ? ids_cond : "(#{options[:conditions]}) AND #{ids_cond}"
+          options[:conditions] = options[:conditions].right_blank? ? ids_cond : "(#{options[:conditions]}) AND #{ids_cond}"
           result = sql_select(options)
           # if one record was requested then return it
           unless bunch_of_records_requested
@@ -471,7 +537,7 @@ module RightAws
             query_expression = query_expression.to_s
             # quote from Amazon:
             # The sort attribute must be present in at least one of the predicates of the query expression.
-            if query_expression.blank?
+            if query_expression.right_blank?
               query_expression = sort_query_expression
             elsif !query_attributes(query_expression).include?(sort_by)
               query_expression += " intersection #{sort_query_expression}"
@@ -518,13 +584,13 @@ module RightAws
           # detect amount of records requested
           bunch_of_records_requested = args.size > 1 || args.first.is_a?(Array)
           # flatten ids
-          args = args.to_a.flatten
+          args = Array(args).flatten
           args.each { |id| cond << "'id'=#{self.connection.escape(id)}" }
           ids_cond = "[#{cond.join(' OR ')}]"
           # user defined :conditions to string (if it was defined)
           options[:conditions] = build_conditions(options[:conditions])
           # join ids condition and user defined conditions
-          options[:conditions] = options[:conditions].blank? ? ids_cond : "#{options[:conditions]} intersection #{ids_cond}"
+          options[:conditions] = options[:conditions].right_blank? ? ids_cond : "#{options[:conditions]} intersection #{ids_cond}"
           result = find_every(options)
           # if one record was requested then return it
           unless bunch_of_records_requested
@@ -575,9 +641,9 @@ module RightAws
           order      = options[:order]      ? " ORDER BY #{options[:order]}"                     : ''
           limit      = options[:limit]      ? " LIMIT #{options[:limit]}"                        : ''
           # mix sort by argument (it must present in response)
-          unless order.blank?
+          unless order.right_blank?
             sort_by, sort_order = sort_options(options[:order])
-            conditions << (conditions.blank? ? " WHERE " : " AND ") << "(#{sort_by} IS NOT NULL)"
+            conditions << (conditions.right_blank? ? " WHERE " : " AND ") << "(#{sort_by} IS NOT NULL)"
           end
           "SELECT #{select} FROM #{from}#{conditions}#{order}#{limit}"
         end
@@ -590,6 +656,13 @@ module RightAws
           end
         end
 
+        def serialization_for_type(type)
+          @serializations ||= {}
+          unless @serializations.has_key? type
+            @serializations[type] = ::RightAws::ActiveSdb.const_get("#{type}Serialization") rescue false
+          end
+          @serializations[type]
+        end
       end
       
       public
@@ -657,11 +730,15 @@ module RightAws
       def attributes=(attrs)
         old_id = @attributes['id']
         @attributes = uniq_values(attrs)
-        @attributes['id'] = old_id if @attributes['id'].blank? && !old_id.blank?
+        @attributes['id'] = old_id if @attributes['id'].right_blank? && !old_id.right_blank?
         self.attributes
       end
 
-      def connection 
+      def columns
+        self.class.columns
+      end
+
+      def connection
         self.class.connection
       end
 
@@ -675,7 +752,8 @@ module RightAws
       #  puts item['Cat'].inspect  #=> ["Jons socks", "clew", "mice"]
       #
       def [](attribute)
-        @attributes[attribute.to_s]
+        raw = @attributes[attribute.to_s]
+        self.class.column?(attribute) && raw ? self.class.deserialize(attribute, raw.first) : raw
       end
 
       # Updates the attribute identified by +attribute+ with the specified +values+.
@@ -686,7 +764,14 @@ module RightAws
       #
       def []=(attribute, values)
         attribute = attribute.to_s
-        @attributes[attribute] = attribute == 'id' ? values.to_s : values.to_a.uniq
+        @attributes[attribute] = case
+        when attribute == 'id'
+          values.to_s
+        when self.class.column?(attribute)
+          self.class.serialize(attribute, values)
+        else
+          Array(values).uniq
+        end
       end
 
       # Reload attributes from SDB. Replaces in-memory attributes.
@@ -699,7 +784,7 @@ module RightAws
         old_id = id
         attrs = connection.get_attributes(domain, id)[:attributes]
         @attributes = {}
-        unless attrs.blank?
+        unless attrs.right_blank?
           attrs.each { |attribute, values| @attributes[attribute] = values }
           @attributes['id'] = old_id
         end
@@ -725,7 +810,7 @@ module RightAws
         attrs_list.flatten.uniq.each do |attribute|
           attribute = attribute.to_s
           values = connection.get_attributes(domain, id, attribute)[:attributes][attribute]
-          unless values.blank?
+          unless values.right_blank?
             @attributes[attribute] = result[attribute] = values
           else
             @attributes.delete(attribute)
@@ -755,7 +840,7 @@ module RightAws
         prepare_for_update
         attrs = @attributes.dup
         attrs.delete('id')
-        connection.put_attributes(domain, id, attrs) unless attrs.blank?
+        connection.put_attributes(domain, id, attrs) unless attrs.right_blank?
         connection.put_attributes(domain, id, { 'id' => id }, :replace)
         mark_as_old
         @attributes
@@ -771,10 +856,10 @@ module RightAws
         prepare_for_update
         # if 'id' is present in attrs hash:
         # replace internal 'id' attribute and remove it from the attributes to be sent
-        @attributes['id'] = attrs['id'] unless attrs['id'].blank?
+        @attributes['id'] = attrs['id'] unless attrs['id'].right_blank?
         attrs.delete('id')
         # add new values to all attributes from list
-        connection.put_attributes(domain, id, attrs) unless attrs.blank?
+        connection.put_attributes(domain, id, attrs) unless attrs.right_blank?
         connection.put_attributes(domain, id, { 'id' => id }, :replace)
         attrs.each do |attribute, values|
           @attributes[attribute] ||= []
@@ -818,12 +903,12 @@ module RightAws
         prepare_for_update
         attrs = uniq_values(attrs)
         # if 'id' is present in attrs hash then replace internal 'id' attribute
-        unless attrs['id'].blank?
+        unless attrs['id'].right_blank?
           @attributes['id'] = attrs['id']
         else
           attrs['id'] = id
         end
-        connection.put_attributes(domain, id, attrs, :replace) unless attrs.blank?
+        connection.put_attributes(domain, id, attrs, :replace) unless attrs.right_blank?
         attrs.each { |attribute, values| attrs[attribute] = values }
         mark_as_old
         attrs
@@ -842,7 +927,7 @@ module RightAws
         raise_on_id_absence
         attrs = uniq_values(attrs)
         attrs.delete('id')
-        unless attrs.blank?
+        unless attrs.right_blank?
           connection.delete_attributes(domain, id, attrs)
           attrs.each do |attribute, values|
             # remove the values from the attribute
@@ -871,7 +956,7 @@ module RightAws
         raise_on_id_absence
         attrs_list = attrs_list.flatten.map{ |attribute| attribute.to_s }
         attrs_list.delete('id')
-        unless attrs_list.blank?
+        unless attrs_list.right_blank?
           connection.delete_attributes(domain, id, attrs_list)
           attrs_list.each { |attribute| @attributes.delete(attribute) }
         end
@@ -906,25 +991,117 @@ module RightAws
         @new_record = false
       end
 
-    private    
-    
+      # support accessing attribute values via method call
+      def method_missing(method_sym, *args)
+        method_name = method_sym.to_s
+        setter = method_name[-1,1] == '='
+        method_name.chop! if setter
+
+        if @attributes.has_key?(method_name) || self.class.column?(method_name)
+          setter ? self[method_name] = args.first : self[method_name]
+        else
+          super
+        end
+      end
+
+    private
+
       def raise_on_id_absence
         raise ActiveSdbError.new('Unknown record id') unless id
       end
       
       def prepare_for_update
-        @attributes['id'] = self.class.generate_id if @attributes['id'].blank?
+        @attributes['id'] = self.class.generate_id if @attributes['id'].right_blank?
+        columns.all.each do |col_name|
+          self[col_name] ||= columns.default(col_name)
+        end
       end
       
       def uniq_values(attributes=nil) # :nodoc:
         attrs = {}
         attributes.each do |attribute, values|
           attribute = attribute.to_s
-          attrs[attribute] = attribute == 'id' ? values.to_s : values.to_a.uniq
-          attrs.delete(attribute) if values.blank?
+          attrs[attribute] = case
+          when attribute == 'id'
+            values.to_s
+          when self.class.column?(attribute)
+            values.is_a?(String) ? values : self.class.serialize(attribute, values)
+          else
+            Array(values).uniq
+          end
+          attrs.delete(attribute) if values.right_blank?
         end
         attrs
       end
     end
+
+    class ColumnSet
+      attr_accessor :columns
+      def initialize
+        @columns = {}
+      end
+
+      def all
+        @columns.keys
+      end
+
+      def column(col_name)
+        @columns[col_name.to_s]
+      end
+      alias_method :include?, :column
+
+      def type_of(col_name)
+        column(col_name) && column(col_name)[:type]
+      end
+
+      def default(col_name)
+        return nil unless include?(col_name)
+        default = column(col_name)[:default]
+        default.respond_to?(:call) ? default.call : default
+      end
+
+      def method_missing(method_sym, *args)
+        data_type = args.shift || :String
+        options = args.shift || {}
+        @columns[method_sym.to_s] = options.merge( :type => data_type )
+      end
+    end
+
+    class DateTimeSerialization
+      class << self
+        def serialize(date)
+          date.strftime('%Y-%m-%dT%H:%M:%S%z')
+        end
+
+        def deserialize(string)
+          r = DateTime.parse(string) rescue nil
+        end
+      end
+    end
+
+    class BooleanSerialization
+      class << self
+        def serialize(boolean)
+          boolean ? 'T' : 'F'
+        end
+
+        def deserialize(string)
+          string == 'T'
+        end
+      end
+    end
+
+    class IntegerSerialization
+      class << self
+        def serialize(int)
+          int.to_s
+        end
+
+        def deserialize(string)
+          string.to_i
+        end
+      end
+    end
+
   end
 end

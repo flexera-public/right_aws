@@ -65,13 +65,12 @@ module RightAws
     # Amazon's article "Migrating to Amazon SQS API version 2008-01-01" at:
     # http://developer.amazonwebservices.com/connect/entry.jspa?externalID=1148
     #
-    #  sqs = RightAws::SqsGen2Interface.new('1E3GDYEOGFJPIT75KDT40','hgTHt68JY07JKUY08ftHYtERkjgtfERn57DFE379', {:multi_thread => true, :logger => Logger.new('/tmp/x.log')}) 
+    #  sqs = RightAws::SqsGen2Interface.new('1E3GDYEOGFJPIT75KDT40','hgTHt68JY07JKUY08ftHYtERkjgtfERn57DFE379', {:logger => Logger.new('/tmp/x.log')}) 
     #  
     # Params is a hash:
     #
     #    {:server       => 'queue.amazonaws.com' # Amazon service host: 'queue.amazonaws.com' (default)
     #     :port         => 443                   # Amazon service port: 80 or 443 (default)
-    #     :multi_thread => true|false            # Multi-threaded (connection per each thread): true or false (default)
     #     :signature_version => '0'              # The signature version : '0', '1' or '2'(default)
     #     :logger       => Logger Object}        # Logger instance: logs to STDOUT if omitted }
     #
@@ -127,7 +126,7 @@ module RightAws
       #
       service_params = signed_service_params(@aws_secret_access_key, service_hash, :post, @params[:server], service)
       request        = Net::HTTP::Post.new(AwsUtils::URLencode(service))
-      request['Content-Type'] = 'application/x-www-form-urlencoded' 
+      request['Content-Type'] = 'application/x-www-form-urlencoded; charset=utf-8'
       request.body = service_params
         # prepare output hash
       { :request  => request, 
@@ -201,8 +200,8 @@ module RightAws
       # http://docs.amazonwebservices.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/index.html?Query_QueryGetQueueAttributes.html
     def get_queue_attributes(queue_url, *attributes)
       attributes.flatten!
-      attributes << 'All' if attributes.blank?
-      params = amazonize_list('AttributeName', attributes.to_a)
+      attributes << 'All' if attributes.right_blank?
+      params = amazonize_list('AttributeName', attributes)
       params.merge!(:queue_url  => queue_url)
       req_hash = generate_request('GetQueueAttributes', params)
       request_info(req_hash, SqsGetQueueAttributesParser.new(:logger => @logger))
@@ -245,8 +244,8 @@ module RightAws
     #  see http://docs.amazonwebservices.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/index.html?Query_QueryAddPermission.html
     #      http://docs.amazonwebservices.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/index.html?acp-overview.html
     def add_permissions(queue_url, label, grantees, actions)
-      params      = amazonize_list('AWSAccountId', grantees.to_a)
-      params.merge!(amazonize_list('ActionName', actions.to_a))
+      params      = amazonize_list('AWSAccountId', Array(grantees))
+      params.merge!(amazonize_list('ActionName', Array(actions)))
       params.merge!('Label'    => label,
                     :queue_url => queue_url )
       req_hash = generate_request('AddPermission', params)
@@ -281,7 +280,8 @@ module RightAws
       #
     def receive_message(queue_url, max_number_of_messages=1, visibility_timeout=nil, attributes=nil)
       return [] if max_number_of_messages == 0
-      params = amazonize_list('AttributeName', attributes.to_a)
+      params = {}
+      params.merge!(amazonize_list('AttributeName', Array(attributes))) unless attributes.right_blank?
       params.merge!('MaxNumberOfMessages' => max_number_of_messages,
                     'VisibilityTimeout'   => visibility_timeout,
                     :queue_url            => queue_url )
@@ -428,7 +428,7 @@ module RightAws
       #
     def pop_message(queue_url, attributes=nil)
       messages = pop_messages(queue_url, 1, attributes)
-      messages.blank? ? nil : messages[0]
+      messages.right_blank? ? nil : messages[0]
     rescue
       on_exception
     end
