@@ -1,0 +1,39 @@
+# Notes and tips for developers
+
+## Setting up credentials for testing
+
+Before you can run any tests, you need to set up credentials (API key and secret) that
+will be used when talking to AWS.  The credentials are loaded in `test/test_credentials.rb`
+and are expected to be found in `~/.rightscale/testcredentials.rb` and look like this:
+
+    TestCredentials.aws_access_key_id= 'AAAAAAAAAAAAAAAAAAAA'
+    TestCredentials.aws_secret_access_key= 'asdfasdfsadf'
+    TestCredentials.account_number= '???'
+
+If you prefer to store your secret key in the OS X keychain, you can do this:
+
+    def secret_access_key_from_keychain (key_id)
+      dump = `security -q find-generic-password -a "#{key_id}" -g 2>&1`
+      dump[/password: "(.*)"/, 1]
+    end
+
+    TestCredentials.aws_access_key_id= 'AAAAAAAAAAAAAAAAAAAA'
+    TestCredentials.aws_secret_access_key= secret_access_key_from_keychain(TestCredentials.aws_access_key_id)
+    TestCredentials.account_number= '???'
+
+## Running tests
+
+There is no test suite that runs all tests.  Each module is tested separately.  E.g.,
+to run the Load Balancer tests, run `rake testelb`.  Run `rake -T` for a full list.
+
+Some tests need to launch services on AWS to have something to test.  This means two things:
+
+1. Running all the tests will cost you money.
+2. You will need to shut down some services separately once you are done, or things
+    will keep running and cost you money.
+
+As an example, the ELB and Route 53 tests need a load balancer for testing.  Starting a load balancer
+for every test would make every test case cost as much as running the LB for one hour, so it makes
+more sense to leave it running until it's no longer needed.
+
+The ELB tests contain instructions for shutting down the load balancer.

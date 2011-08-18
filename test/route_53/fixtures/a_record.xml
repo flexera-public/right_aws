@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ChangeResourceRecordSetsRequest xmlns="https://route53.amazonaws.com/doc/2011-05-05/">
+  <ChangeBatch>
+    <Changes>
+      <Change>
+        <Action>CREATE</Action>
+        <ResourceRecordSet>
+          <Name>host.right-aws.example.com.</Name>
+          <Type>A</Type>
+          <TTL>600</TTL>
+          <ResourceRecords>
+            <ResourceRecord><Value>10.0.0.1</Value></ResourceRecord>
+          </ResourceRecords>
+        </ResourceRecordSet>
+      </Change>
+    </Changes>
+  </ChangeBatch>
+</ChangeResourceRecordSetsRequest>
