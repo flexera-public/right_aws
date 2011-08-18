@@ -416,7 +416,6 @@ module RightAws
     # Options: :type, :name, :max_items
     #
     #  r53.list_resource_record_sets("/hostedzone/ZWEC7PPVACGQ4") #=>
-    #    {:items=>
     #      [{:type=>"NS",
     #        :ttl=>172800,
     #        :name=>"mysite.patch-island.com.",
@@ -433,9 +432,7 @@ module RightAws
     #       {:type=>"NS",
     #        :ttl=>600,
     #        :resource_records=>["xxx.mysite.com"],
-    #        :name=>"m1.mysite.patch-island.com."}],
-    #     :is_truncated=>false,
-    #     :max_items=>100}
+    #        :name=>"m1.mysite.patch-island.com."}]
     #
     # PS: http://docs.amazonwebservices.com/Route53/latest/APIReference/API_ListResourceRecordSets.html
     #
@@ -451,7 +448,7 @@ module RightAws
 
     # Create or delete DNS records.
     #
-    #  resource_record_sets =  { :action => :create,
+    #  resource_record_sets = [{ :action => :create,
     #                            :name => 'm3.mysite.patch-island.com',
     #                            :type => 'NS',
     #                            :ttl => 600,
@@ -460,7 +457,7 @@ module RightAws
     #                            :name => 'm2.mysite.patch-island.com',
     #                            :type => 'A',
     #                            :ttl => 600,
-    #                            :resource_records => ['10.0.0.1'] }
+    #                            :resource_records => ['10.0.0.1'] }]
     #  r53.change_resource_record_sets("/hostedzone/Z1K6NCF0EB26FB", resource_record_sets, 'KD: Comment#1') #=>
     #    {:status=>"PENDING",
     #     :submitted_at=>"2011-01-18T20:21:56.828Z",
@@ -476,14 +473,14 @@ module RightAws
 
     # Create DNS records.
     #
-    #  resource_record_sets =  { :name => 'm3.mysite.patch-island.com',
+    #  resource_record_sets = [{ :name => 'm3.mysite.patch-island.com',
     #                            :type => 'NS',
     #                            :ttl => 600,
     #                            :resource_records => 'xxx.mysite.com' },
     #                          { :name => 'm2.mysite.patch-island.com',
     #                            :type => 'A',
     #                            :ttl => 600,
-    #                            :resource_records => ['10.0.0.1'] }
+    #                            :resource_records => ['10.0.0.1'] }]
     #  r53.create_resource_record_sets("/hostedzone/Z1K6NCF0EB26FB", resource_record_sets, 'KD: Comment#1') #=>
     #    {:status=>"PENDING",
     #     :submitted_at=>"2011-01-18T20:21:56.828Z",
@@ -498,14 +495,14 @@ module RightAws
 
     # Delete DNS records.
     #
-    #  resource_record_sets =  { :name => 'm3.mysite.patch-island.com',
+    #  resource_record_sets = [{ :name => 'm3.mysite.patch-island.com',
     #                            :type => 'NS',
     #                            :ttl => 600,
     #                            :resource_records => 'xxx.mysite.com' },
     #                          { :name => 'm2.mysite.patch-island.com',
     #                            :type => 'A',
     #                            :ttl => 600,
-    #                            :resource_records => ['10.0.0.1'] }
+    #                            :resource_records => ['10.0.0.1'] }]
     #  r53.create_resource_record_sets("/hostedzone/Z1K6NCF0EB26FB", resource_record_sets, 'KD: Comment#1') #=>
     #    {:status=>"PENDING",
     #     :submitted_at=>"2011-01-18T20:21:56.828Z",
