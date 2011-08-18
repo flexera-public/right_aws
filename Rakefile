@@ -108,4 +108,11 @@ task :testroute53 do
   require 'test/route_53/test_right_route_53'
 end
 
+desc "Test ELB interface"
+task :testelb do
+  require 'test/test_credentials'
+  TestCredentials.get_credentials
+  require 'test/elb/test_right_elb'
+end
+
 # vim: syntax=Ruby
