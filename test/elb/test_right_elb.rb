@@ -11,8 +11,10 @@ class TestElb < Test::Unit::TestCase
     unless @elb.describe_load_balancers.detect { |lb| lb[:load_balancer_name] == BALANCER_NAME }
       @elb.create_load_balancer(BALANCER_NAME, %w[us-east-1b], [])
     end
+    @lb = @elb.describe_load_balancers.detect { |lb| lb[:load_balancer_name] == BALANCER_NAME }
   end
 
+  # Uncomment this at the end of the day to shut down the test balancer.
   # def teardown
   #   @elb.delete_load_balancer BALANCER_NAME
   # end
@@ -23,7 +25,15 @@ class TestElb < Test::Unit::TestCase
   end
 
   def test_description
-    lb = @elb.describe_load_balancers.detect { |lb| lb[:load_balancer_name] == BALANCER_NAME }
-    assert_match /^#{BALANCER_NAME}-\d+\.us-east-1\.elb\.amazonaws\.com$/, lb[:dns_name]
+    assert_match /^#{BALANCER_NAME}-\d+\.us-east-1\.elb\.amazonaws\.com$/, @lb[:dns_name]
   end
+
+  def test_description_has_canonical_hosted_zone_name
+    assert_match /^#{BALANCER_NAME}-\d+\.us-east-1\.elb\.amazonaws\.com$/, @lb[:canonical_hosted_zone_name]
+  end
+
+  def test_description_has_canonical_hosted_zone_name_id
+    assert_match /^[A-Z0-9]+$/, @lb[:canonical_hosted_zone_name_id]
+  end
+
 end
