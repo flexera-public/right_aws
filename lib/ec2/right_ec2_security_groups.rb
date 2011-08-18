@@ -283,7 +283,8 @@ module RightAws
           #  :groups => {UserId1 => GroupId1, ... UserIdN => GroupIdN}
           #  or (this allows using same UserId multiple times )
           #  :groups => [[UserId1, GroupId1], ... [UserIdN, GroupIdN]]
-          hash.merge!(amazonize_list( ["IpPermissions.#{pid}.Groups.?.UserId", "IpPermissions.#{pid}.Groups.?.GroupId"], permission[:groups] ))
+          hash.merge!(amazonize_list( ["IpPermissions.#{pid}.Groups.?.UserId", "IpPermissions.#{pid}.Groups.?.GroupName"], permission[:group_names] ))
+          hash.merge!(amazonize_list( ["IpPermissions.#{pid}.Groups.?.UserId", "IpPermissions.#{pid}.Groups.?.GroupId"],   permission[:groups] ))
         when :egress
           #  :groups => [GroupId1, ... GroupIdN]
           hash.merge!(amazonize_list( "IpPermissions.#{pid}.Groups.?.GroupId", permission[:groups] ))
