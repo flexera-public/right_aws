@@ -13,7 +13,7 @@ begin
 rescue LoadError => e
   STDERR.puts("Bundler is not available, some rake tasks will not be defined: #{e.message}")
 else
-  Bundler::GemHelper.install_tasks
+  Bundler::GemHelper.install_tasks :name => 'right_aws'
 end
 
 # == Gem == #
@@ -99,6 +99,13 @@ task :testrds do
   require 'test/test_credentials'
   TestCredentials.get_credentials
   require 'test/rds/test_right_rds.rb'
+end
+
+desc "Test Route 53 interface"
+task :testroute53 do
+  require 'test/test_credentials'
+  TestCredentials.get_credentials
+  require 'test/route_53/test_right_route_53'
 end
 
 # vim: syntax=Ruby
