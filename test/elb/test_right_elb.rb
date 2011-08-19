@@ -14,7 +14,11 @@ class TestElb < Test::Unit::TestCase
     @lb = @elb.describe_load_balancers.detect { |lb| lb[:load_balancer_name] == BALANCER_NAME }
   end
 
-  # Uncomment this at the end of the day to shut down the test balancer.
+  # At the end of the day when you want to shut down the test balancer:
+  # * Uncomment this method.
+  # * Comment out all test except one.
+  # * Run this test file.
+  #
   # def teardown
   #   @elb.delete_load_balancer BALANCER_NAME
   # end
