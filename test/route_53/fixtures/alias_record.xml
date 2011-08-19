@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ChangeResourceRecordSetsRequest xmlns="https://route53.amazonaws.com/doc/2011-05-05/">
+  <ChangeBatch>
+    <Changes>
+      <Change>
+        <Action>CREATE</Action>
+        <ResourceRecordSet>
+          <Name>right-aws.example.com.</Name>
+          <Type>A</Type>
+          <AliasTarget>
+            <HostedZoneId>Z1234567890123</HostedZoneId>
+            <DNSName>example-load-balancer-1111111111.us-east-1.elb.amazonaws.com.</DNSName>
+          </AliasTarget>
+        </ResourceRecordSet>
+      </Change>
+    </Changes>
+  </ChangeBatch>
+</ChangeResourceRecordSetsRequest>
