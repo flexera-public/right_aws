@@ -158,7 +158,7 @@ module RightAws
     
     include RightAwsBaseInterface
 
-    API_VERSION       = "2010-10-01"
+    API_VERSION       = "2011-05-05"
     DEFAULT_HOST      = "route53.amazonaws.com"
     DEFAULT_PATH      = '/'
     DEFAULT_PROTOCOL  = 'https'
@@ -295,11 +295,22 @@ module RightAws
                        "        <Action>#{AwsUtils::xml_escape(change[:action].to_s.upcase)}</Action>\n" +
                        "        <ResourceRecordSet>\n"                                                   +
                        "          <Name>#{AwsUtils::xml_escape(change[:name])}</Name>\n"                 +
-                       "          <Type>#{AwsUtils::xml_escape(change[:type].to_s.upcase)}</Type>\n"     +
+                       "          <Type>#{AwsUtils::xml_escape(change[:type].to_s.upcase)}</Type>\n"
+        if change[:alias_target]
+          alias_target = change[:alias_target]
+          xml_changes +=
+                       "          <AliasTarget>\n"                                                                              +
+                       "            <HostedZoneId>#{AwsUtils::xml_escape(alias_target[:hosted_zone_id].to_s)}</HostedZoneId>\n" +
+                       "            <DNSName>#{AwsUtils::xml_escape(alias_target[:dns_name].to_s)}</DNSName>\n"                 +
+                       "          </AliasTarget>\n"
+        else
+          xml_changes +=
                        "          <TTL>#{AwsUtils::xml_escape(change[:ttl].to_s)}</TTL>\n"               +
                        "          <ResourceRecords>\n"                                                   +
                        xml_resource_records                                                              +
-                       "          </ResourceRecords>\n"                                                  +
+                       "          </ResourceRecords>\n"
+        end
+        xml_changes +=
                        "        </ResourceRecordSet>\n"                                                  +
                        "      </Change>\n"
       end
@@ -603,7 +614,9 @@ module RightAws
         when 'ResourceRecordSet' then @result[:items] << @item
         else
           case full_tag_name
-          when %r{/ResourceRecord/Value} then (@item[:resource_records] ||= []) << @text
+          when %r{/ResourceRecord/Value}     then (@item[:resource_records] ||= []) << @text
+          when %r{/AliasTarget/DNSName}      then (@item[:alias_target] ||= {})[:dns_name] = @text
+          when %r{/AliasTarget/HostedZoneId} then (@item[:alias_target] ||= {})[:hosted_zone_id] = @text
           end
         end
       end
