@@ -283,8 +283,42 @@ module RightAws
           #  :groups => {UserId1 => GroupId1, ... UserIdN => GroupIdN}
           #  or (this allows using same UserId multiple times )
           #  :groups => [[UserId1, GroupId1], ... [UserIdN, GroupIdN]]
-          hash.merge!(amazonize_list( ["IpPermissions.#{pid}.Groups.?.UserId", "IpPermissions.#{pid}.Groups.?.GroupName"], permission[:group_names] ))
-          hash.merge!(amazonize_list( ["IpPermissions.#{pid}.Groups.?.UserId", "IpPermissions.#{pid}.Groups.?.GroupId"],   permission[:groups] ))
+          #  or even (unset user is == current account user)
+          #  :groups => [GroupId1, GroupId2, ... GroupIdN]
+          #  :groups => [[UserId1, GroupId1], GroupId2, ... GroupIdN, ... [UserIdM, GroupIdM]]
+          #
+          index = 1
+          unless permission[:group_names].right_blank?
+            owner_and_groups = []
+            groups_only      = []
+            Array(permission[:group_names]).each do |item|
+              if item.is_a?(Array) && item.size == 2
+                owner_and_groups << item
+              else
+                groups_only << item
+              end
+            end
+            hash.merge!(amazonize_list( ["IpPermissions.#{pid}.Groups.?.UserId", "IpPermissions.#{pid}.Groups.?.GroupName"], owner_and_groups, :index => index ))
+            index += owner_and_groups.size
+            groups_only = groups_only.flatten
+            hash.merge!(amazonize_list( "IpPermissions.#{pid}.Groups.?.GroupName", groups_only, :index => index ))
+            index += groups_only.size
+          end
+          unless permission[:groups].right_blank?
+            owner_and_groups = []
+            groups_only      = []
+            Array(permission[:groups]).each do |item|
+              if item.is_a?(Array) && item.size == 2
+                owner_and_groups << item
+              else
+                groups_only << item
+              end
+            end
+            hash.merge!(amazonize_list( ["IpPermissions.#{pid}.Groups.?.UserId", "IpPermissions.#{pid}.Groups.?.GroupId"], owner_and_groups, :index => index ))
+            index += owner_and_groups.size
+            groups_only = groups_only.flatten
+            hash.merge!(amazonize_list( "IpPermissions.#{pid}.Groups.?.GroupId", groups_only, :index => index ))
+          end
         when :egress
           #  :groups => [GroupId1, ... GroupIdN]
           hash.merge!(amazonize_list( "IpPermissions.#{pid}.Groups.?.GroupId", permission[:groups] ))
