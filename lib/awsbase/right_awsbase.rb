@@ -620,10 +620,11 @@ module RightAws
     #     "Filter.2.Value.2"=>"bb"}
     def amazonize_list(masks, list, options={}) #:nodoc:
       groups = {}
-      Array(list).each_with_index do |list_item, i|
+      list_idx = options[:index] || 1
+      Array(list).each do |list_item|
         Array(masks).each_with_index do |mask, mask_idx|
           key = mask[/\?/] ? mask.dup : mask.dup + '.?'
-          key.sub!('?', (i+1).to_s)
+          key.sub!('?', list_idx.to_s)
           value = Array(list_item)[mask_idx]
           if value.is_a?(Array)
             groups.merge!(amazonize_list(key, value, options))
@@ -639,6 +640,7 @@ module RightAws
             groups[key] = value
           end
         end
+        list_idx += 1
       end
       groups
     end
