@@ -1,5 +1,4 @@
 require File.dirname(__FILE__) + '/test_helper.rb'
-require 'pp'
 
 class TestAwsbase < Test::Unit::TestCase
 

@@ -4,7 +4,7 @@ Initial release.
 == 1.2.0 2007-09-12
 
 * r1718, todd, 2007-09-12 15:34:37
-  * # 458, Extensive documentation review, rework, and expansion.  Also added 
+  * # 458, Extensive documentation review, rework, and expansion.  Also added
     coverage analysis to the test suite using RCov.
 
 * r1690, todd, 2007-09-07 15:23:11
@@ -39,7 +39,7 @@ Initial release.
   * # 487, # 488, Consolidate a lot of code that was repeated in three places.
     Fix error handling path when using streaming GET interfaces with S3.
     Also add a stub for RightHttpConnection which allows more control over the
-    unit tests.  Expand the unit tests and coverage tests. 
+    unit tests.  Expand the unit tests and coverage tests.
 
 * r1755, todd, 2007-09-19 14:29:19
   * # 487, RDoc fixes after code consolidation
@@ -59,13 +59,13 @@ Initial release.
   * # 524, blocks added to ec2_describe_xxx to support aws_cache
 
 * r1924, konstantin, 2007-10-12 11:35:06
-  * # 536, user_data bug fix 
+  * # 536, user_data bug fix
 
 * r1929, tve,  2007-10-15 00:00:11
   * Fix libxml/rexml selection bug
 
 * r1938, konstantin, 2007-10-16 10:53:56
-  * instance type support is set to default 
+  * instance type support is set to default
 
 == 1.4.3 2007-10-25
 
@@ -82,11 +82,11 @@ Initial release.
 * r2001, konstantin, 2007-11-01 12:03:13  +0300
   * Fixed multiple permissions assignment on Grantee#grant/revoke
   * Fixed new grantee permissions set ingnore (Grantee#apply)
-  * S3::Grantee#exists? method added 
+  * S3::Grantee#exists? method added
 
 * r2109, konstantin, 2007-11-12 21:49:36  +0300
   * RightAwsBaseInterface: caching implemented.
-    (The Ec2 functions are being cached: describe_images, describe_instances, 
+    (The Ec2 functions are being cached: describe_images, describe_instances,
     describe_security_groups and describe_key_pairs)
 
 == 1.4.5 - 1.4.6
@@ -107,7 +107,7 @@ Initial release.
 == 1.5.0
 * r 2688, konstantin, 02-30-08 15:42:00  +0300
   * SDB support added.
-  * RightAws::S3::bucket and RightAws::S3::Bucket.create methods behaviour 
+  * RightAws::S3::bucket and RightAws::S3::Bucket.create methods behaviour
     changed: param +create+ is set to +false+ by default.
 
 == 1.6.0
@@ -151,7 +151,7 @@ Initial release.
 == 1.7.2
 
   Release Notes:
-  
+
   RightAws includes some new features, including:
   - Support in RightAws::S3 and RightAws::S3Interface for S3 key copy, move, and rename
   - Support for signature version 0 request authentication to EC2, SQS, and SDB
@@ -165,7 +165,7 @@ Initial release.
     We now reset the seek pointer of the streaming IO object to its initial position.
   - Removal of an accidental dependency on ActiveSupport in RightAws::S3Interface.get_link().
   - Monkey-patch of the Ruby File class on Windows platforms to correct a problem in lstat.
-    The lstat bug was causing failure of very large file uploads on Windows [ Contributed by Benjamin Allfree ] 
+    The lstat bug was causing failure of very large file uploads on Windows [ Contributed by Benjamin Allfree ]
   - Fixed parsing of the ETag field for S3 objects
 
 == 1.7.3
@@ -174,7 +174,7 @@ Initial release.
 
   - Removed the 1.7.2 monkey-patch of the Ruby File class on Windows.  This patch broke Rails 2.0.
     The patch is now included in the README for anyone to use at their own risk.
- 
+
 == 1.8.0
 
   Release Notes:
@@ -186,7 +186,7 @@ Initial release.
 
   Bug fixes include correction of RightAws::S3 copy's failure to url-encode
 the source key.
- 
+
 == 1.8.1
 
   Release Notes:
@@ -197,7 +197,7 @@ the source key.
     result sorting and attributes auto loading
   - RightAws::ActiveSdb::Base#find_all_by_ and find_by_ helpers improved to support
     :order, :auto_load, :limit and :next_token options
-  - RightAws::SdbInterface#delete_attributes bug fixed 
+  - RightAws::SdbInterface#delete_attributes bug fixed
   - SdbInterface allows specification of a string value to use for
     representing Ruby nil in SDB.
   - Sdb tests fixed and improved
@@ -215,7 +215,7 @@ the source key.
    - Ec::cancel_bundle_task
 
   - Full Amazon CloudFront support added with RightAws::AcfInterface
-  - Bug fixes to S3Interface::store_object_and_verify and 
+  - Bug fixes to S3Interface::store_object_and_verify and
     S3Interface::retrieve_object_and_verify (thanks to numerous user reports)
   - Updates to caching for Ec2::describe_images_by methods
   - Ec2 now has Ec2::last_request_id
@@ -228,7 +228,7 @@ the source key.
   - CloudFront: docs fixes
   - SDB: added: SQL-like query, select and query_with_attributes support
   - SDB: fixed no method error when searching for id that doesn't exist
-  
+
 === 1.11.0
 
   Release Notes:
@@ -304,7 +304,6 @@ the source key.
   - this gem requires right_http_connection 0bc3343232133bdb38c237d8285525d74495d3f5 or later
   - "Raise On Timeout On Action" feature added to avoid duplicate resources creation if a timeout error occures and a retry is performed
 
-=== next
   Release Notes:
   - Fixed:
     - ClientToken (launch_instances, run_instances) is not used for Eucalyptus clouds
@@ -314,4 +313,12 @@ the source key.
       describe_security_groups, describe_snapshots, describe_spot_instance_requests, describe_spot_price_history,
       describe_vpcs, disassociate_address, modify_image_attribute, modify_snapshot_attribute, release_address,
       request_spot_instances, stop_instances
+  - EC2: ClientToken (launch_instances, run_instances) is not used for Eucalyptus clouds
+  - RDS:
+    - RDS: API 2011-04-01
+    - Make :instance_class param more consistent: :db_instance_class --> :instance_class
+    - Issue 53: regression in latest master version of right_rds_interface
+    - Issue 73: Can't get list of instances with RdsInterface
+  - EBS: Issue 54: regression in right_ec2_ebs.rb
+  - Add the port number with server name in the v2 signature string if it is not the RFC standard number (author: unakatsuo).
 

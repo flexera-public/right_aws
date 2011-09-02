@@ -162,7 +162,7 @@ module RightAws
     def describe_db_instances(*params, &block)
       item, params = AwsUtils::split_items_and_params(params)
       params = params.dup
-      params['DBInstanceIdentifier'] = item if item
+      params['DBInstanceIdentifier'] = item.first unless item.right_blank?
       result = []
       incrementally_list_items('DescribeDBInstances', DescribeDbInstancesParser, params) do |response|
         result += response[:db_instances]
