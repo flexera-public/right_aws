@@ -422,7 +422,7 @@ module RightAws
 
     # ACF, AMS, EC2, LBS and SDB uses this guy
     # SQS and S3 use their own methods
-    def generate_request_impl(verb, action, options={}) #:nodoc:
+    def generate_request_impl(verb, action, options={}, custom_options={}) #:nodoc:
       # Form a valid http verb: 'GET' or 'POST' (all the other are not supported now)
       http_verb = verb.to_s.upcase
       # remove empty keys from request options
@@ -430,7 +430,7 @@ module RightAws
       # prepare service data
       service_hash = {"Action"         => action,
                       "AWSAccessKeyId" => @aws_access_key_id,
-                      "Version"        => @params[:api_version] }
+                      "Version"        => custom_options[:api_version] || @params[:api_version] }
       service_hash.merge!(options)
       # Sign request options
       service_params = signed_service_params(@aws_secret_access_key, service_hash, http_verb, @params[:host_to_sign], @params[:service])
