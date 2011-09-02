@@ -369,8 +369,8 @@ module RightAws
 
     # Modify instance attribute.
     #
-    # Attributes: 'instanceType', 'kernel', 'ramdisk', 'userData', 'disableApiTermination',
-    # 'instanceInitiatedShutdownBehavior', 'sourceDestCheck', 'groupSet'
+    # Attributes: 'InstanceType', 'Kernel', 'Ramdisk', 'UserData', 'DisableApiTermination',
+    # 'InstanceInitiatedShutdownBehavior', 'SourceDestCheck', 'GroupId'
     #
     #  ec2.modify_instance_attribute(instance, 'instanceInitiatedShutdownBehavior", "stop") #=> true
     #
@@ -378,10 +378,9 @@ module RightAws
       request_hash = {'InstanceId' => instance_id}
       attribute = attribute.to_s.right_underscore.right_camelize
       case attribute
-      when 'InstanceType', 'Kernel', 'Ramdisk', 'DisableApiTermination', 'InstanceInitiatedShutdownBehavior', 'SourceDestCheck'
-        request_hash["#{attribute}.Value"] = value
-      when "GroupSet"
-        request_hash.merge!(amazonize_block_device_mappings(value))
+      when 'UserData' then request_hash["#{attribute}.Value"] = Base64.encode64(value).delete("\n")
+      when 'GroupId'  then request_hash.merge!(amazonize_list('GroupId', value))
+      else                 request_hash["#{attribute}.Value"] = value
       end
       link = generate_request('ModifyInstanceAttribute', request_hash)
       request_info(link, RightBoolResponseParser.new(:logger => @logger))
