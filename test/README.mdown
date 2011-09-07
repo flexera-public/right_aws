@@ -30,7 +30,7 @@ Some tests need to launch services on AWS to have something to test.  This means
 
 1. Running all the tests will cost you money.
 2. You will need to shut down some services separately once you are done, or things
-    will keep running and cost you money.
+    will keep running, accumulating hourly charges.
 
 As an example, the ELB and Route 53 tests need a load balancer for testing.  Starting a load balancer
 for every test would make every test case cost as much as running the LB for one hour, so it makes
