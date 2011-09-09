@@ -5,6 +5,7 @@ GIT
     right_http_connection (1.2.5)
 
 GEM
+  remote: http://rubygems.org/
   specs:
     libxml-ruby (0.5.2.0)
     rake (0.8.7)

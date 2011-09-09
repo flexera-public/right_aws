@@ -62,7 +62,7 @@ module RightAws
     include RightAwsBaseInterface
 
     # Amazon ELB API version being used
-    API_VERSION       = "2010-07-01"
+    API_VERSION       = "2011-04-05"
     DEFAULT_HOST      = "elasticloadbalancing.amazonaws.com"
     DEFAULT_PATH      = '/'
     DEFAULT_PROTOCOL  = 'https'
@@ -460,6 +460,8 @@ module RightAws
         when 'LoadBalancerPort'   then @listener[:load_balancer_port] = @text
         when 'InstancePort'       then @listener[:instance_port]      = @text
         when 'SSLCertificateId'   then @listener[:ssl_certificate_id] = @text
+        when 'CanonicalHostedZoneName'   then @item[:canonical_hosted_zone_name] = @text
+        when 'CanonicalHostedZoneNameID' then @item[:canonical_hosted_zone_name_id] = @text
         end
         case full_tag_name
         when %r{AvailabilityZones/member$}    then @item[:availability_zones] << @text
