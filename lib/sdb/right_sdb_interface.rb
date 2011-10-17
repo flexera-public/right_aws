@@ -33,7 +33,7 @@ module RightAws
     DEFAULT_PORT      = 443
     DEFAULT_PROTOCOL  = 'https'
     DEFAULT_PATH      = '/'
-    API_VERSION       = '2007-11-07'
+    API_VERSION       = '2009-04-15'
     DEFAULT_NIL_REPRESENTATION = 'nil'
 
     @@bench = AwsBenchmarkingBlock.new
@@ -399,12 +399,21 @@ module RightAws
     #                                                     :box_usage  => "0.0000093222",
     #                                                     :request_id => "81273d21-001-1111-b3f9-512d91d29ac8" }
     #
+    #  # request all attributes using a consistent read
+    #  # see:  http://docs.amazonwebservices.com/AmazonSimpleDB/latest/DeveloperGuide/index.html?ConsistencySummary.html
+    #  sdb.get_attributes('family', 'toys', nil, true) # => { :attributes => {"cat"    => ["clew", "Jons_socks", "mouse"] },
+    #                                                              "Silvia" => ["beetle", "rolling_pin", "kids"],
+    #                                                              "Jon"    => ["vacuum_cleaner", "hammer", "spade"]},
+    #                                              :box_usage  => "0.0000093222",
+    #                                              :request_id => "81273d21-000-1111-b3f9-512d91d29ac8" }
+    # 
     # see: http://docs.amazonwebservices.com/AmazonSimpleDB/2007-11-07/DeveloperGuide/SDB_API_GetAttributes.html
     #
-    def get_attributes(domain_name, item_name, attribute_name=nil)
-      link = generate_request("GetAttributes", 'DomainName'    => domain_name,
-                                               'ItemName'      => item_name,
-                                               'AttributeName' => attribute_name )
+    def get_attributes(domain_name, item_name, attribute_name=nil, consistent_read=nil)
+      link = generate_request("GetAttributes", 'DomainName'     => domain_name,
+                                               'ItemName'       => item_name,
+                                               'AttributeName'  => attribute_name,
+                                               'ConsistentRead' => consistent_read )
       res = request_info(link, QSdbGetAttributesParser.new)
       res[:attributes].each_value do |values|
         values.collect! { |e| sdb_to_ruby(e) }
