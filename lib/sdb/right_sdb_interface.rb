@@ -33,7 +33,7 @@ module RightAws
     DEFAULT_PORT      = 443
     DEFAULT_PROTOCOL  = 'https'
     DEFAULT_PATH      = '/'
-    API_VERSION       = '2007-11-07'
+    API_VERSION       = '2009-04-15'
     DEFAULT_NIL_REPRESENTATION = 'nil'
 
     @@bench = AwsBenchmarkingBlock.new
