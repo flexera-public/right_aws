@@ -347,7 +347,8 @@ module RightAws
                               'InstanceId' => instance_id,
                               'Attribute'  => attribute)
       value = request_info(link, QEc2DescribeInstanceAttributeParser.new(:logger => @logger))
-      attribute == "userData" ? Base64.decode64(value) : value
+      value = Base64.decode64(value) if attribute == "userData" && !value.right_blank?
+      value
     rescue Exception
       on_exception
     end
