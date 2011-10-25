@@ -153,23 +153,28 @@ module RightAws
     # tag-value, tag:key, volume-id, volume-size
     #
     #  ec2.describe_snapshots #=>
-    #   [ {:aws_volume_id=>"vol-545fac3d",
-    #      :aws_description=>"Wikipedia XML Backups (Linux)",
+    #    [{:aws_volume_size=>2,
+    #      :tags=>{},
+    #      :aws_id=>"snap-d010f6b9",
+    #      :owner_alias=>"amazon",
     #      :aws_progress=>"100%",
-    #      :aws_started_at=>"2009-09-28T23:49:50.000Z",
-    #      :aws_owner=>"amazon",
-    #      :aws_id=>"snap-8041f2e9",
-    #      :aws_volume_size=>500,
-    #      :aws_status=>"completed"},
-    #     {:aws_volume_id=>"vol-185fac71",
-    #      :aws_description=>"Sloan Digital Sky Survey DR6 Subset (Linux)",
+    #      :aws_status=>"completed",
+    #      :aws_description=>
+    #       "Windows 2003 R2 Installation Media [Deprecated] - Enterprise Edition 64-bit",
+    #      :aws_owner=>"711940113766",
+    #      :aws_volume_id=>"vol-351efb5c",
+    #      :aws_started_at=>"2008-10-20T18:23:59.000Z"},
+    #     {:aws_volume_size=>2,
+    #      :tags=>{},
+    #      :aws_id=>"snap-a310f6ca",
+    #      :owner_alias=>"amazon",
     #      :aws_progress=>"100%",
-    #      :aws_started_at=>"2009-09-28T23:56:10.000Z",
-    #      :aws_owner=>"amazon",
-    #      :aws_id=>"snap-3740f35e",
-    #      :aws_volume_size=>180,
-    #      :aws_status=>"completed"}, ...]
-    #
+    #      :aws_status=>"completed",
+    #      :aws_description=>"Windows 2003 R2 Installation Media 64-bit",
+    #      :aws_owner=>"711940113766",
+    #      :aws_volume_id=>"vol-001efb69",
+    #      :aws_started_at=>"2008-10-20T18:25:53.000Z"}, ... ]
+    #  
     #  ec2.describe_snapshots("snap-e676e28a", "snap-e176e281")
     #
     #  ec2.describe_snapshots(:restorable_by => ['123456781234'],
@@ -180,6 +185,10 @@ module RightAws
     #
     def describe_snapshots(*list_and_options)
       describe_resources_with_list_and_options('DescribeSnapshots', 'SnapshotId', QEc2DescribeSnapshotsParser, list_and_options)
+    end
+
+    def describe_snapshots_by_restorable_by(*list_and_options)
+      describe_resources_with_list_and_options('DescribeSnapshots', 'RestorableBy', QEc2DescribeSnapshotsParser, list_and_options)
     end
 
     # Create a snapshot of specified volume.
@@ -276,18 +285,18 @@ module RightAws
 
     # Modify snapshot attribute.
     #
-    #  attribute      : currently, only 'createVolumePermission' is supported.
-    #  operation_type : currently, only 'add' & 'remove' are supported.
-    #  vars:
-    #    :user_group  : currently, only 'all' is supported.
-    #    :user_id     : an array of user ids
+    #  Attribute can take only 'createVolumePermission' value.
+    #  Value is a Hash {:add_user_ids, :add_groups, :remove_user_ids, :remove_groups }.
     #
-    def modify_snapshot_attribute(snapshot_id, attribute='createVolumePermission', operation_type='add', vars = {})
-      params =  {'SnapshotId'    => snapshot_id,
-                 'Attribute'     => attribute,
-                 'OperationType' => operation_type}
-      params.update(amazonize_list('UserId',    Array(vars[:user_id])))    if vars[:user_id]
-      params.update(amazonize_list('UserGroup', Array(vars[:user_group]))) if vars[:user_group]
+    def modify_snapshot_attribute(snapshot_id, attribute, value)
+      params = { 'SnapshotId' => snapshot_id }
+      case attribute.to_s
+      when 'createVolumePermission'
+        params.update(amazonize_list('CreateVolumePermission.Add.?.UserId',    value[:add_user_ids]))
+        params.update(amazonize_list('CreateVolumePermission.Add.?.Group',     value[:add_groups]))
+        params.update(amazonize_list('CreateVolumePermission.Remove.?.UserId', value[:remove_user_ids]))
+        params.update(amazonize_list('CreateVolumePermission.Remove.?.Group',  value[:remove_groups]))
+      end
       link = generate_request("ModifySnapshotAttribute", params)
       request_info(link, RightBoolResponseParser.new(:logger => @logger))
     rescue Exception
@@ -298,36 +307,36 @@ module RightAws
     #
     #  ec2.modify_snapshot_attribute_create_volume_permission_add_users('snap-36fe435f', '000000000000', '000000000001') #=> true
     #
-    def modify_snapshot_attribute_create_volume_permission_add_users(snapshot_id, *user_id)
-      modify_snapshot_attribute(snapshot_id, 'createVolumePermission', 'add', :user_id => user_id.flatten )
+    def modify_snapshot_attribute_create_volume_permission_add_users(snapshot_id, *user_ids)
+      modify_snapshot_attribute(snapshot_id, 'createVolumePermission', :add_user_ids => user_ids.flatten )
     end
     
     # Revoke create volume permission for a list of users.
     #
     #  ec2.modify_snapshot_attribute_create_volume_permission_remove_users('snap-36fe435f', '000000000000', '000000000001') #=> true
     #
-    def modify_snapshot_attribute_create_volume_permission_remove_users(snapshot_id, *user_id)
-      modify_snapshot_attribute(snapshot_id, 'createVolumePermission', 'remove', :user_id => user_id.flatten )
+    def modify_snapshot_attribute_create_volume_permission_remove_users(snapshot_id, *user_ids)
+      modify_snapshot_attribute(snapshot_id, 'createVolumePermission', :remove_user_ids => user_ids.flatten )
     end
 
     # Grant create volume permission for user groups (currently only 'all' is supported).
     #
     #  ec2.modify_snapshot_attribute_create_volume_permission_add_groups('snap-36fe435f') #=> true
     #
-    def modify_snapshot_attribute_create_volume_permission_add_groups(snapshot_id, *user_group)
-      user_group.flatten!
-      user_group = ['all'] if user_group.right_blank?
-      modify_snapshot_attribute(snapshot_id, 'createVolumePermission', 'add', :user_group => user_group )
+    def modify_snapshot_attribute_create_volume_permission_add_groups(snapshot_id, *groups)
+      groups.flatten!
+      groups = ['all'] if groups.right_blank?
+      modify_snapshot_attribute(snapshot_id, 'createVolumePermission', :add_groups => groups )
     end
 
     # Remove create volume permission for user groups (currently only 'all' is supported).
     #
     #  ec2.modify_snapshot_attribute_create_volume_permission_remove_groups('snap-36fe435f') #=> true
     #
-    def modify_snapshot_attribute_create_volume_permission_remove_groups(snapshot_id, *user_group)
-      user_group.flatten!
-      user_group = ['all'] if user_group.right_blank?
-      modify_snapshot_attribute(snapshot_id, 'createVolumePermission', 'remove', :user_group => user_group )
+    def modify_snapshot_attribute_create_volume_permission_remove_groups(snapshot_id, *groups)
+      groups.flatten!
+      groups = ['all'] if groups.right_blank?
+      modify_snapshot_attribute(snapshot_id, 'createVolumePermission', :remove_groups => groups )
     end
 
     # Delete the specified snapshot.
@@ -433,6 +442,7 @@ module RightAws
         when 'description' then @item[:aws_description] = @text
         when 'ownerId'     then @item[:aws_owner]       = @text
         when 'volumeSize'  then @item[:aws_volume_size] = @text.to_i
+        when 'ownerAlias'  then @item[:owner_alias]     = @text
         else
           case full_tag_name
           when %r{/tagSet/item/key$}         then @aws_tag[:key]                = @text

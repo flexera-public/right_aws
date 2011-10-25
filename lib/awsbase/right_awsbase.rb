@@ -620,10 +620,11 @@ module RightAws
     #     "Filter.2.Value.2"=>"bb"}
     def amazonize_list(masks, list, options={}) #:nodoc:
       groups = {}
-      Array(list).each_with_index do |list_item, i|
+      list_idx = options[:index] || 1
+      Array(list).each do |list_item|
         Array(masks).each_with_index do |mask, mask_idx|
           key = mask[/\?/] ? mask.dup : mask.dup + '.?'
-          key.sub!('?', (i+1).to_s)
+          key.sub!('?', list_idx.to_s)
           value = Array(list_item)[mask_idx]
           if value.is_a?(Array)
             groups.merge!(amazonize_list(key, value, options))
@@ -639,6 +640,7 @@ module RightAws
             groups[key] = value
           end
         end
+        list_idx += 1
       end
       groups
     end
@@ -665,6 +667,121 @@ module RightAws
           end
         end
       end
+      result
+    end
+
+    # Build API request keys set.
+    #
+    # Options is a hash, expectations is a set of keys [and rules] how to represent options.
+    # Mappings is an Array (may include hashes) or a Hash.
+    #
+    #  Example:
+    #
+    #  options = { :valid_from              => Time.now - 10,
+    #              :instance_count          => 3,
+    #              :image_id                => 'ami-08f41161',
+    #              :spot_price              => 0.059,
+    #              :instance_type           => 'c1.medium',
+    #              :instance_count          => 1,
+    #              :key_name                => 'tim',
+    #              :availability_zone       => 'us-east-1a',
+    #              :monitoring_enabled      => true,
+    #              :launch_group            => 'lg1',
+    #              :availability_zone_group => 'azg1',
+    #              :groups                  => ['a', 'b', 'c'],
+    #              :group_ids               => 'sg-1',
+    #              :user_data               => 'konstantin',
+    #              :block_device_mappings   => [ { :device_name     => '/dev/sdk',
+    #                                              :ebs_snapshot_id => 'snap-145cbc7d',
+    #                                              :ebs_delete_on_termination => true,
+    #                                              :ebs_volume_size => 3,
+    #                                              :virtual_name => 'ephemeral2' }]}
+    #  mappings = { :spot_price,
+    #               :availability_zone_group,
+    #               :launch_group,
+    #               :type,
+    #               :instance_count,
+    #               :image_id              => 'LaunchSpecification.ImageId',
+    #               :instance_type         => 'LaunchSpecification.InstanceType',
+    #               :key_name              => 'LaunchSpecification.KeyName',
+    #               :addressing_type       => 'LaunchSpecification.AddressingType',
+    #               :kernel_id             => 'LaunchSpecification.KernelId',
+    #               :ramdisk_id            => 'LaunchSpecification.RamdiskId',
+    #               :subnet_id             => 'LaunchSpecification.SubnetId',
+    #               :availability_zone     => 'LaunchSpecification.Placement.AvailabilityZone',
+    #               :monitoring_enabled    => 'LaunchSpecification.Monitoring.Enabled',
+    #               :valid_from            => { :value => Proc.new { !options[:valid_from].right_blank?  && AwsUtils::utc_iso8601(options[:valid_from]) }},
+    #               :valid_until           => { :value => Proc.new { !options[:valid_until].right_blank? && AwsUtils::utc_iso8601(options[:valid_until]) }},
+    #               :user_data             => { :name  => 'LaunchSpecification.UserData',
+    #                                           :value => Proc.new { !options[:user_data].right_blank? && Base64.encode64(options[:user_data]).delete("\n") }},
+    #               :groups                => { :amazonize_list => 'LaunchSpecification.SecurityGroup'},
+    #               :group_ids             => { :amazonize_list => 'LaunchSpecification.SecurityGroupId'},
+    #               :block_device_mappings => { :amazonize_bdm  => 'LaunchSpecification.BlockDeviceMapping'})
+    #
+    #  map_api_keys_and_values( options, mappings) #=>
+    #    {"LaunchSpecification.BlockDeviceMapping.1.Ebs.DeleteOnTermination" => true,
+    #     "LaunchSpecification.BlockDeviceMapping.1.VirtualName"             => "ephemeral2",
+    #     "LaunchSpecification.BlockDeviceMapping.1.Ebs.VolumeSize"          => 3,
+    #     "LaunchSpecification.BlockDeviceMapping.1.Ebs.SnapshotId"          => "snap-145cbc7d",
+    #     "LaunchSpecification.BlockDeviceMapping.1.DeviceName"              => "/dev/sdk",
+    #     "LaunchSpecification.SecurityGroupId.1"                            => "sg-1",
+    #     "LaunchSpecification.InstanceType"                                 => "c1.medium",
+    #     "LaunchSpecification.KeyName"                                      => "tim",
+    #     "LaunchSpecification.ImageId"                                      => "ami-08f41161",
+    #     "LaunchSpecification.SecurityGroup.1"                              => "a",
+    #     "LaunchSpecification.SecurityGroup.2"                              => "b",
+    #     "LaunchSpecification.SecurityGroup.3"                              => "c",
+    #     "LaunchSpecification.Placement.AvailabilityZone"                   => "us-east-1a",
+    #     "LaunchSpecification.Monitoring.Enabled"                           => true,
+    #     "LaunchGroup"                                                      => "lg1",
+    #     "InstanceCount"                                                    => 1,
+    #     "SpotPrice"                                                        => 0.059,
+    #     "AvailabilityZoneGroup"                                            => "azg1",
+    #     "ValidFrom"                                                        => "2011-06-30T08:06:30.000Z",
+    #     "LaunchSpecification.UserData"                                     => "a29uc3RhbnRpbg=="}
+    #
+    def map_api_keys_and_values(options, *mappings) # :nodoc:
+      result = {}
+      vars   = {}
+      # Fix inputs and make them all to be hashes
+      mappings.flatten.each do |mapping|
+        unless mapping.is_a?(Hash)
+          # mapping is just a :key_name
+          mapping = { mapping => { :name  => mapping.to_s.right_camelize, :value => options[mapping] }}
+        else
+          mapping.each do |local_key, api_opts|
+            unless api_opts.is_a?(Hash)
+              # mapping is a { :key_name => 'ApiKeyName' }
+              mapping[local_key] = { :name  => api_opts.to_s, :value => options[local_key]}
+            else
+              # mapping is a { :key_name => { :name => 'ApiKeyName', :value => 'Value', ... etc}  }
+              api_opts[:name]  = local_key.to_s.right_camelize if (api_opts.keys & [:name, :amazonize_list, :amazonize_bdm]).right_blank?
+              api_opts[:value] = options[local_key] unless api_opts.has_key?(:value)
+            end
+          end
+        end
+        vars.merge! mapping
+      end
+      # Build API keys set
+      #  vars now is a Hash:
+      #    { :key1 => { :name           => 'ApiKey1',   :value => 'BlahBlah'},
+      #      :key2 => { :amazonize_list => 'ApiKey2.?', :value => [1, ...] },
+      #      :key3 => { :amazonize_bdm  => 'BDM',       :value => [{..}, ...] }, ... }
+      #
+      vars.each do |local_key, api_opts|
+        if api_opts[:amazonize_list]
+          result.merge!(amazonize_list( api_opts[:amazonize_list], api_opts[:value] )) unless api_opts[:value].right_blank?
+        elsif api_opts[:amazonize_bdm]
+          result.merge!(amazonize_block_device_mappings( api_opts[:value], api_opts[:amazonize_bdm] )) unless api_opts[:value].right_blank?
+        else
+          api_key = api_opts[:name]
+          value   = api_opts[:value]
+          value   = value.call if value.is_a?(Proc)
+          next if value.right_blank?
+          result[api_key] = value
+        end
+      end
+      #
       result
     end
 

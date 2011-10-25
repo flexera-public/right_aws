@@ -98,39 +98,32 @@ module RightAws
     # spot-instance-request-id, spot-price, state, tag-key, tag-value, tag:key, type, valid-from, valid-until
     #
     #  ec2.describe_spot_instance_requests #=>
-    #    [{:type=>"one-time",
-    #      :create_time=>"2010-03-10T10:30:32.000Z",
-    #      :instance_type=>"c1.medium",
-    #      :state=>"cancelled",
-    #      :groups=>["default"],
-    #      :product_description=>"Linux/UNIX",
-    #      :spot_instance_request_id=>"sir-bfa06804",
+    #    [{:product_description=>"Linux/UNIX",
+    #      :type=>"one-time",
+    #      :availability_zone=>"us-east-1b",
+    #      :monitoring_enabled=>false,
+    #      :tags=>{},
     #      :image_id=>"ami-08f41161",
+    #      :groups=>[{:group_id=>"sg-a0b85dc9", :group_name=>"default"}],
     #      :spot_price=>0.01,
-    #      :monitoring_enabled=>false},
-    #     {:type=>"one-time",
-    #      :create_time=>"2010-03-10T10:33:29.000Z",
+    #      :create_time=>"2010-03-24T10:41:28.000Z",
     #      :instance_type=>"c1.medium",
     #      :state=>"open",
-    #      :groups=>["default", "33"],
-    #      :product_description=>"Linux/UNIX",
-    #      :spot_instance_request_id=>"sir-b1713a03",
+    #      :spot_instance_request_id=>"sir-9652a604",
+    #      :key_name=>"rightscale_test"},
+    #     {:product_description=>"Linux/UNIX",
+    #      :type=>"one-time",
+    #      :availability_zone=>"us-east-1b",
+    #      :monitoring_enabled=>false,
+    #      :tags=>{},
     #      :image_id=>"ami-08f41161",
+    #      :groups=>[{:group_id=>"sg-a0b85dc9", :group_name=>"default"}],
     #      :spot_price=>0.01,
-    #      :monitoring_enabled=>false,
-    #      :key_name=>"tim"},
-    #     {:type=>"one-time",
-    #      :instance_id=>"i-c516ceae",
-    #      :create_time=>"2010-03-10T10:43:48.000Z",
+    #      :create_time=>"2010-03-24T11:40:27.000Z",
     #      :instance_type=>"c1.medium",
-    #      :state=>"active",
-    #      :groups=>["default", "33"],
-    #      :product_description=>"Linux/UNIX",
-    #      :spot_instance_request_id=>"sir-5eb6c604",
-    #      :image_id=>"ami-08f41161",
-    #      :spot_price=>0.2,
-    #      :monitoring_enabled=>false,
-    #      :key_name=>"tim"}]
+    #      :state=>"open",
+    #      :spot_instance_request_id=>"sir-fa912802",
+    #      :key_name=>"rightscale_test"}, ... ]
     #
     #  ec2.describe_spot_instance_requests(:filters => {'type'=>"one-time", 'state'=>"open"})
     #  
@@ -153,7 +146,7 @@ module RightAws
     #    :spot_price => 0.01,
     #    :key_name => 'tim',
     #    :instance_count => 2,
-    #    :groups => ['33','default'],
+    #    :group_ids => ["sg-a0b85dc9"],
     #    :instance_type => 'c1.medium') #=>
     #    
     #    [{:product_description=>"Linux/UNIX",
@@ -163,7 +156,7 @@ module RightAws
     #      :image_id=>"ami-08f41161",
     #      :state=>"open",
     #      :spot_price=>0.01,
-    #      :groups=>["default", "33"],
+    #      :groups=>[{:group_id=>"sg-a0b85dc9", :group_name=>"default"}],
     #      :key_name=>"tim",
     #      :create_time=>"2010-03-10T10:33:09.000Z",
     #      :instance_type=>"c1.medium"},
@@ -174,7 +167,7 @@ module RightAws
     #      :image_id=>"ami-08f41161",
     #      :state=>"open",
     #      :spot_price=>0.01,
-    #      :groups=>["default", "33"],
+    #      :groups=>[{:group_id=>"sg-a0b85dc9", :group_name=>"default"}],
     #      :key_name=>"tim",
     #      :create_time=>"2010-03-10T10:33:09.000Z",
     #      :instance_type=>"c1.medium"}]
@@ -187,7 +180,7 @@ module RightAws
     #    :valid_until => 1.hour.since,
     #    :instance_count => 1,
     #    :key_name => 'tim',
-    #    :groups => ['33','default'],
+    #    :group_names => ['default'],
     #    :availability_zone => 'us-east-1a',
     #    :monitoring_enabled => true,
     #    :launch_group => 'lg1',
@@ -198,55 +191,50 @@ module RightAws
     #                                  :ebs_volume_size => 3,
     #                                  :virtual_name => 'ephemeral2'
     #                                 } ] ) #=>
-    #
-    #    [{:monitoring_enabled=>true,
-    #      :type=>"one-time",
+    #    [{:type=>"one-time",
     #      :image_id=>"ami-08f41161",
-    #      :launch_group=>"lg1",
-    #      :state=>"open",
-    #      :valid_until=>"2010-02-05T19:13:44.000Z",
-    #      :create_time=>"2010-02-05T18:13:46.000Z",
     #      :availability_zone_group=>"azg1",
-    #      :spot_price=>0.01,
+    #      :key_name=>"default",
+    #      :spot_instance_request_id=>"sir-66c79a12",
     #      :block_device_mappings=>
-    #       [{:ebs_delete_on_termination=>true,
-    #         :ebs_volume_size=>3,
+    #       [{:ebs_volume_size=>3,
     #         :virtual_name=>"ephemeral2",
     #         :device_name=>"/dev/sdk",
-    #         :ebs_snapshot_id=>"snap-145cbc7d"}],
-    #      :instance_type=>"m1.small",
-    #      :groups=>["default", "33"],
+    #         :ebs_snapshot_id=>"snap-145cbc7d",
+    #         :ebs_delete_on_termination=>true}],
+    #      :spot_price=>0.01,
     #      :product_description=>"Linux/UNIX",
-    #      :key_name=>"tim",
-    #      :valid_from=>"2010-02-05T18:23:44.000Z",
+    #      :state=>"open",
+    #      :instance_type=>"m1.small",
     #      :availability_zone=>"us-east-1a",
-    #      :spot_instance_request_id=>"sir-32da8a03"}]
+    #      :groups=>[{:group_id=>"sg-a0b85dc9", :group_name=>"default"}],
+    #      :valid_from=>"2011-07-01T14:26:33.000Z",
+    #      :tags=>{},
+    #      :monitoring_enabled=>true,
+    #      :valid_until=>"2011-07-01T14:28:03.000Z",
+    #      :create_time=>"2011-07-01T14:26:24.000Z",
+    #      :launch_group=>"lg1"}]
     #
     def request_spot_instances(options)
-      options = options.dup
-      request_hash = { 'SpotPrice'                        => options[:spot_price],
-                       'LaunchSpecification.ImageId'      => options[:image_id],
-                       'LaunchSpecification.InstanceType' => options[:instance_type]}
-      request_hash['ValidFrom']                      = AwsUtils::utc_iso8601(options[:valid_from])  unless options[:valid_from].right_blank?
-      request_hash['ValidUntil']                     = AwsUtils::utc_iso8601(options[:valid_until]) unless options[:valid_until].right_blank?
-      request_hash['InstanceCount']                      = options[:instance_count]                 unless options[:instance_count].right_blank?
-      request_hash['Type']                               = options[:type]                           unless options[:type].right_blank?
-      request_hash['LaunchGroup']                        = options[:launch_group]                   unless options[:launch_group].right_blank?
-      request_hash['AvailabilityZoneGroup']              = options[:availability_zone_group]        unless options[:availability_zone_group].right_blank?
-      request_hash['LaunchSpecification.KeyName']        = options[:key_name]                       unless options[:key_name].right_blank?
-      request_hash['LaunchSpecification.AddressingType'] = options[:addressing_type]                unless options[:addressing_type].right_blank?
-      request_hash['LaunchSpecification.KernelId']       = options[:kernel_id]                      unless options[:kernel_id].right_blank?
-      request_hash['LaunchSpecification.RamdiskId']      = options[:ramdisk_id]                     unless options[:ramdisk_id].right_blank?
-      request_hash['LaunchSpecification.SubnetId']       = options[:subnet_id]                      unless options[:subnet_id].right_blank?
-      request_hash['LaunchSpecification.Placement.AvailabilityZone'] = options[:availability_zone]  unless options[:availability_zone].right_blank?
-      request_hash['LaunchSpecification.Monitoring.Enabled']         = options[:monitoring_enabled] unless options[:monitoring_enabled].right_blank?
-      request_hash.merge!(amazonize_list('LaunchSpecification.SecurityGroup', options[:groups]))    unless options[:groups].right_blank?
-      request_hash.merge!(amazonize_block_device_mappings(options[:block_device_mappings], 'LaunchSpecification.BlockDeviceMapping'))
-      unless options[:user_data].right_blank?
-        # See RightAws::Ec2#run_instances
-        options[:user_data].strip!
-        request_hash['LaunchSpecification.UserData'] = Base64.encode64(options[:user_data]).delete("\n") unless options[:user_data].right_blank?
-      end
+      options[:user_data] = options[:user_data].to_s
+      request_hash = map_api_keys_and_values( options,
+        :spot_price, :availability_zone_group, :launch_group, :type, :instance_count,
+        :image_id              => 'LaunchSpecification.ImageId',
+        :instance_type         => 'LaunchSpecification.InstanceType',
+        :key_name              => 'LaunchSpecification.KeyName',
+        :addressing_type       => 'LaunchSpecification.AddressingType',
+        :kernel_id             => 'LaunchSpecification.KernelId',
+        :ramdisk_id            => 'LaunchSpecification.RamdiskId',
+        :subnet_id             => 'LaunchSpecification.SubnetId',
+        :availability_zone     => 'LaunchSpecification.Placement.AvailabilityZone',
+        :monitoring_enabled    => 'LaunchSpecification.Monitoring.Enabled',
+        :valid_from            => { :value => Proc.new { !options[:valid_from].right_blank?  && AwsUtils::utc_iso8601(options[:valid_from]) }},
+        :valid_until           => { :value => Proc.new { !options[:valid_until].right_blank? && AwsUtils::utc_iso8601(options[:valid_until]) }},
+        :user_data             => { :name  => 'LaunchSpecification.UserData',
+                                    :value => Proc.new { !options[:user_data].empty? && Base64.encode64(options[:user_data]).delete("\n") }},
+        :group_names           => { :amazonize_list => 'LaunchSpecification.SecurityGroup'},
+        :group_ids             => { :amazonize_list => 'LaunchSpecification.SecurityGroupId'},
+        :block_device_mappings => { :amazonize_bdm  => 'LaunchSpecification.BlockDeviceMapping'})
       link = generate_request("RequestSpotInstances", request_hash)
       request_info(link, QEc2DescribeSpotInstanceParser.new(:logger => @logger))
     end
@@ -330,6 +318,10 @@ module RightAws
         case full_tag_name
         when %r{spotInstanceRequestSet/item$}
           @item = { :tags => {} }
+        when %r{groupSet$}
+          @item[:groups] = []
+        when %r{groupSet/item$}
+          @group  = {}
         when %r{/blockDeviceMapping/item$}
           @item[:block_device_mappings] ||= []
           @block_device_mapping = {}
@@ -362,9 +354,14 @@ module RightAws
         when 'instanceId'            then @item[:instance_id]             = @text
         when 'createTime'            then @item[:create_time]             = @text
         when 'productDescription'    then @item[:product_description]     = @text
-        when 'groupId'               then (@item[:groups] ||= [])        << @text
         else
           case full_tag_name
+          when %r{/groupSet/item} # no trailing $
+            case name
+            when 'groupId'   then @group[:group_id]   = @text
+            when 'groupName' then @group[:group_name] = @text
+            when 'item'      then @item[:groups]     << @group
+            end
           when %r{monitoring/enabled$}
             @item[:monitoring_enabled] = @text == 'true'
           when %r{/blockDeviceMapping/item} # no trailing $
@@ -411,9 +408,8 @@ module RightAws
         when 'bucket'  then @result[:bucket]   = @text
         when 'prefix'  then @result[:prefix]   = @text
         when 'state'   then @result[:state]    = @text
-        when 'fault'   then @result[:fault]    = @text
-        when 'code'    then @result[:code]     = @text
-        when 'message' then @result[:message]  = @text
+        when 'code'    then @result[:fault_code]     = @text
+        when 'message' then @result[:fault_message]  = @text
         end
       end
       def reset
