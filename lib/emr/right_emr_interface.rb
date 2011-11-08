@@ -644,12 +644,14 @@ module RightAws
           end
         when %r{/Steps/member/StepConfig/HadoopJarStep/Args/member}
           @step[:args] << @text
+        when %r{/Steps/member/StepConfig/HadoopJarStep/Properties$}
+            @step[:properties][@key] = @value
         when %r{/Steps/member/StepConfig/HadoopJarStep/Properties}
           case name
           when 'Key'
             @key = @text
           when 'Value'
-            @step[:properties][@key] = @text
+            @value = @text
           end
         when %r{/Steps/member$}
           @item[:steps] << @step
