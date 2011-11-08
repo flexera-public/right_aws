@@ -642,14 +642,14 @@ module RightAws
           when 'State' then @instance_group[:state] = @text
           when 'member' then @item[:instance_groups]        << @instance_group
           end
-        when %r{/Steps/member/StepConfig/HadoopJarStepConfig/Args/member}
-          @steps[:args] << @text
-        when %r{/Steps/member/StepConfig/HadoopJarStepConfig/Properties}
+        when %r{/Steps/member/StepConfig/HadoopJarStep/Args/member}
+          @step[:args] << @text
+        when %r{/Steps/member/StepConfig/HadoopJarStep/Properties}
           case name
           when 'Key'
             @key = @text
           when 'Value'
-            @steps[:properties][@key] = @text
+            @step[:properties][@key] = @text
           end
         when %r{/Steps/member$}
           @item[:steps] << @step
