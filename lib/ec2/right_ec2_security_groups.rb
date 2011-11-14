@@ -168,9 +168,15 @@ module RightAws
     # Remove Security Group. Returns +true+ or an exception.
     # Options: :group_name, :group_id
     #
+    #  # Delete security group by group_id:
+    #  ec2.delete_security_group('sg-90054ef9') #=> true
     #  ec2.delete_security_group(:group_id => 'sg-90054ef9') #=> true
     #
-    def delete_security_group(options = {})
+    #  # Delete security group by name (EC2 only):
+    #  ec2.delete_security_group(:group_name => 'my-group']) #=> true
+    #
+    def delete_security_group(group_id_or_options={})
+      options = group_id_or_options.is_a?(Hash) ? group_id_or_options : { :group_id => group_id_or_options } 
       link = generate_request("DeleteSecurityGroup", map_api_keys_and_values(options, :group_name, :group_id))
       request_info(link, RightBoolResponseParser.new(:logger => @logger))
     rescue Exception

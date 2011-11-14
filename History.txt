@@ -298,6 +298,9 @@ the source key.
     - ELB: API '2010-07-01' (SSL support)
     - IAM: API '2010-05-08' (AWS Identity and Access Management interface)
     - 301 Redirect support added
+    - EMR (Elastic Map Reduce) support
+    - SNS (Simple Notification Service) support
+    - SDB: ConsistentRead support
   - Removed:
     - ActiveSupport dependency
     - SDB: uuid gem dependency
@@ -307,18 +310,19 @@ the source key.
   Release Notes:
   - Fixed:
     - ClientToken (launch_instances, run_instances) is not used for Eucalyptus clouds
-  - VPC2, stage1. Next methods were updated:
-    - associate_address, modify_security_group, create_security_group, create_vpc, delete_security_group,
-      describe_addresses, describe_images, describe_instance_attribute, describe_regions, describe_reserved_instances_offerings,
-      describe_security_groups, describe_snapshots, describe_spot_instance_requests, describe_spot_price_history,
-      describe_vpcs, disassociate_address, modify_image_attribute, modify_snapshot_attribute, release_address,
-      request_spot_instances, stop_instances
-  - EC2: ClientToken (launch_instances, run_instances) is not used for Eucalyptus clouds
-  - RDS:
-    - RDS: API 2011-04-01
-    - Make :instance_class param more consistent: :db_instance_class --> :instance_class
-    - Issue 53: regression in latest master version of right_rds_interface
-    - Issue 73: Can't get list of instances with RdsInterface
-  - EBS: Issue 54: regression in right_ec2_ebs.rb
-  - Add the port number with server name in the v2 signature string if it is not the RFC standard number (author: unakatsuo).
+    - VPC2, stage1. Next methods were updated:
+      - associate_address, modify_security_group, create_security_group, create_vpc, delete_security_group,
+        describe_addresses, describe_images, describe_instance_attribute, describe_regions, describe_reserved_instances_offerings,
+        describe_security_groups, describe_snapshots, describe_spot_instance_requests, describe_spot_price_history,
+        describe_vpcs, disassociate_address, modify_image_attribute, modify_snapshot_attribute, release_address,
+        request_spot_instances, stop_instances
+    - EC2: ClientToken (launch_instances, run_instances) is not used for Eucalyptus clouds
+    - RDS:
+      - RDS: API 2011-04-01
+      - Make :instance_class param more consistent: :db_instance_class --> :instance_class
+      - Issue 53: regression in latest master version of right_rds_interface
+      - Issue 73: Can't get list of instances with RdsInterface
+    - EBS: Issue 54: regression in right_ec2_ebs.rb
+    - Add the port number with server name in the v2 signature string if it is not the RFC standard number (author: unakatsuo).
+    - bunch of micro bugs
 
