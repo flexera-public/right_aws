@@ -298,17 +298,15 @@ the source key.
     - ELB: API '2010-07-01' (SSL support)
     - IAM: API '2010-05-08' (AWS Identity and Access Management interface)
     - 301 Redirect support added
-    - EMR (Elastic Map Reduce) support
-    - SNS (Simple Notification Service) support
-    - SDB: ConsistentRead support
   - Removed:
     - ActiveSupport dependency
     - SDB: uuid gem dependency
   - this gem requires right_http_connection 0bc3343232133bdb38c237d8285525d74495d3f5 or later
   - "Raise On Timeout On Action" feature added to avoid duplicate resources creation if a timeout error occures and a retry is performed
 
+=== 3.0.0
   Release Notes:
-  - Fixed:
+  - Fixed/Added:
     - ClientToken (launch_instances, run_instances) is not used for Eucalyptus clouds
     - VPC2, stage1. Next methods were updated:
       - associate_address, modify_security_group, create_security_group, create_vpc, delete_security_group,
@@ -324,5 +322,8 @@ the source key.
       - Issue 73: Can't get list of instances with RdsInterface
     - EBS: Issue 54: regression in right_ec2_ebs.rb
     - Add the port number with server name in the v2 signature string if it is not the RFC standard number (author: unakatsuo).
+    - EMR (Elastic Map Reduce) support
+    - SNS (Simple Notification Service) support
+    - SDB: ConsistentRead support
     - bunch of micro bugs
 
