@@ -38,7 +38,8 @@ module RightAws
           instance[:aws_reason]         = instance[:aws_reason].sub(/\(\d[^)]*GMT\) */, '')
           instance[:aws_owner]          = reservation[:aws_owner]
           instance[:aws_reservation_id] = reservation[:aws_reservation_id]
-          instance[:aws_groups]         = reservation[:aws_groups]
+          # Security Groups
+          instance[:groups]             = instance[:groups].right_blank? ? reservation[:aws_groups] : instance[:groups]
           result << instance
         end
       end
@@ -61,38 +62,45 @@ module RightAws
     #
     #
     #  ec2.describe_instances #=>
-    #    [{:private_ip_address=>"10.240.7.99",
-    #      :aws_image_id=>"ami-c2a3f5d4",
-    #      :ip_address=>"174.129.134.109",
-    #      :dns_name=>"ec2-174-129-134-109.compute-1.amazonaws.com",
-    #      :aws_instance_type=>"m1.small",
-    #      :aws_owner=>"826693181925",
-    #      :root_device_name=>"/dev/sda1",
-    #      :instance_class=>"elastic",
-    #      :aws_state=>"running",
-    #      :private_dns_name=>"domU-12-31-39-04-00-95.compute-1.internal",
-    #      :aws_reason=>"",
-    #      :aws_launch_time=>"2009-11-18T14:03:25.000Z",
-    #      :aws_reservation_id=>"r-54d38542",
-    #      :aws_state_code=>16,
-    #      :ami_launch_index=>"0",
-    #      :aws_availability_zone=>"us-east-1a",
-    #      :aws_groups=>["default"],
-    #      :monitoring_state=>"disabled",
-    #      :aws_product_codes=>[],
-    #      :ssh_key_name=>"",
-    #      :block_device_mappings=>
-    #       [{:ebs_status=>"attached",
-    #         :ebs_delete_on_termination=>true,
-    #         :ebs_attach_time=>"2009-11-18T14:03:34.000Z",
-    #         :device_name=>"/dev/sda1",
-    #         :ebs_volume_id=>"vol-e600f98f"},
-    #        {:ebs_status=>"attached",
-    #         :ebs_delete_on_termination=>true,
-    #         :ebs_attach_time=>"2009-11-18T14:03:34.000Z",
-    #         :device_name=>"/dev/sdk",
-    #         :ebs_volume_id=>"vol-f900f990"}],
-    #      :aws_instance_id=>"i-8ce84ae4"} , ... ]
+    #    [{:source_dest_check=>true,
+    #        :subnet_id=>"subnet-da6cf9b3",
+    #        :aws_kernel_id=>"aki-3932d150",
+    #        :ami_launch_index=>"0",
+    #        :tags=>{},
+    #        :aws_reservation_id=>"r-7cd25c11",
+    #        :aws_owner=>"826693181925",
+    #        :state_reason_code=>"Client.UserInitiatedShutdown",
+    #        :aws_instance_id=>"i-2d898e41",
+    #        :hypervisor=>"xen",
+    #        :root_device_name=>"/dev/sda1",
+    #        :aws_ramdisk_id=>"ari-c515f6ac",
+    #        :aws_instance_type=>"m1.large",
+    #        :groups=>[{:group_name=>"2009-07-15-default", :group_id=>"sg-90c5d6fc"}],
+    #        :block_device_mappings=>
+    #          [{:device_name=>"/dev/sda1",
+    #            :ebs_status=>"attached",
+    #            :ebs_attach_time=>"2011-03-04T18:51:58.000Z",
+    #            :ebs_delete_on_termination=>true,
+    #            :ebs_volume_id=>"vol-38f2bd50"}],
+    #        :state_reason_message=>
+    #          "Client.UserInitiatedShutdown: User initiated shutdown",
+    #        :aws_image_id=>"ami-a3638cca",
+    #        :virtualization_type=>"paravirtual",
+    #        :aws_launch_time=>"2011-03-04T18:13:59.000Z",
+    #        :private_dns_name=>"",
+    #        :aws_product_codes=>[],
+    #        :aws_availability_zone=>"us-east-1a",
+    #        :aws_state_code=>80,
+    #        :architecture=>"x86_64",
+    #        :dns_name=>"",
+    #        :client_token=>"1299262447-684266-NNgyH-ouPTI-MzG6h-5AIRk",
+    #        :root_device_type=>"ebs",
+    #        :vpc_id=>"vpc-e16cf988",
+    #        :monitoring_state=>"disabled",
+    #        :ssh_key_name=>"default",
+    #        :private_ip_address=>"192.168.0.52",
+    #        :aws_reason=>"User initiated ",
+    #        :aws_state=>"stopped"}, ...]
     #
     #   ec2.describe_instances("i-8ce84ae6", "i-8ce84ae8", "i-8ce84ae0")
     #   ec2.describe_instances(:filters => { 'availability-zone' => 'us-east-1a', 'instance-type' => 'c1.medium' })
@@ -118,7 +126,7 @@ module RightAws
 
     # Launch new EC2 instances. Returns a list of launched instances or an exception.
     #
-    #  ec2.run_instances('ami-e444444d',1,1,['my_awesome_group'],'my_awesome_key', 'Woohoo!!!', 'public') #=>
+    #  ec2.run_instances('ami-e444444d',1,1,['2009-07-15-default'],'my_awesome_key', 'Woohoo!!!', 'public') #=>
     #   [{:aws_image_id       => "ami-e444444d",
     #     :aws_reason         => "",
     #     :aws_state_code     => "0",
@@ -128,7 +136,7 @@ module RightAws
     #     :aws_state          => "pending",
     #     :dns_name           => "",
     #     :ssh_key_name       => "my_awesome_key",
-    #     :aws_groups         => ["my_awesome_group"],
+    #     :groups             => [{:group_name=>"2009-07-15-default", :group_id=>"sg-90c5d6fc"}],
     #     :private_dns_name   => "",
     #     :aws_instance_type  => "m1.small",
     #     :aws_launch_time    => "2008-1-1T00:00:00.000Z"
@@ -138,7 +146,7 @@ module RightAws
     #     :aws_availability_zone => "us-east-1b"
     #     }]
     #
-    def run_instances(image_id, min_count, max_count, group_ids, key_name, user_data='',
+    def run_instances(image_id, min_count, max_count, group_names, key_name, user_data='',
                       addressing_type = nil, instance_type = nil,
                       kernel_id = nil, ramdisk_id = nil, availability_zone = nil,
                       monitoring_enabled = nil, subnet_id = nil, disable_api_termination = nil,
@@ -147,7 +155,7 @@ module RightAws
  	    launch_instances(image_id, { :min_count                            => min_count,
  	                                 :max_count                            => max_count,
  	                                 :user_data                            => user_data,
-                                   :group_ids                            => group_ids,
+                                   :group_names                          => group_names,
                                    :key_name                             => key_name,
                                    :instance_type                        => instance_type,
                                    :addressing_type                      => addressing_type,
@@ -165,50 +173,74 @@ module RightAws
     end
 
     # Launch new EC2 instances.
+    # 
     # Options: :image_id, :addressing_type, :min_count, max_count, :key_name, :kernel_id, :ramdisk_id,
     # :availability_zone, :monitoring_enabled, :subnet_id, :disable_api_termination, :instance_initiated_shutdown_behavior,
-    # :block_device_mappings, :placement_group_name, :license_pool
+    # :block_device_mappings, :placement_group_name, :license_pool, :group_ids, :group_names, :private_ip_address
     # 
     # Returns a list of launched instances or an exception.
     #
-    #  ec2.launch_instances( 'ami-c2a3f5d4',
+    #  ec2.launch_instances( "ami-78779511",
     #                        :min_count => 1,
-    #                        :group_ids => 'default',
+    #                        :group_names => ["default", "eugeg223123123"],
     #                        :user_data => 'Ohoho!',
     #                        :availability_zone => "us-east-1a",
-    #                        :disable_api_termination => true,
+    #                        :disable_api_termination => false,
     #                        :instance_initiated_shutdown_behavior => 'terminate',
-    #                        :block_device_mappings => [ {:ebs_snapshot_id=>"snap-7360871a",
+    #                        :block_device_mappings => [ {:ebs_snapshot_id=>"snap-e40fd188",
     #                                                     :ebs_delete_on_termination=>true,
     #                                                     :device_name => "/dev/sdk",
     #                                                     :virtual_name => "mystorage"} ] ) #=>
-    #    [{:aws_image_id=>"ami-c2a3f5d4",
-    #      :dns_name=>"",
-    #      :aws_instance_type=>"m1.small",
-    #      :aws_owner=>"826693181925",
-    #      :root_device_name=>"/dev/sda1",
-    #      :instance_class=>"elastic",
-    #      :state_reason_code=>0,
-    #      :aws_state=>"pending",
+    #    [{:hypervisor=>"xen",
     #      :private_dns_name=>"",
-    #      :aws_reason=>"",
-    #      :aws_launch_time=>"2009-11-18T14:03:25.000Z",
-    #      :aws_reservation_id=>"r-54d38542",
-    #      :state_reason_message=>"pending",
-    #      :aws_state_code=>0,
-    #      :ami_launch_index=>"0",
-    #      :aws_availability_zone=>"us-east-1a",
-    #      :aws_groups=>["default"],
+    #      :client_token=>"1309532374-551037-gcsBj-gEypk-piG06-ODfQm",
     #      :monitoring_state=>"disabled",
-    #      :aws_product_codes=>[],
-    #      :ssh_key_name=>"",
-    #      :aws_instance_id=>"i-8ce84ae4"}]
+    #      :aws_availability_zone=>"us-east-1a",
+    #      :root_device_name=>"/dev/sda1",
+    #      :state_reason_code=>"pending",
+    #      :dns_name=>"",
+    #      :tags=>{},
+    #      :aws_reason=>"",
+    #      :virtualization_type=>"paravirtual",
+    #      :state_reason_message=>"pending",
+    #      :aws_reservation_id=>"r-6fada703",
+    #      :aws_ramdisk_id=>"ari-a51cf9cc",
+    #      :ami_launch_index=>"0",
+    #      :groups=>
+    #       [{:group_id=>"sg-a0b85dc9", :group_name=>"default"},
+    #        {:group_id=>"sg-70733019", :group_name=>"eugeg223123123"}],
+    #      :aws_owner=>"826693181925",
+    #      :aws_instance_type=>"m1.small",
+    #      :aws_state=>"pending",
+    #      :root_device_type=>"ebs",
+    #      :aws_image_id=>"ami-78779511",
+    #      :aws_kernel_id=>"aki-a71cf9ce",
+    #      :aws_launch_time=>"2011-07-01T14:59:35.000Z",
+    #      :aws_state_code=>0,
+    #      :aws_instance_id=>"i-4f202621",
+    #      :aws_product_codes=>[]}]
     #
     def launch_instances(image_id, options={})
-      options[:image_id]    = image_id
-      options[:min_count] ||= 1
-      options[:max_count] ||= options[:min_count]
-      params = prepare_instance_launch_params(options)
+      options[:user_data] = options[:user_data].to_s
+      params = map_api_keys_and_values( options,
+        :key_name, :addressing_type, :kernel_id,
+        :ramdisk_id, :subnet_id, :instance_initiated_shutdown_behavior,
+        :private_ip_address, :additional_info, :license_pool,
+        :image_id                => { :value => image_id },
+        :min_count               => { :value => options[:min_count] || 1 },
+        :max_count               => { :value => options[:max_count] || options[:min_count] || 1 },
+        :placement_tenancy       => 'Placement.Tenancy',
+        :placement_group_name    => 'Placement.GroupName',
+        :availability_zone       => 'Placement.AvailabilityZone',
+        :group_names             => { :amazonize_list => 'SecurityGroup' },
+        :group_ids               => { :amazonize_list => 'SecurityGroupId' },
+        :block_device_mappings   => { :amazonize_bdm  => 'BlockDeviceMapping' },
+        :instance_type           => { :value => options[:instance_type] || DEFAULT_INSTANCE_TYPE },
+        :disable_api_termination => { :value => Proc.new{ !options[:disable_api_termination].nil? && options[:disable_api_termination].to_s }},
+        :client_token            => { :value => !@params[:eucalyptus] && (options[:client_token] || AwsUtils::generate_unique_token)},
+        :user_data               => { :value => Proc.new { !options[:user_data].empty? && Base64.encode64(options[:user_data]).delete("\n") }},
+        :monitoring_enabled      => { :name  => 'Monitoring.Enabled',
+                                      :value => Proc.new{ options[:monitoring_enabled] && options[:monitoring_enabled].to_s }})
       # Log debug information
       @logger.info("Launching instance of image #{image_id}. Options: #{params.inspect}")
       link = generate_request("RunInstances", params)
@@ -216,43 +248,6 @@ module RightAws
       get_desc_instances(instances)
     rescue Exception
       on_exception
-    end
-
-    def prepare_instance_launch_params(options={}) # :nodoc:
-      params = amazonize_list('SecurityGroup', Array(options[:group_ids]))
-      params['InstanceType']                      = options[:instance_type] || DEFAULT_INSTANCE_TYPE
-      params['ImageId']                           = options[:image_id]                             unless options[:image_id].right_blank?
-      params['AddressingType']                    = options[:addressing_type]                      unless options[:addressing_type].right_blank?
-      params['MinCount']                          = options[:min_count]                            unless options[:min_count].right_blank?
-      params['MaxCount']                          = options[:max_count]                            unless options[:max_count].right_blank?
-      params['KeyName']                           = options[:key_name]                             unless options[:key_name].right_blank?
-      params['KernelId']                          = options[:kernel_id]                            unless options[:kernel_id].right_blank?
-      params['RamdiskId']                         = options[:ramdisk_id]                           unless options[:ramdisk_id].right_blank?
-      params['Placement.AvailabilityZone']        = options[:availability_zone]                    unless options[:availability_zone].right_blank?
-      params['Monitoring.Enabled']                = options[:monitoring_enabled].to_s              if     options[:monitoring_enabled]
-      params['SubnetId']                          = options[:subnet_id]                            unless options[:subnet_id].right_blank?
-      params['AdditionalInfo']                    = options[:additional_info]                      unless options[:additional_info].right_blank?
-      params['DisableApiTermination']             = options[:disable_api_termination].to_s         unless options[:disable_api_termination].nil?
-      params['InstanceInitiatedShutdownBehavior'] = options[:instance_initiated_shutdown_behavior] unless options[:instance_initiated_shutdown_behavior].right_blank?
-      params['Placement.GroupName']               = options[:placement_group_name]                 unless options[:placement_group_name].right_blank?
-      params['License.Pool']                      = options[:license_pool]                         unless options[:license_pool].right_blank?
-      # Client token: do not set it automatically for Euca clouds (but let it go if it was set by a user)
-      client_token          = options[:client_token]
-      client_token        ||= AwsUtils::generate_unique_token unless @params[:eucalyptus]
-      params['ClientToken'] = client_token                    if     client_token
-      #
-      params.merge!(amazonize_block_device_mappings(options[:block_device_mappings]))
-      # KD: https://github.com/rightscale/right_aws/issues#issue/11
-      # Do not modify user data and pass it as is: one may pass there a hex-binary data
-      options[:user_data] = options[:user_data].to_s
-      unless options[:user_data].empty?
-        # Do not use CGI::escape(encode64(...)) as it is done in Amazons EC2 library.
-        # Amazon 169.254.169.254 does not like escaped symbols!
-        # And it doesn't like "\n" inside of encoded string! Grrr....
-        # Otherwise, some of UserData symbols will be lost...
-        params['UserData'] = Base64.encode64(options[:user_data]).delete("\n")
-      end
-      params
     end
 
     # Start instances.
@@ -272,6 +267,8 @@ module RightAws
 
     # Stop instances.
     #
+    # Options: :force => true|false
+    #
     #  ec2.stop_instances("i-36e84a5e") #=>
     #    [{:aws_prev_state_code=>16,
     #      :aws_prev_state_name=>"running",
@@ -279,9 +276,12 @@ module RightAws
     #      :aws_current_state_code=>64,
     #      :aws_current_state_name=>"stopping"}]
     #
-    def stop_instances(*instance_aws_ids)
-      instance_aws_ids = instance_aws_ids.flatten
-      link = generate_request("StopInstances", amazonize_list('InstanceId', instance_aws_ids))
+    def stop_instances(*instance_aws_ids_and_options)
+      list, options = AwsUtils::split_items_and_params(instance_aws_ids_and_options)
+      request_hash = {}
+      request_hash['Force'] = true if options[:force]
+      request_hash.merge!(amazonize_list('InstanceId', list))
+      link = generate_request("StopInstances", request_hash)
       request_info(link, QEc2TerminateInstancesParser.new(:logger => @logger))
     end
 
@@ -328,52 +328,38 @@ module RightAws
       on_exception
     end
 
-    INSTANCE_ATTRIBUTE_MAPPING = {
-      "instance_type"                        => "instanceType",
-      "kernel"                               => "kernel",
-      "ramdisk"                              => "ramdisk",
-      "user_data"                            => "userData",
-      "disable_api_termination"              => "disableApiTermination",
-      "instance_initiated_shutdown_behavior" => "instanceInitiatedShutdownBehavior",
-      "root_device_name"                     => "rootDeviceName",
-      "block_device_mapping"                 => "blockDeviceMapping"
-    }
-
     # Describe instance attribute.
-    # Attributes: :instance_type, :kernel, :ramdisk, :user_data, :disable_api_termination, :instance_initiated_shutdown_behavior, :root_device_name, :block_device_mapping
     #
-    #  ec2.describe_instance_attribute(instance, "BlockDeviceMapping") #=>
+    # Attributes: 'instanceType', 'kernel', 'ramdisk', 'userData', 'rootDeviceName', 'disableApiTermination',
+    # 'instanceInitiatedShutdownBehavior', 'sourceDestCheck', 'blockDeviceMapping', 'groupSet'
+    #
+    #  ec2.describe_instance_attribute(instance, "blockDeviceMapping") #=>
     #     [{:ebs_delete_on_termination=>true,
     #       :ebs_volume_id=>"vol-683dc401",
     #       :device_name=>"/dev/sda1"}]
     #
-    #  ec2.describe_instance_attribute(instance, "InstanceType") #=> "m1.small"
+    #  ec2.describe_instance_attribute(instance, "instanceType") #=> "m1.small"
     #
-    #  ec2.describe_instance_attribute(instance, "InstanceInitiatedShutdownBehavior") #=> "stop"
+    #  ec2.describe_instance_attribute(instance, "instanceInitiatedShutdownBehavior") #=> "stop"
     #
     def describe_instance_attribute(instance_id, attribute)
-      attribute = INSTANCE_ATTRIBUTE_MAPPING[attribute.to_s] || attribute.to_s
       link = generate_request('DescribeInstanceAttribute',
                               'InstanceId' => instance_id,
                               'Attribute'  => attribute)
       value = request_info(link, QEc2DescribeInstanceAttributeParser.new(:logger => @logger))
-      case attribute
-      when "userData"
-        Base64.decode64(value)
-      else
-        value
-      end
+      value = Base64.decode64(value) if attribute == "userData" && !value.right_blank?
+      value
     rescue Exception
       on_exception
     end
 
     # Describe instance attribute.
-    # Attributes: :kernel, :ramdisk
     #
-    #  ec2.reset_instance_attribute(instance, :kernel) #=> true
+    # Attributes: 'kernel', 'ramdisk', 'sourceDestCheck'
+    # 
+    #  ec2.reset_instance_attribute(instance, 'kernel') #=> true
     #
     def reset_instance_attribute(instance_id, attribute)
-      attribute = INSTANCE_ATTRIBUTE_MAPPING[attribute.to_s] || attribute.to_s
       link = generate_request('ResetInstanceAttribute',
                               'InstanceId' => instance_id,
                               'Attribute'  => attribute )
@@ -383,23 +369,21 @@ module RightAws
     end
 
     # Modify instance attribute.
-    # Attributes: :instance_type, :kernel, :ramdisk, :user_data, :disable_api_termination, :instance_initiated_shutdown_behavior, :root_device_name, :block_device_mapping
     #
-    #  ec2.modify_instance_attribute(instance, :instance_initiated_shutdown_behavior, "stop") #=> true
+    # Attributes: 'InstanceType', 'Kernel', 'Ramdisk', 'UserData', 'DisableApiTermination',
+    # 'InstanceInitiatedShutdownBehavior', 'SourceDestCheck', 'GroupId'
+    #
+    #  ec2.modify_instance_attribute(instance, 'instanceInitiatedShutdownBehavior", "stop") #=> true
     #
     def modify_instance_attribute(instance_id, attribute, value)
-      attribute = INSTANCE_ATTRIBUTE_MAPPING[attribute.to_s] || attribute.to_s
-      params = { 'InstanceId' => instance_id,
-                 'Attribute'  => attribute }
+      request_hash = {'InstanceId' => instance_id}
+      attribute = attribute.to_s.right_underscore.right_camelize
       case attribute
-      when "blockDeviceMapping"
-        params.merge!(amazonize_block_device_mappings(value))
-      when "userData"
-        params['Value'] = Base64.encode64(value).delete("\n")
-      else
-        params['Value'] = value
+      when 'UserData' then request_hash["#{attribute}.Value"] = Base64.encode64(value).delete("\n")
+      when 'GroupId'  then request_hash.merge!(amazonize_list('GroupId', value))
+      else                 request_hash["#{attribute}.Value"] = value
       end
-      link = generate_request('ModifyInstanceAttribute', params)
+      link = generate_request('ModifyInstanceAttribute', request_hash)
       request_info(link, RightBoolResponseParser.new(:logger => @logger))
     rescue Exception
       on_exception
@@ -555,21 +539,16 @@ module RightAws
 
     class QEc2DescribeInstancesParser < RightAWSParser #:nodoc:
       def tagstart(name, attributes)
-           # DescribeInstances property
         case full_tag_name
-        when 'DescribeInstancesResponse/reservationSet/item',
-             'RunInstancesResponse'
+        when %r{(RunInstancesResponse|DescribeInstancesResponse/reservationSet/item)$}
           @reservation = { :aws_groups    => [],
                            :instances_set => [] }
+        when %r{(/groupSet/item|instancesSet/item/placement)$}
+          @group = {}
         when %r{instancesSet/item$}
             # the optional params (sometimes are missing and we dont want them to be nil)
-          @item = { :aws_reason       => '',
-                    :dns_name         => '',
-                    :private_dns_name => '',
-                    :ami_launch_index => '',
-                    :ssh_key_name     => '',
-                    :aws_state        => '',
-                    :aws_product_codes => [],
+          @item = { :aws_product_codes => [],
+                    :groups            => [],
                     :tags              => {} }
         when %r{blockDeviceMapping/item$}
           @item[:block_device_mappings] ||= []
@@ -582,7 +561,6 @@ module RightAws
         case name
         when 'reservationId'    then @reservation[:aws_reservation_id] = @text
         when 'ownerId'          then @reservation[:aws_owner]          = @text
-        when 'groupId'          then @reservation[:aws_groups]        << @text
         when 'instanceId'       then @item[:aws_instance_id]       = @text
         when 'imageId'          then @item[:aws_image_id]          = @text
         when 'privateDnsName'   then @item[:private_dns_name]      = @text
@@ -608,11 +586,25 @@ module RightAws
         when 'instanceLifecycle'     then @item[:instance_lifecycle]       = @text
         when 'spotInstanceRequestId' then @item[:spot_instance_request_id] = @text
         when 'requesterId'           then @item[:requester_id]             = @text
-        when 'groupName'             then @item[:placement_group_name]     = @text 
         when 'virtualizationType'    then @item[:virtualization_type]      = @text
-        when 'clientToken'           then @item[:client_token]     = @text
+        when 'clientToken'           then @item[:client_token]      = @text
+        when 'sourceDestCheck'       then @item[:source_dest_check] = @text == 'true' ? true : false
+        when 'tenancy'               then @item[:placement_tenancy] = @text
+        when 'hypervisor'            then @item[:hypervisor]        = @text
         else
           case full_tag_name
+          # EC2 Groups
+          when %r{(RunInstancesResponse|/reservationSet/item)/groupSet/item/groupId$}   then @group[:group_id]          = @text
+          when %r{(RunInstancesResponse|/reservationSet/item)/groupSet/item/groupName$} then @group[:group_name]        = @text
+          when %r{(RunInstancesResponse|/reservationSet/item)/groupSet/item$}           then @reservation[:aws_groups] << @group
+          # VPC Groups
+          # KD: It seems that these groups are always present when the groups above present for non VPC instances only
+          when %r{/instancesSet/item/groupSet/item/groupId$}   then @group[:group_id]   = @text
+          when %r{/instancesSet/item/groupSet/item/groupName$} then @group[:group_name] = @text
+          when %r{/instancesSet/item/groupSet/item$}           then @item[:groups]     << @group
+          # Placement Group Name
+          when %r{/placement/groupName$} then @group[:placement_group_name]= @text
+          # Codes
           when %r{/stateReason/code$}    then @item[:state_reason_code]    = @text
           when %r{/stateReason/message$} then @item[:state_reason_message] = @text
           when %r{/instanceState/code$}  then @item[:aws_state_code]       = @text.to_i
@@ -633,9 +625,7 @@ module RightAws
           when %r{/tagSet/item/key$}   then @aws_tag[:key]               = @text
           when %r{/tagSet/item/value$} then @aws_tag[:value]             = @text
           when %r{/tagSet/item$}       then @item[:tags][@aws_tag[:key]] = @aws_tag[:value]
-          when 'DescribeInstancesResponse/reservationSet/item',
-               'RunInstancesResponse'
-            @result << @reservation
+          when %r{(RunInstancesResponse|DescribeInstancesResponse/reservationSet/item)$} then @result << @reservation
           end
         end
       end
@@ -672,6 +662,8 @@ module RightAws
     class QEc2DescribeInstanceAttributeParser < RightAWSParser #:nodoc:
       def tagstart(name, attributes)
         case full_tag_name
+        when %r{groupSet$}                then @result = []
+        when %r{groupSet/item$}           then @group  = {}
         when %r{blockDeviceMapping$}      then @result = []
         when %r{blockDeviceMapping/item$} then @block_device_mapping = {}
         end
@@ -679,12 +671,19 @@ module RightAws
       def tagend(name)
         case full_tag_name
         when %r{/instanceType/value$}   then @result = @text
-        when %r{/kernel$}               then @result = @text
-        when %r{/ramdisk$}              then @result = @text
-        when %r{/userData$}             then @result = @text
+        when %r{/kernel/value$}         then @result = @text
+        when %r{/ramdisk/value$}        then @result = @text
+        when %r{/userData/value$}       then @result = @text
         when %r{/rootDeviceName/value$} then @result = @text
         when %r{/disableApiTermination/value}              then @result = @text == 'true' ? true : false
         when %r{/instanceInitiatedShutdownBehavior/value$} then @result = @text
+        when %r{/sourceDestCheck/value$}                   then @result = @text == 'true' ? true : false
+        when %r{/groupSet/item} # no trailing $
+          case name
+          when 'groupId'   then @group[:group_id]   = @text
+          when 'groupName' then @group[:group_name] = @text
+          when 'item'      then @result << @group
+          end
         when %r{/blockDeviceMapping/item} # no trailing $
           case name
           when 'deviceName'          then @block_device_mapping[:device_name]                = @text

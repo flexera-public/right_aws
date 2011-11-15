@@ -3,24 +3,26 @@ require File.dirname(__FILE__) + '/test_helper.rb'
 class TestS3 < Test::Unit::TestCase
 
   RIGHT_OBJECT_TEXT     = 'Right test message'
-  
+  INTERFACE = Rightscale::S3Interface.new(TestCredentials.aws_access_key_id, TestCredentials.aws_secret_access_key)
+  CONNECTION = Rightscale::S3.new(TestCredentials.aws_access_key_id, TestCredentials.aws_secret_access_key)
+
   def setup
-    @s3     = Rightscale::S3Interface.new(TestCredentials.aws_access_key_id, TestCredentials.aws_secret_access_key)
-    @bucket = 'right_s3_awesome_test_bucket_000B1'
-    @bucket2 = 'right_s3_awesome_test_bucket_000B2'
+    @s3     = INTERFACE
+    @bucket = 'right_s3_awesome_test_bucket_000B1_officedrop'
+    @bucket2 = 'right_s3_awesome_test_bucket_000B2_officedrop'
     @key1   = 'test/woohoo1/'
     @key2   = 'test1/key/woohoo2'
     @key3   = 'test2/A%B@C_D&E?F+G=H"I'
     @key1_copy =     'test/woohoo1_2'
     @key1_new_name = 'test/woohoo1_3'
     @key2_new_name = 'test1/key/woohoo2_new'
-    @s      = Rightscale::S3.new(TestCredentials.aws_access_key_id, TestCredentials.aws_secret_access_key)
+    @s      = CONNECTION
   end
 
   #---------------------------
   # Rightscale::S3Interface
   #---------------------------
-  
+
   def test_01_create_bucket
     assert @s3.create_bucket(@bucket), 'Create_bucket fail'
   end
@@ -32,13 +34,13 @@ class TestS3 < Test::Unit::TestCase
   def test_03_list_empty_bucket
     assert_equal 0, @s3.list_bucket(@bucket).size, "#{@bucket} isn't empty, arrgh!"
   end
-  
+
   def test_04_put
     assert @s3.put(@bucket, @key1, RIGHT_OBJECT_TEXT, 'x-amz-meta-family'=>'Woohoo1!'), 'Put bucket fail'
     assert @s3.put(@bucket, @key2, RIGHT_OBJECT_TEXT, 'x-amz-meta-family'=>'Woohoo2!'), 'Put bucket fail'
     assert @s3.put(@bucket, @key3, RIGHT_OBJECT_TEXT, 'x-amz-meta-family'=>'Woohoo3!'), 'Put bucket fail'
   end
-  
+
   def test_05_get_and_get_object
     assert_raise(Rightscale::AwsError) { @s3.get(@bucket, 'undefined/key') }
     data1 = @s3.get(@bucket, @key1)
@@ -47,7 +49,7 @@ class TestS3 < Test::Unit::TestCase
     assert_equal 'Woohoo1!', data1[:headers]['x-amz-meta-family'], "x-amz-meta-family header must be equal to 'Woohoo1!'"
     assert_equal RIGHT_OBJECT_TEXT, @s3.get_object(@bucket, @key3), "Get_object text must return '#{RIGHT_OBJECT_TEXT}'"
   end
-  
+
   def test_06_head
     assert_equal 'Woohoo1!', @s3.head(@bucket,@key1)['x-amz-meta-family'], "x-amz-meta-family header must be equal to 'Woohoo1!'"
   end
@@ -55,7 +57,7 @@ class TestS3 < Test::Unit::TestCase
 
   def test_07_streaming_get
     resp = String.new
-    assert_raise(Rightscale::AwsError) do 
+    assert_raise(Rightscale::AwsError) do
       @s3.get(@bucket, 'undefined/key') do |chunk|
         resp += chunk
       end
@@ -69,7 +71,7 @@ class TestS3 < Test::Unit::TestCase
     assert_equal @s3.get_object(@bucket, @key1), resp, "Streaming iface must return same as non-streaming"
     assert_equal 'Woohoo1!', data1[:headers]['x-amz-meta-family'], "x-amz-meta-family header must be equal to 'Woohoo1!'"
   end
-  
+
   def test_08_keys
     keys = @s3.list_bucket(@bucket).map{|b| b[:key]}
     assert_equal keys.size, 3, "There should be 3 keys"
@@ -77,7 +79,7 @@ class TestS3 < Test::Unit::TestCase
     assert(keys.include?(@key2))
     assert(keys.include?(@key3))
   end
-  
+
   def test_09_copy_key
     #--- test COPY
     # copy a key
@@ -130,7 +132,7 @@ class TestS3 < Test::Unit::TestCase
   def test_13_delete_folder
     assert_equal 1, @s3.delete_folder(@bucket, 'test').size, "Only one key(#{@key1}) must be deleted!"
   end
- 
+
   def test_14_delete_bucket
     assert_raise(Rightscale::AwsError) { @s3.delete_bucket(@bucket) }
     assert @s3.clear_bucket(@bucket), 'Clear_bucket fail'
@@ -138,9 +140,9 @@ class TestS3 < Test::Unit::TestCase
     assert @s3.delete_bucket(@bucket)
     assert !@s3.list_all_my_buckets.map{|bucket| bucket[:name]}.include?(@bucket), "#{@bucket} must not exist"
   end
-  
-  
-  
+
+
+
 
   #---------------------------
   # Rightscale::S3 classes
@@ -198,7 +200,7 @@ class TestS3 < Test::Unit::TestCase
     assert key2.delete
     assert !key2.exists?
   end
-  
+
   def test_23_rename_key
     bucket = Rightscale::S3::Bucket.create(@s, @bucket, false)
     # -- 1 -- (key based rename)
@@ -218,7 +220,7 @@ class TestS3 < Test::Unit::TestCase
     assert  bucket.key('test/copy/3').exists?, "'test/copy/3' should exist"
     assert !bucket.key('test/copy/2').exists?, "'test/copy/2' should not exist"
   end
-  
+
   def test_24_copy_key
     bucket = Rightscale::S3::Bucket.create(@s, @bucket, false)
     # -- 1 -- (key based copy)
@@ -239,7 +241,7 @@ class TestS3 < Test::Unit::TestCase
     assert_equal RIGHT_OBJECT_TEXT, bucket.key('test/copy/11').get
     assert_equal RIGHT_OBJECT_TEXT, bucket.key('test/copy/12').get
   end
-  
+
   def test_25_move_key
     bucket = Rightscale::S3::Bucket.create(@s, @bucket, false)
     # -- 1 -- (key based copy)
@@ -258,7 +260,7 @@ class TestS3 < Test::Unit::TestCase
     assert bucket.key('test/copy/22').exists?, "'test/copy/22' should exist"
     assert_equal RIGHT_OBJECT_TEXT, bucket.key('test/copy/22').get
   end
-  
+
   def test_26_save_meta
     bucket = Rightscale::S3::Bucket.create(@s, @bucket, false)
     # create a key
@@ -271,7 +273,7 @@ class TestS3 < Test::Unit::TestCase
     # reload meta
     assert_equal meta, key.reload_meta
   end
-    
+
   def test_27_clear_delete
     bucket = Rightscale::S3::Bucket.create(@s, @bucket, false)
       # add another key
@@ -280,16 +282,16 @@ class TestS3 < Test::Unit::TestCase
     assert_equal 1, bucket.delete_folder(@key1).size
       # delete
     assert_raise(Rightscale::AwsError) { bucket.delete }
-    bucket.delete(true)
+    bucket.delete(:force => true)
   end
 
     # Grantees
-    
+
   def test_30_create_bucket
     bucket = @s.bucket(@bucket, true, 'public-read')
     assert bucket
   end
-  
+
   def test_31_list_grantees
     bucket = Rightscale::S3::Bucket.create(@s, @bucket, false)
       # get grantees list
@@ -297,10 +299,10 @@ class TestS3 < Test::Unit::TestCase
       # check that the grantees count equal to 2 (root, AllUsers)
     assert_equal 2, grantees.size
   end
-  
+
   def test_32_grant_revoke_drop
     bucket = Rightscale::S3::Bucket.create(@s, @bucket, false)
-      # Take 'AllUsers' grantee 
+      # Take 'AllUsers' grantee
     grantee = Rightscale::S3::Grantee.new(bucket,'http://acs.amazonaws.com/groups/global/AllUsers')
       # Check exists?
     assert grantee.exists?
@@ -331,9 +333,9 @@ class TestS3 < Test::Unit::TestCase
     assert !grantee.exists?
     assert_equal 1, bucket.grantees.size
       # Delete bucket
-    bucket.delete(true)
+    bucket.delete(:force => true)
   end
-  
+
   def test_33_key_grantees
       # Create bucket
     bucket = @s.bucket(@bucket, true)
@@ -350,7 +352,7 @@ class TestS3 < Test::Unit::TestCase
       # Drop grantee
     assert grantee.drop
       # Drop bucket
-    bucket.delete(true)
+    bucket.delete(:force => true)
   end
 
   def test_34_bucket_create_put_with_perms
@@ -393,29 +395,85 @@ class TestS3 < Test::Unit::TestCase
     RightAws::S3Interface.amazon_problems= nil
     assert_nil(RightAws::S3Interface.amazon_problems)
   end
-  
+
   def test_37_access_logging
     bucket = Rightscale::S3::Bucket.create(@s, @bucket, false)
     targetbucket = Rightscale::S3::Bucket.create(@s, @bucket2, true)
-      # Take 'AllUsers' grantee 
+      # Take 'AllUsers' grantee
     grantee = Rightscale::S3::Grantee.new(targetbucket,'http://acs.amazonaws.com/groups/s3/LogDelivery')
- 
+
     assert grantee.grant(['READ_ACP', 'WRITE'])
-    
+
     assert bucket.enable_logging(:targetbucket => targetbucket, :targetprefix => "loggylogs/")
     sleep 10
-    
+
     assert_equal({:enabled => true, :targetbucket => @bucket2, :targetprefix => "loggylogs/"}, bucket.logging_info)
-    
+
     assert bucket.disable_logging
-    
+
       # check 'Drop' method
-    assert grantee.drop    
+    assert grantee.drop
   end
 
   def test_40_delete_buckets
-    Rightscale::S3::Bucket.create(@s, @bucket,  false).delete(true)
-    Rightscale::S3::Bucket.create(@s, @bucket2, false).delete(true)
+    Rightscale::S3::Bucket.create(@s, @bucket,  false).delete(:force => true)
+    Rightscale::S3::Bucket.create(@s, @bucket2, false).delete(:force => true)
+  end
+
+  def test_41_add_cache_control_response_parameter
+    @cache_control = 'max-age=3600'
+    perform_request( 'response-cache-control' => @cache_control ) do |response|
+       assert_equal response['Cache-Control'], @cache_control
+    end
+  end
+
+  def test_42_add_cache_control_and_content_type_and_content_disposition
+    @cache_control = 'max-age=3600'
+    @content_type = 'text/plain'
+    @content_disposition = 'attachment; filename=sample.txt'
+    perform_request(
+        'response-cache-control' => @cache_control,
+        'response-content-type' => @content_type,
+        'response-content-disposition' => @content_disposition
+    ) do |response|
+      assert_equal response['Cache-Control'], @cache_control
+      assert_equal response['Content-Type'], @content_type
+      assert_equal response['Content-Disposition'], @content_disposition
+    end
+  end
+
+  def test_43_add_expires_and_content_type_and_content_disposition
+    @expires = 'Sun, 26 Jun 2011 02:58:26 GMT'
+    @content_type = 'text/plain'
+    @content_disposition = 'attachment; filename=sample.txt'
+    perform_request(
+        'response-expires' => @expires,
+        'response-content-type' => @content_type,
+        'response-content-disposition' => @content_disposition
+    ) do |response|
+      assert_equal response['Expires'], @expires
+      assert_equal response['Content-Type'], @content_type
+      assert_equal response['Content-Disposition'], @content_disposition
+    end
+  end
+
+  private
+
+  def request( uri )
+    url = URI.parse( uri )
+
+    http = Net::HTTP.new(url.host, 443)
+    http.use_ssl = true
+    http.verify_mode = OpenSSL::SSL::VERIFY_PEER
+    http.request(Net::HTTP::Get.new( url.request_uri ))
+  end
+
+  def perform_request( headers, &block )
+    @s3.create_bucket( @bucket )
+    @s3.put( @bucket, @key2, RIGHT_OBJECT_TEXT )
+    response = request( @s3.get_link( @bucket, @key2, nil, {}, headers ) )
+    block.call( response )
+    @s3.force_delete_bucket(@bucket)
   end
 
 end

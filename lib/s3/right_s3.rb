@@ -220,18 +220,19 @@ module RightAws
         #
       def keys_and_service(options={}, head=false)
         opt = {}; options.each{ |key, value| opt[key.to_s] = value }
-        thislist = {}
-        list = []
-        @s3.interface.incrementally_list_bucket(@name, opt) do |thislist|
-          thislist[:contents].each do |entry|
+        service = {}
+        keys = []
+        @s3.interface.incrementally_list_bucket(@name, opt) do |_service|
+          service = _service
+          service[:contents].each do |entry|
             owner = Owner.new(entry[:owner_id], entry[:owner_display_name])
             key = Key.new(self, entry[:key], nil, {}, {}, entry[:last_modified], entry[:e_tag], entry[:size], entry[:storage_class], owner)
             key.head if head
-            list << key
+            keys << key
           end
         end
-        thislist.delete(:contents)
-        [list, thislist]
+        service.delete(:contents)
+        [keys, service]
       end
 
         # Retrieve key information from Amazon. 
@@ -272,12 +273,12 @@ module RightAws
         key.put(data, perms, headers)
       end
 
-        # Retrieve object data from Amazon. 
+        # Retrieve data object from Amazon. 
         # The +key+ is a +String+ or Key. 
-        # Returns Key instance. 
+        # Returns String instance. 
         #
-        #  key = bucket.get('logs/today/1.log') #=> 
-        #  puts key.data #=> 'sasfasfasdf'
+        #  data = bucket.get('logs/today/1.log') #=> 
+        #  puts data #=> 'sasfasfasdf'
         #
       def get(key, headers={})
         key = Key.create(self, key.to_s) unless key.is_a?(Key)
@@ -1041,8 +1042,8 @@ module RightAws
         #
         #  bucket.get('logs/today/1.log', 1.hour)
         #
-      def get(key, expires=nil, headers={})
-        @s3.interface.get_link(@name, key.to_s, expires, headers)
+      def get(key, expires=nil, headers={}, response_params={})
+        @s3.interface.get_link(@name, key.to_s, expires, headers, response_params)
       end
        
         # Generate link to delete bucket. 
@@ -1098,8 +1099,8 @@ module RightAws
         #
         #  bucket.get('logs/today/1.log', 1.hour) #=> https://s3.amazonaws.com:443/my_awesome_bucket/logs%2Ftoday%2F1.log?Signature=h...M%3D&Expires=1180820032&AWSAccessKeyId=1...2
         #
-      def get(expires=nil, headers={})
-        @bucket.s3.interface.get_link(@bucket.to_s, @name, expires, headers)
+      def get(expires=nil, headers={}, response_params={})
+        @bucket.s3.interface.get_link(@bucket.to_s, @name, expires, headers, response_params)
       end
        
         # Generate link to delete key. 

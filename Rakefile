@@ -2,7 +2,6 @@
 
 require 'rubygems'
 require "rake/testtask"
-require 'rcov/rcovtask'
 require 'rake/gempackagetask'
 require 'rake/clean'
 $: << File.dirname(__FILE__)
@@ -13,7 +12,19 @@ begin
 rescue LoadError => e
   STDERR.puts("Bundler is not available, some rake tasks will not be defined: #{e.message}")
 else
-  Bundler::GemHelper.install_tasks
+  Bundler::GemHelper.install_tasks :name => 'right_aws'
+end
+
+begin
+  require 'rcov/rcovtask'
+rescue LoadError => e
+  STDERR.puts("RCov is not available, some rake tasks will not be defined: #{e.message}")
+else
+  desc "Analyze code coverage of the unit tests."
+  Rcov::RcovTask.new do |t|
+    t.test_files = FileList[testglobs]
+    #t.verbose = true     # uncomment to see the executed command
+  end
 end
 
 # == Gem == #
@@ -27,12 +38,6 @@ end
 directory gemtask.package_dir
 
 CLEAN.include(gemtask.package_dir)
-
-desc "Analyze code coverage of the unit tests."
-Rcov::RcovTask.new do |t|
-  t.test_files = FileList[testglobs]
-  #t.verbose = true     # uncomment to see the executed command
-end
 
 desc "Test just the SQS interface"
 task :testsqs do
@@ -99,6 +104,27 @@ task :testrds do
   require 'test/test_credentials'
   TestCredentials.get_credentials
   require 'test/rds/test_right_rds.rb'
+end
+
+desc "Test just the SNS interface"
+task :testsns do
+  require 'test/test_credentials'
+  TestCredentials.get_credentials
+  require 'test/sns/test_right_sns.rb'
+end
+
+desc "Test Route 53 interface"
+task :testroute53 do
+  require 'test/test_credentials'
+  TestCredentials.get_credentials
+  require 'test/route_53/test_right_route_53'
+end
+
+desc "Test ELB interface"
+task :testelb do
+  require 'test/test_credentials'
+  TestCredentials.get_credentials
+  require 'test/elb/test_right_elb'
 end
 
 # vim: syntax=Ruby

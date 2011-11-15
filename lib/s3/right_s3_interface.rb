@@ -38,6 +38,17 @@ module RightAws
     ONE_YEAR_IN_SECONDS    = 365 * 24 * 60 * 60
     AMAZON_HEADER_PREFIX   = 'x-amz-'
     AMAZON_METADATA_PREFIX = 'x-amz-meta-'
+    S3_REQUEST_PARAMETERS = [ 'acl',
+        'location',
+        'logging', # this one is beta, no support for now
+        'response-content-type',
+        'response-content-language',
+        'response-expires',
+        'response-cache-control',
+        'response-content-disposition',
+        'response-content-encoding',
+        'torrent' ].sort
+
 
     @@bench = AwsBenchmarkingBlock.new
     def self.bench_xml
@@ -107,13 +118,20 @@ module RightAws
       s3_headers.sort { |a, b| a[0] <=> b[0] }.each do |key, value|
         out_string << (key[/^#{AMAZON_HEADER_PREFIX}/o] ? "#{key}:#{value}\n" : "#{value}\n")
       end
-        # ignore everything after the question mark...
+      # ignore everything after the question mark by default...
       out_string << path.gsub(/\?.*$/, '')
-       # ...unless there is an acl or torrent parameter
-      out_string << '?acl'      if path[/[&?]acl($|&|=)/]
-      out_string << '?torrent'  if path[/[&?]torrent($|&|=)/]
-      out_string << '?location' if path[/[&?]location($|&|=)/]
-      out_string << '?logging'  if path[/[&?]logging($|&|=)/]  # this one is beta, no support for now
+      # ... unless there is a parameter that we care about.
+      S3_REQUEST_PARAMETERS.each do |parameter|
+        if path[/[&?]#{parameter}(=[^&]*)?($|&)/]
+          if $1
+            value = CGI::unescape($1)
+          else
+            value = ''
+          end
+          out_string << (out_string[/[?]/] ? "&#{parameter}#{value}" : "?#{parameter}#{value}")
+        end
+      end
+
       out_string
     end
 
@@ -135,6 +153,7 @@ module RightAws
       # extract bucket name and check it's dns compartibility
       headers[:url].to_s[%r{^([a-z0-9._-]*)(/[^?]*)?(\?.+)?}i]
       bucket_name, key_path, params_list = $1, $2, $3
+      key_path = key_path.gsub( '%2F', '/' ) if key_path
       # select request model
       if !param(:no_subdomains) && is_dns_bucket?(bucket_name)
         # fix a path
@@ -836,6 +855,7 @@ module RightAws
     def generate_link(method, headers={}, expires=nil) #:nodoc:
         # calculate request data
       server, path, path_to_sign = fetch_request_params(headers)
+      path_to_sign = CGI.unescape(path_to_sign)
         # expiration time
       expires ||= DEFAULT_EXPIRES_AFTER
       expires   = Time.now.utc + expires if expires.is_a?(Fixnum) && (expires < ONE_YEAR_IN_SECONDS)
@@ -844,7 +864,7 @@ module RightAws
       headers.each{ |key, value| headers.delete(key) if (value.nil? || key.is_a?(Symbol)) }
         #generate auth strings
       auth_string = canonical_string(method, path_to_sign, headers, expires)
-      signature   = CGI::escape(Base64.encode64(OpenSSL::HMAC.digest(OpenSSL::Digest::Digest.new("sha1"), @aws_secret_access_key, auth_string)).strip)
+      signature   = CGI::escape(AwsUtils::sign( @aws_secret_access_key, auth_string))
         # path building
       addon = "Signature=#{signature}&Expires=#{expires}&AWSAccessKeyId=#{@aws_access_key_id}"
       path += path[/\?/] ? "&#{addon}" : "?#{addon}"
@@ -916,8 +936,20 @@ module RightAws
       #  s3.get_link('my_awesome_bucket',key) #=> https://s3.amazonaws.com:443/my_awesome_bucket/asia%2Fcustomers?Signature=QAO...
       #
       # see http://docs.amazonwebservices.com/AmazonS3/2006-03-01/VirtualHosting.html
-    def get_link(bucket, key, expires=nil, headers={})
-      generate_link('GET', headers.merge(:url=>"#{bucket}/#{CGI::escape key}"), expires)
+      #
+      # To specify +response+-* parameters, define them in the response_params hash:
+      #
+      #  s3.get_link('my_awesome_bucket',key,nil,{},{ "response-content-disposition" => "attachment; filename=caf�.png", "response-content-type" => "image/png"})
+      #
+      #    #=> https://s3.amazonaws.com:443/my_awesome_bucket/asia%2Fcustomers?response-content-disposition=attachment%3B%20filename%3Dcaf%25C3%25A9.png&response-content-type=image%2Fpng&Signature=wio...
+      #
+    def get_link(bucket, key, expires=nil, headers={}, response_params={})
+      if response_params.size > 0
+        response_params = '?' + response_params.map { |k, v| "#{k}=#{CGI::escape(v).gsub(/[+]/, '%20')}" }.join('&')
+      else
+        response_params = ''
+      end
+      generate_link('GET', headers.merge(:url=>"#{bucket}/#{CGI::escape key}#{response_params}"), expires)
     rescue
       on_exception
     end

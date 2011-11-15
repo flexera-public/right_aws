@@ -68,7 +68,7 @@ module RightAws
     include RightAwsBaseInterface
     
     # Amazon EC2 API version being used
-    API_VERSION       = "2010-08-31"
+    API_VERSION       = "2011-02-28"
     DEFAULT_HOST      = "ec2.amazonaws.com"
     DEFAULT_PATH      = '/'
     DEFAULT_PROTOCOL  = 'https'
@@ -130,8 +130,8 @@ module RightAws
       #end
     end
 
-    def generate_request(action, params={}) #:nodoc:
-      generate_request_impl(:get, action, params )
+    def generate_request(action, params={}, custom_options={}) #:nodoc:
+      generate_request_impl(:get, action, params, custom_options)
     end
 
       # Sends request to Amazon and parses the response
@@ -236,32 +236,49 @@ module RightAws
   #-----------------------------------------------------------------
 
     # Acquire a new elastic IP address for use with your account.
-    # Returns allocated IP address or an exception.
+    # Options: :domain.
+    # Returns allocated IP address or or an exception.
     #
-    #  ec2.allocate_address #=> '75.101.154.140'
+    #  ec2.allocate_address #=>
+    #    { :public_ip => "50.19.214.224",
+    #      :domain    => "standard"}
     #
-    def allocate_address
-      link = generate_request("AllocateAddress")
+    #  ec2.allocate_address(:domain => 'vpc') #=>
+    #    { :allocation_id => "eipalloc-c6abfeaf",
+    #      :domain        => "vpc",
+    #      :public_ip     => "184.72.112.39"}
+    #
+    def allocate_address(options={})
+      request_hash = {}
+      request_hash['Domain'] = options[:domain] unless options[:domain].right_blank?
+      link = generate_request("AllocateAddress", request_hash)
       request_info(link, QEc2AllocateAddressParser.new(:logger => @logger))
     rescue Exception
       on_exception
     end
 
     # Associate an elastic IP address with an instance.
-    # Returns +true+ or an exception.
+    # Options: :public_ip, :allocation_id.
+    # Returns a hash of data or an exception.
     #
-    #  ec2.associate_address('i-d630cbbf', '75.101.154.140') #=> true
+    #  ec2.associate_address('i-d630cbbf', :public_ip => '75.101.154.140') #=>
+    #    { :return => true }
     #
-    def associate_address(instance_id, public_ip)
-      link = generate_request("AssociateAddress", 
-                              "InstanceId" => instance_id.to_s,
-                              "PublicIp"   => public_ip.to_s)
-      request_info(link, RightBoolResponseParser.new(:logger => @logger))
+    #  ec2.associate_address(inst, :allocation_id => "eipalloc-c6abfeaf") #=>
+    #    { :return         => true,
+    #      :association_id => 'eipassoc-fc5ca095'}
+    #
+    def associate_address(instance_id, options={})
+      request_hash = { "InstanceId" => instance_id.to_s }
+      request_hash['PublicIp']     = options[:public_ip]     unless options[:public_ip].right_blank?
+      request_hash['AllocationId'] = options[:allocation_id] unless options[:allocation_id].right_blank?
+      link = generate_request("AssociateAddress", request_hash)
+      request_info(link, QEc2AssociateAddressParser.new(:logger => @logger))
     rescue Exception
       on_exception
     end
 
-    # List elastic IP addresses assigned to your account.
+    # List elastic IPs by public addresses.
     #
     # Accepts a list of addresses and/or a set of filters as the last parameter.
     #
@@ -269,40 +286,62 @@ module RightAws
     #
     # Returns an array of 2 keys (:instance_id and :public_ip) hashes:
     #
-    #  ec2.describe_addresses  #=> [{:instance_id=>"i-d630cbbf", :public_ip=>"75.101.154.140"},
-    #                               {:instance_id=>nil, :public_ip=>"75.101.154.141"}]
+    #  ec2.describe_addresses  #=> [{:instance_id=>"i-75ebd41b", :domain=>"standard", :public_ip=>"50.17.211.96"},
+    #                                :domain=>"vpc", :public_ip=>"184.72.112.39",  :allocation_id=>"eipalloc-c6abfeaf"}]
     #
-    #  ec2.describe_addresses('75.101.154.140') #=> [{:instance_id=>"i-d630cbbf", :public_ip=>"75.101.154.140"}]
+    #  ec2.describe_addresses('75.101.154.140') #=> [{:instance_id=>"i-d630cbbf", :public_ip=>"75.101.154.140", :domain=>"standard"}]
     #
     #  ec2.describe_addresses(:filters => { 'public-ip' => "75.101.154.140" })
     #
-    # P.S. filters: http://docs.amazonwebservices.com/AWSEC2/latest/APIReference/index.html?ApiReference-query-DescribeAddresses.html
+    # P.S. http://docs.amazonwebservices.com/AWSEC2/latest/APIReference/index.html?ApiReference-query-DescribeAddresses.html
     #
     def describe_addresses(*list_and_options)
       describe_resources_with_list_and_options('DescribeAddresses', 'PublicIp', QEc2DescribeAddressesParser, list_and_options)
     end
 
+
+    # List elastic IPs by allocation ids.
+    #
+    # Accepts a list of allocations and/or a set of filters as the last parameter.
+    #
+    #  describe_addresses_by_allocation_ids("eipalloc-c6abfeaf") #=>
+    #    [{:domain=>"vpc",
+    #      :public_ip=>"184.72.112.39",
+    #      :allocation_id=>"eipalloc-c6abfeaf"}]
+    #
+    #  P.S. http://docs.amazonwebservices.com/AWSEC2/latest/APIReference/index.html?ApiReference-query-DescribeAddresses.html
+    #
+    def describe_addresses_by_allocation_ids(*list_and_options)
+      describe_resources_with_list_and_options('DescribeAddresses', 'AllocationId', QEc2DescribeAddressesParser, list_and_options)
+    end
+
     # Disassociate the specified elastic IP address from the instance to which it is assigned.
+    # Options: :public_ip, :association_id.
     # Returns +true+ or an exception.
     # 
-    #  ec2.disassociate_address('75.101.154.140') #=> true
+    #  ec2.disassociate_address(:public_ip => '75.101.154.140') #=> true
     #
-    def disassociate_address(public_ip)
-      link = generate_request("DisassociateAddress", 
-                              "PublicIp" => public_ip.to_s)
+    def disassociate_address(options = {})
+      request_hash = {}
+      request_hash['PublicIp']      = options[:public_ip]      unless options[:public_ip].right_blank?
+      request_hash['AssociationId'] = options[:association_id] unless options[:association_id].right_blank?
+      link = generate_request("DisassociateAddress", request_hash)
       request_info(link, RightBoolResponseParser.new(:logger => @logger))
     rescue Exception
       on_exception
     end
 
     # Release an elastic IP address associated with your account.
+    # Options: :public_ip, :allocation_id.
     # Returns +true+ or an exception.
     #
-    #  ec2.release_address('75.101.154.140') #=> true
+    #  ec2.release_address(:public_ip => '75.101.154.140') #=> true
     #
-    def release_address(public_ip)
-      link = generate_request("ReleaseAddress", 
-                              "PublicIp" => public_ip.to_s)
+    def release_address(options = {})
+      request_hash = {}
+      request_hash['PublicIp']     = options[:public_ip]     unless options[:public_ip].right_blank?
+      request_hash['AllocationId'] = options[:allocation_id] unless options[:allocation_id].right_blank?
+      link = generate_request("ReleaseAddress", request_hash)
       request_info(link, RightBoolResponseParser.new(:logger => @logger))
     rescue Exception
       on_exception
@@ -344,7 +383,12 @@ module RightAws
     #
     # Filters: endpoint, region-name
     #
-    #  ec2.describe_regions  #=> ["eu-west-1", "us-east-1"]
+    #  ec2.describe_regions  #=>
+    #   [{:region_endpoint=>"ec2.eu-west-1.amazonaws.com",      :region_name=>"eu-west-1"},
+    #    {:region_endpoint=>"ec2.us-east-1.amazonaws.com",      :region_name=>"us-east-1"},
+    #    {:region_endpoint=>"ec2.ap-northeast-1.amazonaws.com", :region_name=>"ap-northeast-1"},
+    #    {:region_endpoint=>"ec2.us-west-1.amazonaws.com",      :region_name=>"us-west-1"},
+    #    {:region_endpoint=>"ec2.ap-southeast-1.amazonaws.com", :region_name=>"ap-southeast-1"}]
     #
     # P.S. filters: http://docs.amazonwebservices.com/AWSEC2/latest/APIReference/ApiReference-query-DescribeRegions.html
     #
@@ -403,19 +447,41 @@ module RightAws
   
     class QEc2AllocateAddressParser < RightAWSParser #:nodoc:
       def tagend(name)
-        @result = @text if name == 'publicIp'
+        case name
+        when 'publicIp'     then @result[:public_ip]     = @text
+        when 'allocationId' then @result[:allocation_id] = @text
+        when 'domain'       then @result[:domain]        = @text
+        end
+      end
+      def reset
+        @result = {}
       end
     end
-    
+
+    class QEc2AssociateAddressParser < RightAWSParser #:nodoc:
+      def tagend(name)
+        case name
+        when 'return'        then @result[:return]         = @text == 'true'
+        when 'associationId' then @result[:association_id] = @text
+        end
+      end
+      def reset
+        @result = {}
+      end
+    end
+
     class QEc2DescribeAddressesParser < RightAWSParser #:nodoc:
       def tagstart(name, attributes)
-        @address = {} if name == 'item'
+        @item = {} if name == 'item'
       end
       def tagend(name)
         case name
-        when 'instanceId' then @address[:instance_id] = @text.right_blank? ? nil : @text
-        when 'publicIp'   then @address[:public_ip]   = @text
-        when 'item'       then @result << @address
+        when 'instanceId'    then (@item[:instance_id]    = @text unless @text.right_blank?)
+        when 'publicIp'      then @item[:public_ip]       = @text
+        when 'allocationId'  then @item[:allocation_id]   = @text
+        when 'associationId' then @item[:association_id]  = @text
+        when 'domain'        then @item[:domain]          = @text
+        when 'item'          then @result                << @item
         end
       end
       def reset
@@ -455,8 +521,15 @@ module RightAws
   #-----------------------------------------------------------------
 
     class QEc2DescribeRegionsParser < RightAWSParser #:nodoc:
+      def tagstart(name, attributes)
+        @item = {} if name == 'item'
+      end
       def tagend(name)
-        @result << @text if name == 'regionName'
+        case name
+        when 'regionName'     then @item[:region_name]     = @text
+        when 'regionEndpoint' then @item[:region_endpoint] = @text
+        when 'item'           then @result                << @item
+        end
       end
       def reset
         @result = []

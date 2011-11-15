@@ -38,9 +38,11 @@ module RightAws
     # Filters: cidr, dchp-options-id, state, tag-key, tag-value, tag:key, vpc-id
     #
     #  ec2.describe_vpcs #=>
-    #    [{:vpc_id=>"vpc-890ce2e0",
+    #    [{:instance_tenancy=>"default",
+    #      :vpc_id=>"vpc-e16cf988",
+    #      :tags=>{},
     #      :dhcp_options_id=>"default",
-    #      :cidr_block=>"10.0.0.0/23",
+    #      :cidr_block=>"192.168.0.0/24",
     #      :state=>"available"}]
     #
     #  ec2.describe_vpcs("vpc-890ce2e0")
@@ -63,8 +65,10 @@ module RightAws
     #     :cidr_block=>"10.0.0.0/23",
     #     :state=>"pending"}
     #
-    def create_vpc(cidr_block)
-      link = generate_request("CreateVpc",'CidrBlock' => cidr_block )
+    def create_vpc(cidr_block, options = {})
+      request_hash = {'CidrBlock' => cidr_block}
+      request_hash['instanceTenancy'] = options[:instance_tenancy] unless options[:instance_tenancy].right_blank?
+      link = generate_request("CreateVpc", request_hash )
       request_info(link, QEc2DescribeVpcsParser.new(:logger => @logger)).first
     rescue Exception
       on_exception
@@ -395,6 +399,7 @@ module RightAws
       on_exception
     end
 
+
     #-----------------
     # Parsers
     #-----------------
@@ -408,10 +413,11 @@ module RightAws
       end
       def tagend(name)
         case name
-        when 'vpcId'         then @item[:vpc_id]          = @text
-        when 'state'         then @item[:state]           = @text
-        when 'dhcpOptionsId' then @item[:dhcp_options_id] = @text
-        when 'cidrBlock'     then @item[:cidr_block]      = @text
+        when 'vpcId'           then @item[:vpc_id]          = @text
+        when 'state'           then @item[:state]           = @text
+        when 'dhcpOptionsId'   then @item[:dhcp_options_id] = @text
+        when 'cidrBlock'       then @item[:cidr_block]      = @text
+        when 'instanceTenancy' then @item[:instance_tenancy] = @text
         else
           case full_tag_name
           when %r{/tagSet/item/key$}   then @aws_tag[:key]               = @text
@@ -578,6 +584,7 @@ module RightAws
         @result = []
       end
     end
+
 
   end
 end

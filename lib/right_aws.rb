@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2007-2008 RightScale Inc
+# Copyright (c) 2007-2011 RightScale Inc
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -47,11 +47,13 @@ require 'ec2/right_ec2_spot_instances'
 require 'ec2/right_ec2_ebs'
 require 'ec2/right_ec2_reserved_instances'
 require 'ec2/right_ec2_vpc'
+require 'ec2/right_ec2_vpc2'
 require 'ec2/right_ec2_monitoring'
 require 'ec2/right_ec2_placement_groups'
 require 'ec2/right_ec2_windows_mobility'
 require 'ec2/right_ec2_tags'
 require 'elb/right_elb_interface'
+require 'emr/right_emr_interface'
 require 'acw/right_acw_interface'
 require 'as/right_as_interface'
 require 's3/right_s3_interface'
@@ -72,6 +74,7 @@ require 'iam/right_iam_users'
 require 'iam/right_iam_access_keys'
 require 'iam/right_iam_mfa_devices'
 require 'route_53/right_route_53_interface'
+require 'sns/right_sns_interface'
 
 #-
 
