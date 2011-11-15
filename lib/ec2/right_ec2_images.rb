@@ -162,7 +162,9 @@ module RightAws
     #                       :root_device_name => "/dev/sda1",
     #                       :block_device_mappings => [ { :ebs_snapshot_id=>"snap-7360871a",
     #                                                     :ebs_delete_on_termination=>true,
-    #                                                     :device_name=>"/dev/sda1"} ] }
+    #                                                     :device_name=>"/dev/sda1"},
+    #                                                   { :virtual_name => 'ephemeral0',}
+    #                                                     :device_name=>"/dev/sdb"} ]
     #  ec2.register_image(image_reg_params) #=> "ami-b2a1f7a4"
     #
     def register_image(options)
