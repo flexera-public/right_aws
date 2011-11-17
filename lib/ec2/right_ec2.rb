@@ -539,3 +539,16 @@ module RightAws
   end
       
 end
+
+require 'ec2/right_ec2_images'
+require 'ec2/right_ec2_instances'
+require 'ec2/right_ec2_security_groups'
+require 'ec2/right_ec2_spot_instances'
+require 'ec2/right_ec2_ebs'
+require 'ec2/right_ec2_reserved_instances'
+require 'ec2/right_ec2_vpc'
+require 'ec2/right_ec2_vpc2'
+require 'ec2/right_ec2_monitoring'
+require 'ec2/right_ec2_placement_groups'
+require 'ec2/right_ec2_windows_mobility'
+require 'ec2/right_ec2_tags'

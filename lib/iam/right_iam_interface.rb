@@ -339,3 +339,8 @@ module RightAws
   end
 
 end
+
+require 'iam/right_iam_groups'
+require 'iam/right_iam_users'
+require 'iam/right_iam_access_keys'
+require 'iam/right_iam_mfa_devices'
