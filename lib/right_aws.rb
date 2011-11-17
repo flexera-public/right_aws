@@ -33,7 +33,6 @@ require "digest/sha1"
 
 require 'right_http_connection'
 
-$:.unshift(File.dirname(__FILE__))
 require 'awsbase/version'
 require 'awsbase/support'
 require 'awsbase/benchmark_fix'
