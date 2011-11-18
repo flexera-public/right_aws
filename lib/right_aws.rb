@@ -27,7 +27,6 @@ require 'uri'
 require 'time'
 require "cgi"
 require "base64"
-require "rexml/document"
 require "openssl"
 require "digest/sha1"
 
