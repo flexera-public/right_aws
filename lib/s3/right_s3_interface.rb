@@ -78,10 +78,11 @@ module RightAws
       #  
       # Params is a hash:
       #
-      #    {:server       => 's3.amazonaws.com'   # Amazon service host: 's3.amazonaws.com'(default)
-      #     :port         => 443                  # Amazon service port: 80 or 443(default)
-      #     :protocol     => 'https'              # Amazon service protocol: 'http' or 'https'(default)
-      #     :logger       => Logger Object}       # Logger instance: logs to STDOUT if omitted }
+      #    {:server        => 's3.amazonaws.com'   # Amazon service host: 's3.amazonaws.com'(default)
+      #     :port          => 443                  # Amazon service port: 80 or 443(default)
+      #     :protocol      => 'https'              # Amazon service protocol: 'http' or 'https'(default)
+      #     :logger        => Logger Object        # Logger instance: logs to STDOUT if omitted
+      #     :no_subdomains => true}                # Force placing bucket name into path instead of domain name
       #
     def initialize(aws_access_key_id=nil, aws_secret_access_key=nil, params={})
       init({ :name             => 'S3', 
