@@ -31,7 +31,6 @@ Gem::Specification.new do |spec|
   spec.authors = ['RightScale, Inc.']
   spec.email = 'support@rightscale.com'
   spec.summary = 'Interface classes for the Amazon EC2, SQS, and S3 Web Services'
-  spec.has_rdoc = true
   spec.rdoc_options = ['--main', 'README.txt', '--title', '']
   spec.extra_rdoc_files = ['README.txt']
   spec.required_ruby_version = '>= 1.8.7'
