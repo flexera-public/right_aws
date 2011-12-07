@@ -97,10 +97,24 @@ module RightAws
     #  (section: Canned Access Policies)
     #
     def bucket(name, create=false, perms=nil, headers={})
-      headers['x-amz-acl'] = perms if perms
-      @interface.create_bucket(name, headers) if create
-      buckets.each { |bucket| return bucket if bucket.name == name }
-      nil
+      result = nil
+      if create
+        headers['x-amz-acl'] = perms if perms
+        @interface.create_bucket(name, headers) 
+      end
+      begin
+        buckets.each do |bucket| 
+          if bucket.name == name 
+            result = bucket
+            break
+          end
+        end
+      rescue RightAws::AwsError => e
+        # With non root creds one can use bucket(s) but can't list them
+        raise e unless e.message['AccessDenied']
+        result = Bucket::new(self, name)
+      end
+      result
     end
     
 
