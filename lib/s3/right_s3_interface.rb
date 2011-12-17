@@ -52,9 +52,11 @@ module RightAws
         'response-content-encoding',
         'torrent',
         'uploadId',
-        'uploads'].sort
+        'uploads',
+        'delete'].sort
+    MULTI_OBJECT_DELETE_MAX_KEYS = 1000
 
-
+    
     @@bench = AwsBenchmarkingBlock.new
     def self.bench_xml
       @@bench.xml
@@ -788,6 +790,34 @@ module RightAws
       on_exception
     end
 
+    # Deletes multiple keys. Returns an array with errors, if any.
+    #
+    #  s3.delete_multiple('my_awesome_bucket', ['key1', 'key2', ...)
+    #    #=> [ { :key => 'key2', :code => 'AccessDenied', :message => "Access Denied" } ]
+    #
+    def delete_multiple(bucket, keys=[], headers={})
+      errors = []
+      keys = Array.new(keys)
+      while keys.length > 0
+        data = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+        data += "<Delete>\n<Quiet>true</Quiet>\n"
+        keys.take(MULTI_OBJECT_DELETE_MAX_KEYS).each do |key|
+          data += "<Object><Key>#{AwsUtils::xml_escape(key)}</Key></Object>\n"
+        end
+        data += "</Delete>"
+        req_hash = generate_rest_request('POST', headers.merge(
+          :url  => "#{bucket}?delete",
+          :data => data,
+          'content-md5' => AwsUtils::content_md5(data)
+        ))
+        errors += request_info(req_hash, S3DeleteMultipleParser.new)
+        keys = keys.drop(MULTI_OBJECT_DELETE_MAX_KEYS)
+      end
+      errors
+    rescue
+      on_exception
+    end
+
       # Copy an object. 
       #  directive: :copy    - copy meta-headers from source (default value)
       #             :replace - replace meta-headers by passed ones
@@ -1152,6 +1182,23 @@ module RightAws
       return put_acl_link(bucket, '', acl_xml_doc, headers)
     rescue
       on_exception
+    end
+
+    class S3DeleteMultipleParser < RightAWSParser # :nodoc:
+      def reset
+        @result = []
+      end
+      def tagstart(name, attributes)
+        @error = {}
+      end
+      def tagend(name)
+        case name
+          when 'Key'     then current[:key]     = @text
+          when 'Code'    then current[:code]    = @text
+          when 'Message' then current[:message] = @text
+          when 'Error'   then @result << @error
+        end
+      end
     end
 
     #-----------------------------------------------------------------
