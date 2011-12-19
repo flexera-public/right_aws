@@ -1,5 +1,5 @@
 =begin
-Copyright (c) 2007 RightScale, Inc. 
+Copyright (c) 2007 RightScale, Inc.
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -55,7 +55,7 @@ module Rightscale
       if(block)
         # Do something special
       else
-        next_response = HttpConnection::pop() 
+        next_response = HttpConnection::pop()
         classname = Net::HTTPResponse::CODE_TO_OBJ["#{next_response[:code]}"]
         response = classname.new("1.1", next_response[:code], next_response[:msg])
         if(next_response[:msg])

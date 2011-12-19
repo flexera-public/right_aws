@@ -190,6 +190,6 @@ module RightAws
     end
 
   end
-  
+
 end
 

@@ -73,7 +73,7 @@ module RightAws
   #  acf.set_distribution_config(distibution[:aws_id], config) #=> true
   #
   class AcfInterface < RightAwsBase
-    
+
     include RightAwsBaseInterface
 
     API_VERSION      = "2010-11-01"
@@ -109,8 +109,8 @@ module RightAws
              :default_service     => ENV['ACF_URL'] ? URI.parse(ENV['ACF_URL']).path   : DEFAULT_PATH,
              :default_protocol    => ENV['ACF_URL'] ? URI.parse(ENV['ACF_URL']).scheme : DEFAULT_PROTOCOL,
              :default_api_version => ENV['ACF_API_VERSION'] || API_VERSION },
-           aws_access_key_id     || ENV['AWS_ACCESS_KEY_ID'], 
-           aws_secret_access_key || ENV['AWS_SECRET_ACCESS_KEY'], 
+           aws_access_key_id     || ENV['AWS_ACCESS_KEY_ID'],
+           aws_secret_access_key || ENV['AWS_SECRET_ACCESS_KEY'],
            params)
     end
 
@@ -138,12 +138,12 @@ module RightAws
       # Set request headers
       headers.each { |key, value| request[key.to_s] = value }
       # prepare output hash
-      { :request  => request, 
+      { :request  => request,
         :server   => @params[:server],
         :port     => @params[:port],
         :protocol => @params[:protocol] }
       end
-      
+
       # Sends request to Amazon and parses the response.
       # Raises AwsError if any banana happened.
     def request_info(request, parser, &block) # :nodoc:
@@ -272,7 +272,7 @@ module RightAws
     end
 
     # Incrementally list distributions.
-    # 
+    #
     # Optional params: +:marker+ and +:max_items+.
     #
     #   # get first distribution
@@ -310,8 +310,8 @@ module RightAws
         last_response = request_info(link,  AcfDistributionListParser.new(:logger => @logger))
         opts['Marker'] = last_response[:next_marker]
         break unless block && block.call(last_response) && !last_response[:next_marker].right_blank?
-      end 
-      last_response 
+      end
+      last_response
     end
 
     # Create a new distribution.
@@ -446,7 +446,7 @@ module RightAws
       merge_headers(request_info(link, AcfDistributionListParser.new(:logger => @logger))[:distributions].first)
     end
 
-    # Set a distribution's configuration 
+    # Set a distribution's configuration
     # Returns +true+ on success or RightAws::AwsError exception.
     #
     #  config = acf.get_distribution_config('E2REJM3VUN5RSI') #=>
@@ -464,7 +464,7 @@ module RightAws
     #  # config[:s3_origin][:origin_access_identity] = "E3JPJZ80ZBX24G"
     #  config[:trusted_signers]        = ['self', '648772220000', '120288270000']
     #  config[:logging]                = { :bucket => 'my-bucket.s3.amazonaws.com', :prefix => 'xlog/' }
-    #  
+    #
     #  acf.set_distribution_config('E2REJM3VUN5RSI', config) #=> true
     #
     def set_distribution_config(aws_id, config)

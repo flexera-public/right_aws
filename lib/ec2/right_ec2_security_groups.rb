@@ -157,7 +157,7 @@ module RightAws
     #
     def create_security_group(name, description = nil, options = {})
       options = options.dup
-      options[:group_name]        = name      
+      options[:group_name]        = name
       options[:group_description] = description.right_blank? ? '-' : description # EC2 rejects an empty description...
       link = generate_request("CreateSecurityGroup", map_api_keys_and_values(options, :group_name, :group_description, :vpc_id))
       request_info(link, QEc2CreateSecurityGroupsParser.new(:logger => @logger))
@@ -176,7 +176,7 @@ module RightAws
     #  ec2.delete_security_group(:group_name => 'my-group']) #=> true
     #
     def delete_security_group(group_id_or_options={})
-      options = group_id_or_options.is_a?(Hash) ? group_id_or_options : { :group_id => group_id_or_options } 
+      options = group_id_or_options.is_a?(Hash) ? group_id_or_options : { :group_id => group_id_or_options }
       link = generate_request("DeleteSecurityGroup", map_api_keys_and_values(options, :group_name, :group_id))
       request_info(link, RightBoolResponseParser.new(:logger => @logger))
     rescue Exception
@@ -486,6 +486,6 @@ module RightAws
         @result = []
       end
     end
-    
+
   end
 end

@@ -21,7 +21,7 @@
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 module RightAws
-  
+
   class AcfInterface
 
     # List Origin Access Identities.
@@ -182,7 +182,7 @@ module RightAws
     #                                        :comment => "MyBestOriginAccessConfig",
     #                                        :caller_reference => '01234567890',
     #                                        :e_tag=>"E2QOKZEXCUWHJX") #=> true
-    #                                        
+    #
     # P.S. This guy is not tested yet: http://developer.amazonwebservices.com/connect/thread.jspa?threadID=45256
     def set_origin_access_identity_config(aws_id, config)
       link = generate_request('PUT', "origin-access-identity/cloudfront/#{aws_id}/config", {}, origin_access_identity_config_to_xml(config),

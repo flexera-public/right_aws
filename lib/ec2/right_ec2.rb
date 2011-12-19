@@ -34,7 +34,7 @@ module RightAws
   # Examples:
   #
   # Create an EC2 interface handle:
-  #   
+  #
   #   @ec2   = RightAws::Ec2.new(aws_access_key_id,
   #                               aws_secret_access_key)
   # Create a new SSH key pair:
@@ -56,35 +56,35 @@ module RightAws
   #
   # Launch an instance:
   #  ec2.run_instances('ami-9a9e7bf3', 1, 1, ['default'], @key, 'SomeImportantUserData', 'public')
-  # 
+  #
   #
   # Describe running instances:
   #  @ec2.describe_instances
   #
   # Error handling: all operations raise an RightAws::AwsError in case
   # of problems. Note that transient errors are automatically retried.
-    
+
   class Ec2 < RightAwsBase
     include RightAwsBaseInterface
-    
+
     # Amazon EC2 API version being used
     API_VERSION       = "2011-02-28"
     DEFAULT_HOST      = "ec2.amazonaws.com"
     DEFAULT_PATH      = '/'
     DEFAULT_PROTOCOL  = 'https'
     DEFAULT_PORT      = 443
-    
+
     # Default addressing type (public=NAT, direct=no-NAT) used when launching instances.
     DEFAULT_ADDRESSING_TYPE =  'public'
     DNS_ADDRESSING_SET      = ['public','direct']
-    
+
     # Amazon EC2 Instance Types : http://www.amazon.com/b?ie=UTF8&node=370375011
-    # Default EC2 instance type (platform) 
-    DEFAULT_INSTANCE_TYPE   =  'm1.small' 
+    # Default EC2 instance type (platform)
+    DEFAULT_INSTANCE_TYPE   =  'm1.small'
     INSTANCE_TYPES          = ['t1.micro','m1.small','c1.medium','m1.large','m1.xlarge',
                                'c1.xlarge', 'm2.xlarge', 'm2.2xlarge', 'm2.4xlarge',
                                'cc1.4xlarge', 'cg1.4xlarge']
-    
+
     @@bench = AwsBenchmarkingBlock.new
     def self.bench_xml
       @@bench.xml
@@ -92,13 +92,13 @@ module RightAws
     def self.bench_ec2
       @@bench.service
     end
-    
+
      # Current API version (sometimes we have to check it outside the GEM).
     @@api = ENV['EC2_API_VERSION'] || API_VERSION
-    def self.api 
+    def self.api
       @@api
     end
-    
+
     # Create a new handle to an EC2 account. All handles share the same per process or per thread
     # HTTP connection to Amazon EC2. Each handle is for a specific account. The params have the
     # following options:
@@ -111,7 +111,7 @@ module RightAws
     # * <tt>:signature_version</tt>:  The signature version : '0','1' or '2'(default)
     # * <tt>:cache</tt>: true/false: caching for: ec2_describe_images, describe_instances,
     # describe_images_by_owner, describe_images_by_executable_by, describe_availability_zones,
-    # describe_security_groups, describe_key_pairs, describe_addresses, 
+    # describe_security_groups, describe_key_pairs, describe_addresses,
     # describe_volumes, describe_snapshots methods, default: false.
     #
     def initialize(aws_access_key_id=nil, aws_secret_access_key=nil, params={})
@@ -121,7 +121,7 @@ module RightAws
              :default_service     => ENV['EC2_URL'] ? URI.parse(ENV['EC2_URL']).path   : DEFAULT_PATH,
              :default_protocol    => ENV['EC2_URL'] ? URI.parse(ENV['EC2_URL']).scheme : DEFAULT_PROTOCOL,
              :default_api_version => @@api },
-           aws_access_key_id    || ENV['AWS_ACCESS_KEY_ID'] , 
+           aws_access_key_id    || ENV['AWS_ACCESS_KEY_ID'] ,
            aws_secret_access_key|| ENV['AWS_SECRET_ACCESS_KEY'],
            params)
       # Eucalyptus supports some yummy features but Amazon does not
@@ -166,7 +166,7 @@ module RightAws
   #-----------------------------------------------------------------
   #      Keys
   #-----------------------------------------------------------------
-  
+
       # Retrieve a list of SSH keys.
       #
       # Accepts a list of ssh keys and/or a set of filters as the last parameter.
@@ -188,7 +188,7 @@ module RightAws
     def describe_key_pairs(*list_and_options)
       describe_resources_with_list_and_options('DescribeKeyPairs', 'KeyName', QEc2DescribeKeyPairParser, list_and_options)
     end
-      
+
       # Import new SSH key. Returns a hash of the key's data or an exception.
       #
       #  ec2.import_key_pair('my_awesome_key', 'C:\keys\myfavoritekeypair_public.ppk') #=>
@@ -224,13 +224,13 @@ module RightAws
       #  ec2.delete_key_pair('my_awesome_key') #=> true
       #
     def delete_key_pair(name)
-      link = generate_request("DeleteKeyPair", 
+      link = generate_request("DeleteKeyPair",
                               'KeyName' => name.to_s)
       request_info(link, RightBoolResponseParser.new(:logger => @logger))
     rescue Exception
       on_exception
     end
-    
+
   #-----------------------------------------------------------------
   #      Elastic IPs
   #-----------------------------------------------------------------
@@ -318,7 +318,7 @@ module RightAws
     # Disassociate the specified elastic IP address from the instance to which it is assigned.
     # Options: :public_ip, :association_id.
     # Returns +true+ or an exception.
-    # 
+    #
     #  ec2.disassociate_address(:public_ip => '75.101.154.140') #=> true
     #
     def disassociate_address(options = {})
@@ -350,7 +350,7 @@ module RightAws
   #-----------------------------------------------------------------
   #      Availability zones
   #-----------------------------------------------------------------
-    
+
     # Describes availability zones that are currently available to the account and their states.
     #
     # Accepts a list of availability zones and/or a set of filters as the last parameter.
@@ -363,7 +363,7 @@ module RightAws
     #                                         :zone_name=>"us-east-1a",
     #                                         :zone_state=>"available"}, ... ]
     #
-    #  ec2.describe_availability_zones('us-east-1c') #=> [{:region_name=>"us-east-1", 
+    #  ec2.describe_availability_zones('us-east-1c') #=> [{:region_name=>"us-east-1",
     #                                                      :zone_state=>"available",
     #                                                      :zone_name=>"us-east-1c"}]
     #
@@ -405,14 +405,14 @@ module RightAws
         @item = {} if name == 'item'
       end
       def tagend(name)
-        case name 
+        case name
           when 'keyName'        then @item[:aws_key_name]    = @text
           when 'keyFingerprint' then @item[:aws_fingerprint] = @text
           when 'item'           then @result                << @item
         end
       end
       def reset
-        @result = [];    
+        @result = [];
       end
     end
 
@@ -421,7 +421,7 @@ module RightAws
         @result = {} if name == 'CreateKeyPairResponse'
       end
       def tagend(name)
-        case name 
+        case name
           when 'keyName'        then @result[:aws_key_name]    = @text
           when 'keyFingerprint' then @result[:aws_fingerprint] = @text
           when 'keyMaterial'    then @result[:aws_material]    = @text
@@ -444,7 +444,7 @@ module RightAws
   #-----------------------------------------------------------------
   #      PARSERS: Elastic IPs
   #-----------------------------------------------------------------
-  
+
     class QEc2AllocateAddressParser < RightAWSParser #:nodoc:
       def tagend(name)
         case name
@@ -535,7 +535,7 @@ module RightAws
         @result = []
       end
     end
-    
+
   end
-      
+
 end

@@ -60,7 +60,7 @@ module RightAws
     # Create a new handle to an IAM account. All handles share the same per process or per thread
     # HTTP connection to Amazon IAM. Each handle is for a specific account. The params have the
     # following options:
-    # * <tt>:endpoint_url</tt> a fully qualified url to Amazon API endpoint (this overwrites: :server, :port, :service, :protocol). 
+    # * <tt>:endpoint_url</tt> a fully qualified url to Amazon API endpoint (this overwrites: :server, :port, :service, :protocol).
     # * <tt>:server</tt>: IAM service host, default: DEFAULT_HOST
     # * <tt>:port</tt>: IAM service port, default: DEFAULT_PORT
     # * <tt>:protocol</tt>: 'http' or 'https', default: DEFAULT_PROTOCOL
@@ -113,7 +113,7 @@ module RightAws
         result[items]
       end
     end
-    
+
     #-----------------------------------------------------------------
     #      Server Certificates
     #-----------------------------------------------------------------
@@ -170,7 +170,7 @@ module RightAws
       link = generate_request_impl(:post, "UploadServerCertificate", request_hash)
       request_info(link, GetServerCertificateParser.new(:logger => @logger))
     end
-    
+
     # Updates the name and/or the path of the specified server certificate.
     #
     # Options: :new_server_certificate_name, :new_path
@@ -218,7 +218,7 @@ module RightAws
     #-----------------------------------------------------------------
 
     # Returns information about the signing certificates associated with the specified User.
-    # 
+    #
     # Options: :user_name, :max_items, :marker
     #
     # iam.list_signing_certificates #=>

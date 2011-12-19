@@ -32,7 +32,7 @@ module RightAws
     # Describe Spot Price history.
     #
     # Options: :start_time, :end_time, instance_types, product_description
-    # 
+    #
     # Filters: instance-type, product-description, spot-price, timestamp
     #
     #  ec2.describe_spot_price_history #=>
@@ -126,7 +126,7 @@ module RightAws
     #      :key_name=>"rightscale_test"}, ... ]
     #
     #  ec2.describe_spot_instance_requests(:filters => {'type'=>"one-time", 'state'=>"open"})
-    #  
+    #
     # P.S. filters: http://docs.amazonwebservices.com/AWSEC2/latest/APIReference/index.html?ApiReference-query-DescribeSpotInstanceRequests.html
     #
     def describe_spot_instance_requests(*list_and_options)
@@ -148,7 +148,7 @@ module RightAws
     #    :instance_count => 2,
     #    :group_ids => ["sg-a0b85dc9"],
     #    :instance_type => 'c1.medium') #=>
-    #    
+    #
     #    [{:product_description=>"Linux/UNIX",
     #      :type=>"one-time",
     #      :spot_instance_requestId=>"sir-7a893003",
@@ -416,7 +416,7 @@ module RightAws
         @result = {}
       end
     end
-    
+
   end
 
 end

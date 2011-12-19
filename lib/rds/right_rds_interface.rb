@@ -24,7 +24,7 @@
 module RightAws
 
     class RdsInterface < RightAwsBase
-    
+
     include RightAwsBaseInterface
 
     API_VERSION      = "2011-04-01"
@@ -64,8 +64,8 @@ module RightAws
              :default_service     => ENV['RDS_URL'] ? URI.parse(ENV['RDS_URL']).path   : DEFAULT_PATH,
              :default_protocol    => ENV['RDS_URL'] ? URI.parse(ENV['RDS_URL']).scheme : DEFAULT_PROTOCOL,
              :default_api_version => ENV['RDS_API_VERSION'] || API_VERSION },
-           aws_access_key_id     || ENV['AWS_ACCESS_KEY_ID'], 
-           aws_secret_access_key || ENV['AWS_SECRET_ACCESS_KEY'], 
+           aws_access_key_id     || ENV['AWS_ACCESS_KEY_ID'],
+           aws_secret_access_key || ENV['AWS_SECRET_ACCESS_KEY'],
            params)
     end
 
@@ -77,7 +77,7 @@ module RightAws
     def generate_request(action, params={}) #:nodoc:
       generate_request_impl(:get, action, params )
     end
-      
+
       # Sends request to Amazon and parses the response.
       # Raises AwsError if any banana happened.
     def request_info(request, parser, &block) # :nodoc:
@@ -228,8 +228,8 @@ module RightAws
     end
 
     # Modify a DB instance.
-    # 
-    # Mandatory arguments: +aws_id+. 
+    #
+    # Mandatory arguments: +aws_id+.
     # Optional params: +:master_user_password+, +:instance_class+, +:db_security_groups+,
     # +:db_parameter_group+, +:preferred_maintenance_window+, +:allocated_storage+, +:apply_immediately+,
     # +:backup_retention_period+, +:preferred_backup_window+, +:multi_az+, +:engine_version+,
@@ -405,7 +405,7 @@ module RightAws
     end
 
     # Authorize an ingress. Params: +:cidrip+ or (+:ec2_security_group_name+ and +:ec2_security_group_owner+)
-    #  
+    #
     #  rds.authorize_db_security_group_ingress('kd3', :cidrip => '131.0.0.1/8')
     #    {:owner_id=>"82...25",
     #     :ec2_security_groups=>[],
@@ -513,7 +513,7 @@ module RightAws
     # Modify DBParameterGroup paramaters. Up to 20 params can be midified at once.
     #
     #  rds.modify_db_parameter_group('kd1', 'max_allowed_packet' => 2048) #=> true
-    #  
+    #
     #  rds.modify_db_parameter_group('kd1', 'max_allowed_packet' => {:value => 2048, :method => 'immediate')  #=> true
     #
     def modify_db_parameter_group(db_parameter_group_name, params={}) # :nodoc:
@@ -545,7 +545,7 @@ module RightAws
     end
 
     # Modify the parameters of a DBParameterGroup to the engine/system default value.
-    # 
+    #
     #  # Reset all parameters
     #  rds.reset_db_parameter_group('kd2', :all ) #=> true
     #
@@ -663,7 +663,7 @@ module RightAws
       end
       result
     end
-    
+
     # --------------------------------------------
     #  DB Snapshots
     # --------------------------------------------
@@ -825,7 +825,7 @@ module RightAws
     # --------------------------------------------
 
     # Get events related to RDS instances and DBSecurityGroups for the past 14 days.
-    # Optional params: +:duration+, +:start_time+, +:end_time+, +:aws_id+, 
+    # Optional params: +:duration+, +:start_time+, +:end_time+, +:aws_id+,
     #                  +:source_type+('db-instance', 'db-security-group', 'db-snapshot', 'db-parameter-group')
     #
     #  # get all enevts
@@ -1038,7 +1038,7 @@ module RightAws
       link = generate_request('PurchaseReservedDBInstancesOffering', request_hash)
       request_info(link, DescribeReservedDBInstancesParser.new(:logger => @logger))[:reserved_db_instances].first
     end
-    
+
     # --------------------------------------------
     #  Parsers
     # --------------------------------------------

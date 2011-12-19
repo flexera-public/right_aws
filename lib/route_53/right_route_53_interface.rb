@@ -38,7 +38,7 @@ module RightAws
   #  #------------------------
   #  # Create Hosted Zone
   #  #------------------------
-  #  
+  #
   #  hosted_zone_config = {
   #    :name   => 'my-awesome-site.com.',
   #    :config => {
@@ -149,13 +149,13 @@ module RightAws
   #      :submitted_at=>"2011-01-19T08:46:37.307Z" }
   #
   #  # Delete Hosted Zone
-  #  r53.delete_hosted_zone("/hostedzone/Z1K6NCF0EB26FB") #=> 
+  #  r53.delete_hosted_zone("/hostedzone/Z1K6NCF0EB26FB") #=>
   #    { :status=>"PENDING",
   #      :aws_id=>"/change/C3OJ31D4V5P2LU",
   #      :submitted_at=>"2011-01-19T08:46:37.530Z" }
   #
   class Route53Interface < RightAwsBase
-    
+
     include RightAwsBaseInterface
 
     API_VERSION       = "2011-05-05"

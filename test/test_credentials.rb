@@ -1,7 +1,7 @@
 class TestCredentials
 
-  @@aws_access_key_id = nil 
-  @@aws_secret_access_key = nil 
+  @@aws_access_key_id = nil
+  @@aws_secret_access_key = nil
   @@account_number = nil
 
   def self.aws_access_key_id
@@ -26,7 +26,7 @@ class TestCredentials
   def self.get_credentials
     Dir.chdir do
       begin
-        Dir.chdir('./.rightscale') do 
+        Dir.chdir('./.rightscale') do
           require 'testcredentials'
         end
       rescue Exception => e

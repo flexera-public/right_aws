@@ -31,5 +31,5 @@
     def right_underscore
       self.gsub(/[A-Z]/){|match| "#{$`=='' ? '' : '_'}#{match.downcase}" }
     end
-    
+
   end

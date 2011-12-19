@@ -82,7 +82,7 @@ module RightAws
     end
 
     # Delete tags.
-    # Options: 
+    # Options:
     #   :default => 'something' : a default value for keys without (or with nil) values.
     #
     # Delete a tag from a resource regardless of value:

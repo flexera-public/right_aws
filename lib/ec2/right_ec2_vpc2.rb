@@ -28,14 +28,14 @@ module RightAws
     # VPC v2: Limits
     #
     # http://docs.amazonwebservices.com/AmazonVPC/latest/UserGuide/index.html?VPC_Appendix_Limits.html
-    
+
     #----------------------
     #   InternetGateways
     #----------------------
 
     # Create internet gateway
     #
-    #  ec2.create_internet_gateway #=> 
+    #  ec2.create_internet_gateway #=>
     #    { :internet_gateway_id=>"igw-6585c10c", :tags=>{}}
     #
     # P.S. http://docs.amazonwebservices.com/AWSEC2/latest/APIReference/index.html?ApiReference-query-CreateInternetGateway.html
@@ -78,8 +78,8 @@ module RightAws
       on_exception
     end
 
-    # Attaches an Internet gateway to a VPC, enabling connectivity between the Internet and the VPC. 
-    # 
+    # Attaches an Internet gateway to a VPC, enabling connectivity between the Internet and the VPC.
+    #
     #  ec2.attach_internet_gateway("igw-6585c10c", "vpc-df80a6b6") #=> true
     #
     # P.S. http://docs.amazonwebservices.com/AWSEC2/latest/APIReference/ApiReference-query-AttachInternetGateway.html
@@ -94,7 +94,7 @@ module RightAws
     end
 
     # Detaches an Internet gateway from a VPC, disabling connectivity between the Internet and the VPC.
-    # The VPC must not contain any running instances with Elastic IP addresses. 
+    # The VPC must not contain any running instances with Elastic IP addresses.
     #
     #  ec2.detach_internet_gateway("igw-6585c10c", "vpc-df80a6b6") #=> true
     #
@@ -141,7 +141,7 @@ module RightAws
     #  ec2.describe_route_tables(:filters => {'vpc-id' => "vpc-df80a6b6"})
     #
     #  # Custom route table
-    #  ec2.describe_route_tables("rtb-be3006d7") #=> 
+    #  ec2.describe_route_tables("rtb-be3006d7") #=>
     #    [{:vpc_id=>"vpc-df80a6b6",
     #      :route_set=>
     #       [{:state=>"active",
@@ -156,15 +156,15 @@ module RightAws
     #       [{:route_table_association_id=>"rtbassoc-a02610c9",
     #         :subnet_id=>"subnet-b95f76d0",
     #         :route_table_id=>"rtb-be3006d7"}]}]
-    #  
+    #
     # P.S. http://docs.amazonwebservices.com/AWSEC2/latest/APIReference/index.html?ApiReference-query-DescribeRouteTables.html
-    # 
+    #
     def describe_route_tables(*list_and_options)
       describe_resources_with_list_and_options('DescribeRouteTables', 'RouteTableId', QEc2DescribeRouteTablesParser, list_and_options)
     rescue Exception
       on_exception
     end
-    
+
     # Creates a new route table within a VPC. After you create a new route table, you can add routes and associate the table with a subne
     #
     #  ec2.create_route_table("vpc-df80a6b6") #=>
@@ -186,7 +186,7 @@ module RightAws
       on_exception
     end
 
-    # Deletes a route table from a VPC. 
+    # Deletes a route table from a VPC.
     # The route table must not be associated with a subnet. You can't delete the main route table.
     #
     #  ec2.delete_route_table("rtb-4331072a") #=> true
@@ -199,14 +199,14 @@ module RightAws
       on_exception
     end
 
-    # Associates a subnet with a route table. The subnet and route table must be in the same VPC. 
+    # Associates a subnet with a route table. The subnet and route table must be in the same VPC.
     # This association causes traffic originating from the subnet to be routed according to the routes in
-    # the route table. The action returns an association ID, which you need if you want to disassociate 
+    # the route table. The action returns an association ID, which you need if you want to disassociate
     # the route table from the subnet later. A route table can be associated with multiple subnets.
     #
     #  ec2.associate_route_table("rtb-be3006d7", "subnet-b95f76d0") #=> true
     #
-    # P.S. http://docs.amazonwebservices.com/AWSEC2/latest/APIReference/index.html?ApiReference-query-AssociateRouteTable.html  
+    # P.S. http://docs.amazonwebservices.com/AWSEC2/latest/APIReference/index.html?ApiReference-query-AssociateRouteTable.html
     #
     def associate_route_table(route_table_id, subnet_id)
       request_hash = { 'RouteTableId' => route_table_id,
@@ -220,7 +220,7 @@ module RightAws
     # Disassociates a subnet from a route table.
     #
     #  ec2.disassociate_route_table(route_table_association_id) #=> true
-    #  
+    #
     # P.S. http://docs.amazonwebservices.com/AWSEC2/latest/APIReference/ApiReference-query-DisassociateRouteTable.html
     #
     def disassociate_route_table(route_table_association_id)
@@ -230,9 +230,9 @@ module RightAws
       on_exception
     end
 
-    # Changes the route table associated with a given subnet in a VPC. After you execute this action, the subnet 
-    # uses the routes in the new route table it's associated with. 
-    # You can also use this action to change which table is the main route table in the VPC. You just specify 
+    # Changes the route table associated with a given subnet in a VPC. After you execute this action, the subnet
+    # uses the routes in the new route table it's associated with.
+    # You can also use this action to change which table is the main route table in the VPC. You just specify
     # the main route table's association ID and the route table that you want to be the new main route table.
     #
     #  ec2.replace_route_table_association("rtb-be3006d7", "rtbassoc-a02610c9") #=> true
@@ -247,15 +247,15 @@ module RightAws
     rescue Exception
       on_exception
     end
-    
+
     #---------------------
     # Routes
     #---------------------
 
-    # Creates a new route in a route table within a VPC. The route's target can be either a gateway attached to 
+    # Creates a new route in a route table within a VPC. The route's target can be either a gateway attached to
     # the VPC or a NAT instance in the VPC.
     # Options: :gateway_id, :instance_id
-    # 
+    #
     #  ec2.create_route("rtb-be3006d7",  "0.0.0.1/32", :gateway_id => 'igw-6585c10c') #=> true
     #
     # P.S. http://docs.amazonwebservices.com/AWSEC2/latest/APIReference/ApiReference-query-CreateRoute.html
@@ -264,7 +264,7 @@ module RightAws
       request_hash = { 'RouteTableId'         => route_table_id,
                        'DestinationCidrBlock' => destination_cidr_block }
       request_hash['GatewayId']  = options[:gateway_id]  unless options[:gateway_id].right_blank?
-      request_hash['InstanceId'] = options[:instance_id] unless options[:instance_id].right_blank?      
+      request_hash['InstanceId'] = options[:instance_id] unless options[:instance_id].right_blank?
       link = generate_request("CreateRoute", request_hash)
       request_info(link, RightHttp2xxParser.new(:logger => @logger))
     rescue Exception
@@ -287,7 +287,7 @@ module RightAws
 
     # Replaces an existing route within a route table in a VPC
     # Options: :gateway_id, :instance_id
-    # 
+    #
     #  ec2.replace_route("rtb-be3006d7",  "0.0.0.2/32", :gateway_id => 'igw-6585c10c') #=> true
     #
     # P.S. http://docs.amazonwebservices.com/AWSEC2/latest/APIReference/ApiReference-query-ReplaceRoute.html
@@ -296,7 +296,7 @@ module RightAws
       request_hash = { 'RouteTableId'         => route_table_id,
                        'DestinationCidrBlock' => destination_cidr_block }
       request_hash['GatewayId']  = options[:gateway_id]  unless options[:gateway_id].right_blank?
-      request_hash['InstanceId'] = options[:instance_id] unless options[:instance_id].right_blank?      
+      request_hash['InstanceId'] = options[:instance_id] unless options[:instance_id].right_blank?
       link = generate_request("ReplaceRoute", request_hash)
       request_info(link, RightHttp2xxParser.new(:logger => @logger))
     rescue Exception

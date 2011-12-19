@@ -161,7 +161,7 @@ module RightAws
       :main_class => 'HadoopJarStep.MainClass',
       :properties => 'HadoopJarStep.Properties',
     }
-    
+
     KEY_VALUE_KEY_MAPPINGS = {
       :key => 'Key',
       :value => 'Value',
@@ -464,7 +464,7 @@ module RightAws
     rescue
       on_exception
     end
-    
+
     MODIFY_INSTANCE_GROUP_KEY_MAPPINGS = {
       :instance_group_id => 'InstanceGroupId',
       :instance_count => 'InstanceCount',
@@ -501,7 +501,7 @@ module RightAws
     rescue
       on_exception
     end
-    
+
     private
 
     def amazonize_run_job_flow(options) # :nodoc:
@@ -678,7 +678,7 @@ module RightAws
           when 'JobFlowId' then @item[:job_flow_id] = @text
           when 'LogUri' then @item[:log_uri] = @text
           when 'Name' then @item[:name] = @text
-          
+
           # JobFlowExecutionStatusDetail
           when 'CreationDateTime' then @item[:creation_date_time] = @text
           when 'EndDateTime' then @item[:end_date_time] = @text
@@ -686,7 +686,7 @@ module RightAws
           when 'ReadyDateTime' then @item[:ready_date_time] = @text
           when 'StartDateTime' then @item[:start_date_time] = @text
           when 'State' then @item[:state] = @text
-          
+
           # JobFlowInstancesDetail
           when 'Ec2KeyName' then @item[:ec2_key_name] = @text
           when 'HadoopVersion' then @item[:hadoop_version] = @text

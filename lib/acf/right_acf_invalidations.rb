@@ -25,7 +25,7 @@ module RightAws
   class AcfInterface
 
     # List Invalidations
-    # 
+    #
     #  acf.list_invalidations('E3LTBMK4EAQS7D') #=>
     #    [{:status=>"InProgress", :aws_id=>"I3AW9PPQS0CBKV"},
     #     {:status=>"InProgress", :aws_id=>"I1HV23N5KD3XH9"}]

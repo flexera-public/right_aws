@@ -5,14 +5,14 @@ class TestSqs < Test::Unit::TestCase
   GRANTEE_EMAIL_ADDRESS = 'madhur@amazon.com'
   RIGHT_MESSAGE_TEXT    = 'Right test message'
 
-  
+
   def setup
     @sqs = Rightscale::SqsInterface.new(TestCredentials.aws_access_key_id, TestCredentials.aws_secret_access_key)
     @queue_name = 'right_sqs_test_awesome_queue'
       # for classes
     @s = Rightscale::Sqs.new(TestCredentials.aws_access_key_id, TestCredentials.aws_secret_access_key)
   end
-  
+
   # Wait for the queue to appears in the queues list.
   # Amazon needs some time to after the queue creation to place
   # it to the accessible queues list. If we dont want to get
@@ -22,7 +22,7 @@ class TestSqs < Test::Unit::TestCase
     until queue_url
       queue_url = @sqs.queue_url_by_name(queue_name)
       unless queue_url
-        print '-' 
+        print '-'
         STDOUT.flush
         sleep 1
       end
@@ -30,24 +30,24 @@ class TestSqs < Test::Unit::TestCase
     queue_url
   end
 
-  
 
-  
+
+
   def assert_eventually_equal(value, timeout=30, failmsg="", &block)
     start_time = Time.now.to_i
     tries = 0
     while(yield != value) do
       tries += 1
-      print '-' 
+      print '-'
       STDOUT.flush
       s = Time.now.to_i - start_time
       flunk("Timeout: #{failmsg}: did not equal \"#{value}\" after #{tries} tries in #{s}s.") if s > timeout
       sleep(1)
-      setup if (tries % 10) == 0 
+      setup if (tries % 10) == 0
     end
   end
-  
-  
+
+
   #---------------------------
   # Rightscale::SqsInterface
   #---------------------------
@@ -70,7 +70,7 @@ class TestSqs < Test::Unit::TestCase
     sleep 20 # Amazon needs some time to change attribute
     assert_equal '111', @sqs.get_queue_attributes(queue_url)['VisibilityTimeout'], 'New VisibilityTimeout must be equal to 111'
   end
-  
+
   def test_04_set_and_get_visibility_timeout
     queue_url = @sqs.queue_url_by_name(@queue_name)
     assert @sqs.set_visibility_timeout(queue_url, 222), 'Set_visibility_timeout fail'
@@ -80,7 +80,7 @@ class TestSqs < Test::Unit::TestCase
       @sqs.get_visibility_timeout(queue_url)
     end
   end
-  
+
   def test_05_add_test_remove_grant
     queue_url = @sqs.queue_url_by_name(@queue_name)
     assert @sqs.add_grant(queue_url, GRANTEE_EMAIL_ADDRESS, 'FULLCONTROL'), 'Add grant fail'
@@ -88,7 +88,7 @@ class TestSqs < Test::Unit::TestCase
     assert grants_list.size>0, 'List_grants must return at least 1 record for user #{GRANTEE_EMAIL_ADDRESS}'
     assert @sqs.remove_grant(queue_url, GRANTEE_EMAIL_ADDRESS, 'FULLCONTROL'), 'Remove_grant fail'
   end
-  
+
   def test_06_send_message
     queue_url = @sqs.queue_url_by_name(@queue_name)
       # send 5 messages for the tests below
@@ -98,7 +98,7 @@ class TestSqs < Test::Unit::TestCase
     assert @sqs.send_message(queue_url, RIGHT_MESSAGE_TEXT)
     assert @sqs.send_message(queue_url, RIGHT_MESSAGE_TEXT)
   end
-  
+
   def test_07_get_queue_length
     queue_url = @sqs.queue_url_by_name(@queue_name)
     assert_equal 5, @sqs.get_queue_length(queue_url), 'Queue must have 5 messages'
@@ -112,24 +112,24 @@ class TestSqs < Test::Unit::TestCase
     assert_equal r_message[:body], p_message[:body], 'Received and Peeked messages must be equal'
     assert @sqs.change_message_visibility(queue_url, r_message[:id], 0), 'Change_message_visibility fail'
   end
-  
+
   def test_09_delete_message
     queue_url = @sqs.queue_url_by_name(@queue_name)
     message = @sqs.receive_message(queue_url)
     assert @sqs.delete_message(queue_url, message[:id]), 'Delete_message fail'
     assert @sqs.pop_message(queue_url), 'Pop_message fail'
   end
-  
+
   def test_10_clear_and_delete_queue
     queue_url = @sqs.queue_url_by_name(@queue_name)
     assert_raise(Rightscale::AwsError) { @sqs.delete_queue(queue_url) }
-## oops, force_clear_queue does not work any more - amazon expects for 60 secs timeout between 
+## oops, force_clear_queue does not work any more - amazon expects for 60 secs timeout between
 ## queue deletion and recreation...
 ##    assert @sqs.force_clear_queue(queue_url), 'Force_clear_queue fail'
     assert @sqs.clear_queue(queue_url), 'Clear_queue fail'
     assert @sqs.delete_queue(queue_url), 'Delete_queue fail'
   end
-  
+
   #---------------------------
   # Rightscale::Sqs classes
   #---------------------------
@@ -150,7 +150,7 @@ class TestSqs < Test::Unit::TestCase
       # delete queue
     assert queue.delete
   end
-  
+
   def test_21_queue_create
       # create new queue
     queue = Rightscale::Sqs::Queue.create(@s, "#{@queue_name}_21", true)
@@ -158,7 +158,7 @@ class TestSqs < Test::Unit::TestCase
     assert queue.is_a?(Rightscale::Sqs::Queue)
     wait_for_queue_url(@queue_name)
   end
-  
+
   def test_22_queue_attributes
     queue = Rightscale::Sqs::Queue.create(@s, "#{@queue_name}_21", false)
       # get a list of attrinutes
@@ -174,12 +174,12 @@ class TestSqs < Test::Unit::TestCase
     assert_equal v, queue.get_attribute('VisibilityTimeout')
       # get queue visibility timeout
     assert v.to_i, queue.visibility
-      # change it 
+      # change it
     queue.visibility += 10
       # make sure that it is changed
     assert v.to_i + 10, queue.visibility
   end
-  
+
   def test_23_grantees
     queue = Rightscale::Sqs::Queue.create(@s, "#{@queue_name}_21", false)
       # get a list of grantees
@@ -205,7 +205,7 @@ class TestSqs < Test::Unit::TestCase
     # Don't test this - just for cleanup purposes
     queue.delete
   end
-  
+
   def test_24_send_size
     queue_url = @sqs.queue_url_by_name("#{@queue_name}_24")
     @sqs.delete_queue(queue_url)
@@ -223,7 +223,7 @@ class TestSqs < Test::Unit::TestCase
       # check queue size again
     assert_equal 6, queue.size
   end
-  
+
   def test_25_message_receive_pop_peek_delete
     queue = Rightscale::Sqs::Queue.create(@s, "#{@queue_name}_24", false)
       # get queue size
@@ -248,13 +248,13 @@ class TestSqs < Test::Unit::TestCase
       # make sure that queue size has decreased again
     assert_equal size-2, queue.size
   end
-  
+
   def test_26
     queue = Rightscale::Sqs::Queue.create(@s, "#{@queue_name}_24", false)
-      # lock message 
+      # lock message
     queue.receive(100)
       # clear queue
-    assert queue.clear 
+    assert queue.clear
       # queue size is greater than zero
     assert queue.size>0
     queue.push('123456')
@@ -281,5 +281,5 @@ class TestSqs < Test::Unit::TestCase
     # check that the request has correct signature version
     assert sqs.last_request.path.include?('SignatureVersion=0')
   end
-  
+
 end

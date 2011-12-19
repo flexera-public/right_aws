@@ -48,7 +48,7 @@ module RightAws
     # Retrieve a list of images.
     #
     # Accepts a list of images and/or a set of filters as the last parameter.
-    # 
+    #
     # Filters: architecture, block-device-mapping.delete-on-termination block-device-mapping.device-name,
     # block-device-mapping.snapshot-id, block-device-mapping.volume-size, description, image-id, image-type,
     # is-public, kernel-id, manifest-location, name, owner-alias, owner-id, platform, product-code,
@@ -99,7 +99,7 @@ module RightAws
     # Retrieve a list of images by image owner.
     #
     # Accepts a list of images and/or a set of filters as the last parameter.
-    # 
+    #
     # Filters: architecture, block-device-mapping.delete-on-termination block-device-mapping.device-name,
     # block-device-mapping.snapshot-id, block-device-mapping.volume-size, description, image-id, image-type,
     # is-public, kernel-id, manifest-location, name, owner-alias, owner-id, platform, product-code,
@@ -119,9 +119,9 @@ module RightAws
     end
 
     # Retrieve a list of images by image executable by.
-    # 
+    #
     # Accepts a list of images and/or a set of filters as the last parameter.
-    # 
+    #
     # Filters: architecture, block-device-mapping.delete-on-termination block-device-mapping.device-name,
     # block-device-mapping.snapshot-id, block-device-mapping.volume-size, description, image-id, image-type,
     # is-public, kernel-id, manifest-location, name, owner-alias, owner-id, platform, product-code,
@@ -202,7 +202,7 @@ module RightAws
     end
 
     # Describe image attributes.
-    # 
+    #
     # Returns: String (or nil) for 'description', 'kernel', 'ramdisk'; Hash for 'launchPermission'; Array for 'productCodes', 'blockDeviceMapping'
     #
     #  ec2.describe_image_attribute('ami-00000000', 'description')        #=> 'My cool Image'
@@ -438,5 +438,5 @@ module RightAws
     end
 
   end
-  
+
 end

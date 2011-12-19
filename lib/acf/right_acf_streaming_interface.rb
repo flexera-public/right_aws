@@ -21,9 +21,9 @@
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 module RightAws
-  
+
   class AcfInterface
-    
+
     def streaming_distribution_config_to_xml(config) # :nodoc:
       distribution_config_to_xml(config, 'StreamingDistributionConfig')
     end
