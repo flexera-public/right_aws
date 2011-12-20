@@ -1051,13 +1051,13 @@ module RightAws
         @result = []
       end
       def tagstart(name, attributes)
-        @error = {}
+        @error = {} if name == 'Error'
       end
       def tagend(name)
         case name
-          when 'Key'     then current[:key]     = @text
-          when 'Code'    then current[:code]    = @text
-          when 'Message' then current[:message] = @text
+          when 'Key'     then @error[:key]     = @text
+          when 'Code'    then @error[:code]    = @text
+          when 'Message' then @error[:message] = @text
           when 'Error'   then @result << @error
         end
       end
