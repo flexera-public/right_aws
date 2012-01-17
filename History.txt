@@ -327,3 +327,10 @@ the source key.
     - SDB: ConsistentRead support
     - bunch of micro bugs
 
+=== 3.0.1
+  Release Notes:
+  - Fixed: 
+    - SignatureDoesNotMatch on file download via get_link()
+    - S3#bucket should not fail for non admin creds
+    - couple doc typos
+  
