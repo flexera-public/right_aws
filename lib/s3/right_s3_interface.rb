@@ -856,7 +856,7 @@ module RightAws
     def generate_link(method, headers={}, expires=nil) #:nodoc:
         # calculate request data
       server, path, path_to_sign = fetch_request_params(headers)
-      path_to_sign = CGI.unescape(path_to_sign)
+
         # expiration time
       expires ||= DEFAULT_EXPIRES_AFTER
       expires   = Time.now.utc + expires if expires.is_a?(Fixnum) && (expires < ONE_YEAR_IN_SECONDS)
@@ -950,7 +950,7 @@ module RightAws
       else
         response_params = ''
       end
-      generate_link('GET', headers.merge(:url=>"#{bucket}/#{CGI::escape key}#{response_params}"), expires)
+      generate_link('GET', headers.merge(:url=>"#{bucket}/#{URI::escape key}#{response_params}"), expires)
     rescue
       on_exception
     end
