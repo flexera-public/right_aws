@@ -950,7 +950,7 @@ module RightAws
       else
         response_params = ''
       end
-      generate_link('GET', headers.merge(:url=>"#{bucket}/#{URI::escape key}#{response_params}"), expires)
+      generate_link('GET', headers.merge(:url=>"#{bucket}/#{CGI::escape(key).gsub('+', '%20')}#{response_params}"), expires)
     rescue
       on_exception
     end
