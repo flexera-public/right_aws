@@ -371,10 +371,15 @@ module RightAws
       when :revoke, :remove   then action = "RevokeSecurityGroupIngress"
       else raise "Unknown action #{action.inspect}!"
       end
-      hash['GroupName']                  = group_name
-      hash['SourceSecurityGroupName']    = params[:source_group]                         unless params[:source_group].right_blank?
-      hash['SourceSecurityGroupOwnerId'] = params[:source_group_owner].to_s.gsub(/-/,'') unless params[:source_group_owner].right_blank?
-      hash['IpProtocol']                 = params[:protocol]                             unless params[:protocol].right_blank?
+      hash['GroupName']               = group_name
+      hash['SourceSecurityGroupName'] = params[:source_group] unless params[:source_group].right_blank?
+      hash['IpProtocol']              = params[:protocol]     unless params[:protocol].right_blank?
+      unless params[:source_group_owner].right_blank?
+        # Do remove dashes only if the source owner is in format of "7011-0219-8268"
+        source_group_owner = params[:source_group_owner].to_s
+        source_group_owner.gsub!(/-/,'') if source_group_owner[/^\d{4}-\d{4}-\d{4}$/]
+        hash['SourceSecurityGroupOwnerId'] = source_group_owner
+      end
       unless params[:port].right_blank?
         hash['FromPort'] = params[:port]
         hash['ToPort']   = params[:port]
