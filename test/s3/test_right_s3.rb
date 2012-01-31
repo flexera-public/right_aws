@@ -457,6 +457,55 @@ class TestS3 < Test::Unit::TestCase
     end
   end
 
+  def test_44_delete_multiple
+    bucket = RightAws::S3::Bucket.create(@s, @bucket, true)
+
+    key1 = Rightscale::S3::Key.create(bucket, @key1)
+    key2 = Rightscale::S3::Key.create(bucket, @key2)
+    key3 = Rightscale::S3::Key.create(bucket, @key3)
+
+    assert @s3.put(@bucket, @key1, RIGHT_OBJECT_TEXT), 'Put bucket fail'
+    assert @s3.put(@bucket, @key2, RIGHT_OBJECT_TEXT), 'Put bucket fail'
+    assert @s3.put(@bucket, @key3, RIGHT_OBJECT_TEXT), 'Put bucket fail'
+
+    key1.refresh
+    key2.refresh
+    key3.refresh
+
+    assert key1.exists?
+    assert key2.exists?
+    assert key3.exists?
+
+    result = @s3.delete_multiple(@bucket, [@key1, @key2, @key3])
+    assert result.empty?
+
+    key1.refresh
+    key2.refresh
+    key3.refresh
+
+    assert !key1.exists?
+    assert !key2.exists?
+    assert !key3.exists?
+  end
+
+  def test_45_delete_multiple_more_than_1000_objects
+    n = 1200
+    keys = (1..n).map { |i| "key-#{i}"}
+
+    keys.each do |key|
+      assert @s3.put(@bucket, key, RIGHT_OBJECT_TEXT), 'Put bucket fail'
+    end
+
+    result = @s3.delete_multiple(@bucket, keys)
+    assert result.empty?
+
+    keys_after = @s3.list_bucket(@bucket).map { |obj| obj[:key] }
+
+    keys.each do |key|
+      keys_after.include?(key)
+    end
+  end
+
   private
 
   def request( uri )
