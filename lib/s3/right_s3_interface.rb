@@ -852,6 +852,11 @@ module RightAws
     #      Query API: Links
     #-----------------------------------------------------------------
 
+    def s3_link_escape(text)
+      #CGI::escape(text.to_s).gsub(/[+]/, '%20')
+      AwsUtils::amz_escape(text.to_s)
+    end
+    
       # Generates link for QUERY API
     def generate_link(method, headers={}, expires=nil) #:nodoc:
         # calculate request data
@@ -909,7 +914,7 @@ module RightAws
       #  s3.list_bucket_link('my_awesome_bucket') #=> url string
       #
     def list_bucket_link(bucket, options=nil, expires=nil, headers={})
-      bucket += '?' + options.map{|k, v| "#{k.to_s}=#{CGI::escape v.to_s}"}.join('&') unless options.right_blank?
+      bucket += '?' + options.map{|k, v| "#{k.to_s}=#{s3_link_escape(v)}"}.join('&') unless options.right_blank?
       generate_link('GET', headers.merge(:url=>bucket), expires)
     rescue
       on_exception
@@ -920,7 +925,7 @@ module RightAws
       #  s3.put_link('my_awesome_bucket',key, object) #=> url string
       #
     def put_link(bucket, key, data=nil, expires=nil, headers={})
-      generate_link('PUT', headers.merge(:url=>"#{bucket}/#{CGI::escape key}", :data=>data), expires)
+      generate_link('PUT', headers.merge(:url=>"#{bucket}/#{s3_link_escape(key)}", :data=>data), expires)
     rescue
       on_exception
     end
@@ -946,11 +951,11 @@ module RightAws
       #
     def get_link(bucket, key, expires=nil, headers={}, response_params={})
       if response_params.size > 0
-        response_params = '?' + response_params.map { |k, v| "#{k}=#{CGI::escape(v).gsub(/[+]/, '%20')}" }.join('&')
+        response_params = '?' + response_params.map { |k, v| "#{k}=#{s3_link_escape(v)}" }.join('&')
       else
         response_params = ''
       end
-      generate_link('GET', headers.merge(:url=>"#{bucket}/#{URI::escape key}#{response_params}"), expires)
+      generate_link('GET', headers.merge(:url=>"#{bucket}/#{s3_link_escape(key)}#{response_params}"), expires)
     rescue
       on_exception
     end
@@ -960,7 +965,7 @@ module RightAws
       #  s3.head_link('my_awesome_bucket',key) #=> url string
       #
     def head_link(bucket, key, expires=nil,  headers={})
-      generate_link('HEAD', headers.merge(:url=>"#{bucket}/#{CGI::escape key}"), expires)
+      generate_link('HEAD', headers.merge(:url=>"#{bucket}/#{s3_link_escape(key)}"), expires)
     rescue
       on_exception
     end
@@ -970,7 +975,7 @@ module RightAws
       #  s3.delete_link('my_awesome_bucket',key) #=> url string
       #
     def delete_link(bucket, key, expires=nil, headers={})
-      generate_link('DELETE', headers.merge(:url=>"#{bucket}/#{CGI::escape key}"), expires)
+      generate_link('DELETE', headers.merge(:url=>"#{bucket}/#{s3_link_escape(key)}"), expires)
     rescue
       on_exception
     end
@@ -981,7 +986,7 @@ module RightAws
       #  s3.get_acl_link('my_awesome_bucket',key) #=> url string
       #
     def get_acl_link(bucket, key='', headers={})
-      return generate_link('GET', headers.merge(:url=>"#{bucket}/#{CGI::escape key}?acl"))
+      return generate_link('GET', headers.merge(:url=>"#{bucket}/#{s3_link_escape(key)}?acl"))
     rescue
       on_exception
     end
@@ -991,7 +996,7 @@ module RightAws
       #  s3.put_acl_link('my_awesome_bucket',key) #=> url string
       #
     def put_acl_link(bucket, key='', headers={})
-      return generate_link('PUT', headers.merge(:url=>"#{bucket}/#{CGI::escape key}?acl"))
+      return generate_link('PUT', headers.merge(:url=>"#{bucket}/#{s3_link_escape(key)}?acl"))
     rescue
       on_exception
     end
