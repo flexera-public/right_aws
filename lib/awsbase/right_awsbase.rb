@@ -43,9 +43,10 @@ module RightAws
       Base64.encode64(OpenSSL::HMAC.digest(@@digest1, aws_secret_access_key, auth_string)).strip
     end
 
-    # Escape a string accordingly Amazon rulles
+    # Escape a string accordingly Amazon rules
     # http://docs.amazonwebservices.com/AmazonSimpleDB/2007-11-07/DeveloperGuide/index.html?REST_RESTAuth.html
     def self.amz_escape(param)
+      param = param.flatten.join('') if param.is_a?(Array) # ruby 1.9.x Array#to_s fix
       param.to_s.gsub(/([^a-zA-Z0-9._~-]+)/n) do
         '%' + $1.unpack('H2' * $1.size).join('%').upcase
       end
