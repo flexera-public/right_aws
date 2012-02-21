@@ -67,6 +67,16 @@ module RightAws
       service_hash
     end
 
+    def self.fix_headers(headers)
+      result = {}
+      headers.each do |header, value|
+        next if !header.is_a?(String) || value.nil?
+        header = header.downcase
+        result[header] = value if result[header].right_blank?
+      end
+      result
+    end
+
     # Signature Version 0
     # A deprecated guy (should work till septemper 2009)
     def self.sign_request_v0(aws_secret_access_key, service_hash)

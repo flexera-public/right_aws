@@ -126,6 +126,7 @@ module RightAws
         path += "?" + params.to_a.collect{ |key,val| "#{AwsUtils::amz_escape(key)}=#{AwsUtils::amz_escape(val.to_s)}" }.join("&")
       end
       # Headers
+      headers = AwsUtils::fix_headers(headers)
       headers['content-type'] ||= 'text/xml' if body
       headers['date'] = Time.now.httpdate
       # Auth
