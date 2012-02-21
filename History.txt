@@ -333,4 +333,9 @@ the source key.
     - SignatureDoesNotMatch on file download via get_link()
     - S3#bucket should not fail for non admin creds
     - couple doc typos
-  
+
+=== 3.0.2
+  Release Notes:
+  - Fixed:
+    - S3 Content-Type not set in Ruby 1.9.2
+    - error in rds_interface describe_db_snapshots in Ruby 1.9.2

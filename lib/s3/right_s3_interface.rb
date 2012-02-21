@@ -175,8 +175,8 @@ module RightAws
         # calculate request data
       server, path, path_to_sign = fetch_request_params(headers)
       data = headers[:data]
-        # remove unset(==optional) and symbolyc keys
-      headers.each{ |key, value| headers.delete(key) if (value.nil? || key.is_a?(Symbol)) }
+        # make sure headers are downcased strings
+      headers = AwsUtils::fix_headers(headers)
         #
       headers['content-type'] ||= ''
       headers['date']           = Time.now.httpdate
@@ -866,8 +866,8 @@ module RightAws
       expires ||= DEFAULT_EXPIRES_AFTER
       expires   = Time.now.utc + expires if expires.is_a?(Fixnum) && (expires < ONE_YEAR_IN_SECONDS)
       expires   = expires.to_i
-        # remove unset(==optional) and symbolyc keys
-      headers.each{ |key, value| headers.delete(key) if (value.nil? || key.is_a?(Symbol)) }
+        # make sure headers are downcased strings
+      headers = AwsUtils::fix_headers(headers)
         #generate auth strings
       auth_string = canonical_string(method, path_to_sign, headers, expires)
       signature   = CGI::escape(AwsUtils::sign( @aws_secret_access_key, auth_string))
