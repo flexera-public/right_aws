@@ -345,6 +345,7 @@ module RightAws
                     :tags            => {}}
         when %r{/routeSet/item$}       then @route_set       = {}
         when %r{/associationSet/item$} then @association_set = {}
+        when %r{/tagSet/item$}         then @aws_tag = {}
         end
       end
       def tagend(name)
