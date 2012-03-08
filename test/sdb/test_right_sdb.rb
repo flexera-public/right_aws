@@ -12,7 +12,7 @@ class TestSdb < Test::Unit::TestCase
   end
 
   SDB_DELAY = 7
-  
+
   def wait(delay, msg='')
     print "waiting #{delay} seconds #{msg}"
     while delay>0 do
@@ -32,7 +32,7 @@ class TestSdb < Test::Unit::TestCase
     assert @sdb.delete_domain(@domain), 'delete_domain fail'
     wait SDB_DELAY, 'after domain deletion'
   end
-  
+
   def test_01_create_domain
     # check that domain does not exist
     assert !@sdb.list_domains[:domains].include?(@domain)
@@ -48,7 +48,7 @@ class TestSdb < Test::Unit::TestCase
     assert @sdb.put_attributes(@domain, @item, @attr)
     wait SDB_DELAY, 'after putting attributes'
   end
-  
+
   def test_03_get_attributes
     # get attributes
     values = Array(@sdb.get_attributes(@domain, @item)[:attributes]['Jon']).sort
@@ -65,7 +65,7 @@ class TestSdb < Test::Unit::TestCase
     values = Array(@sdb.get_attributes(@domain, @item)[:attributes]['Jon']).sort
     assert_equal values, (@attr['Jon'] << new_value).sort
   end
-  
+
   def test_05_replace_attributes
     # replace attributes
     @sdb.put_attributes @domain, @item, {'Jon' => 'pub'}, :replace
@@ -74,7 +74,7 @@ class TestSdb < Test::Unit::TestCase
     values = @sdb.get_attributes(@domain, @item)[:attributes]['Jon']
     assert_equal values, ['pub']
   end
-  
+
   def test_06_delete_attribute
     # add value 'girls' and 'vodka' to 'Jon'
     @sdb.put_attributes @domain, @item, {'Jon' => ['girls','vodka']}
@@ -108,8 +108,8 @@ class TestSdb < Test::Unit::TestCase
     # get attributes (values must be empty)
     values = @sdb.get_attributes(@domain, @item)[:attributes]['Volodya']
     assert_equal values, nil
-  end  
-  
+  end
+
   def test_08_query
     # add some values for query
     @sdb.put_attributes @domain, @item, {'Jon' => ['girls','vodka']}
@@ -118,23 +118,23 @@ class TestSdb < Test::Unit::TestCase
     assert_equal items.size, 1
     assert_equal items.first, @item
   end
-  
-  def test_09_signature_version_0 
-    sdb    = Rightscale::SdbInterface.new(TestCredentials.aws_access_key_id, TestCredentials.aws_secret_access_key, :signature_version => '0') 
-    item   = 'toys' 
+
+  def test_09_signature_version_0
+    sdb    = Rightscale::SdbInterface.new(TestCredentials.aws_access_key_id, TestCredentials.aws_secret_access_key, :signature_version => '0')
+    item   = 'toys'
     # TODO: need to change the below test.  I think Juergen's intention was to include some umlauts in the values
-    # put attributes 
+    # put attributes
     # mhhh... Not sure how to translate this: hÃ¶lzchehn klÃ¶tzchen grÃŒnspan buÃe... Lets assume this is:
-    attributes = { 'Jurgen' => %w{kitten puppy chickabiddy piglet} } 
-    assert sdb.put_attributes(@domain, item, attributes) 
-    wait SDB_DELAY, 'after putting attributes' 
-    # get attributes 
+    attributes = { 'Jurgen' => %w{kitten puppy chickabiddy piglet} }
+    assert sdb.put_attributes(@domain, item, attributes)
+    wait SDB_DELAY, 'after putting attributes'
+    # get attributes
     values = Array(sdb.get_attributes(@domain, item)[:attributes]['Jurgen']).sort
-    # compare to original list 
-    assert_equal values, attributes['Jurgen'].sort 
+    # compare to original list
+    assert_equal values, attributes['Jurgen'].sort
     # check that the request has correct signature version
     assert sdb.last_request.path.include?('SignatureVersion=0')
-  end 
+  end
 
   def test_10_signature_version_1
     sdb = Rightscale::SdbInterface.new(TestCredentials.aws_access_key_id, TestCredentials.aws_secret_access_key, :signature_version => '1')
@@ -160,14 +160,14 @@ class TestSdb < Test::Unit::TestCase
       @sdb.put_attributes(@domain, item, {:one=>1, :two=>2, :three=>3})
     end
   end
-  
+
   def test_13_zero_len_attrs
     item = 'zeroes'
     assert_nothing_thrown "Failed to put zero-length attributes" do
       @sdb.put_attributes(@domain, item, {:one=>"", :two=>"", :three=>""})
     end
   end
-  
+
   def test_14_nil_attrs
     item = 'nils'
     res = nil
@@ -182,7 +182,7 @@ class TestSdb < Test::Unit::TestCase
     assert_nil(res[:attributes]['two'][0])
     assert_not_nil(res[:attributes]['three'][0])
   end
-  
+
   def test_15_url_escape
     item = 'urlescapes'
     content = {:a=>"one & two & three",
@@ -194,7 +194,7 @@ class TestSdb < Test::Unit::TestCase
     assert_equal(content[:a], res[:attributes]['a'][0])
     assert_equal(content[:b], res[:attributes]['b'][0])
   end
-  
+
   def test_16_put_attrs_by_post
     item = 'reqgirth'
     i = 0
@@ -249,5 +249,5 @@ class TestSdb < Test::Unit::TestCase
     # check that domain does not exist
     assert !@sdb.list_domains[:domains].include?(@domain)
   end
-  
+
 end

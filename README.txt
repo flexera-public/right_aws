@@ -5,8 +5,8 @@ For information about RightScale, see http://www.rightscale.com
 
 == DESCRIPTION:
 
-The RightScale AWS gems have been designed to provide a robust, fast, and secure interface to Amazon EC2, EBS, S3, SQS, SDB, and CloudFront. 
-These gems have been used in production by RightScale since late 2006 and are being maintained to track enhancements made by Amazon. 
+The RightScale AWS gems have been designed to provide a robust, fast, and secure interface to Amazon EC2, EBS, S3, SQS, SDB, and CloudFront.
+These gems have been used in production by RightScale since late 2006 and are being maintained to track enhancements made by Amazon.
 The RightScale AWS gems comprise:
 
 - RightAws::Ec2 -- interface to Amazon EC2 (Elastic Compute Cloud), VPC (Virtual Private Cloud) and the associated EBS (Elastic Block Store)
@@ -32,7 +32,7 @@ The RightScale AWS gems comprise:
   These errors are automaticallly retried using exponentially increasing intervals.
   The number of retries is user-configurable.
 - Fast REXML-based parsing of responses (as fast as a pure Ruby solution allows).
-- Uses libxml (if available) for faster response parsing. 
+- Uses libxml (if available) for faster response parsing.
 - Support for large S3 list operations.  Buckets and key subfolders containing
   many (> 1000) keys are listed in entirety.  Operations based on list (like
   bucket clear) work on arbitrary numbers of keys.
@@ -50,7 +50,7 @@ The RightScale AWS gems comprise:
 All RightScale AWS interfaces offer two threading options:
 1. Use a single persistent HTTP connection per process.
 2. Use a persistent HTTP connection per Ruby thread.
- 
+
 Either way, it doesn't matter how many (for example) RightAws::S3 objects you create,
 they all use the same per-program or per-thread
 connection. The purpose of sharing the connection is to keep a single
@@ -77,20 +77,20 @@ may not get the degree of parallelism you may expect with the multi-threaded set
 * For first generation SQS read RightAws::Sqs and consult the Amazon SQS API documentation at
   http://developer.amazonwebservices.com/connect/kbcategory.jspa?categoryID=31
 * For second generation SQS read RightAws::SqsGen2, RightAws::SqsGen2Interface, and consult the Amazon SQS API documentation at
-  http://developer.amazonwebservices.com/connect/entry.jspa?externalID=1214&categoryID=31 
+  http://developer.amazonwebservices.com/connect/entry.jspa?externalID=1214&categoryID=31
 
   Amazon's Migration Guide for moving from first to second generation SQS is
   avalable at:
   http://developer.amazonwebservices.com/connect/entry.jspa?externalID=1148
 * For SDB read RightAws::SdbInterface, RightAws::ActiveSdb, and consult the Amazon SDB API documentation at
   http://developer.amazonwebservices.com/connect/kbcategory.jspa?categoryID=141
-* For CloudFront (ACF) read RightAws::AcfInterface and consult the Amazon CloudFront API documentation at 
+* For CloudFront (ACF) read RightAws::AcfInterface and consult the Amazon CloudFront API documentation at
   http://developer.amazonwebservices.com/connect/kbcategory.jspa?categoryID=213
 
 == KNOWN ISSUES:
 
 - 7/08: A user has reported that uploads of large files on Windows may be broken on some
-  Win platforms due to a buggy File.lstat.size.  Use the following monkey-patch at your own risk, 
+  Win platforms due to a buggy File.lstat.size.  Use the following monkey-patch at your own risk,
   as it has been proven to break Rails 2.0 on Windows:
 
     require 'win32/file'
@@ -101,7 +101,7 @@ may not get the degree of parallelism you may expect with the multi-threaded set
     end
 
 
-- Attempting to use the Gibberish plugin (used by the Beast forum app) 
+- Attempting to use the Gibberish plugin (used by the Beast forum app)
   will break right_aws as well as lots of other code.  Gibberish
   changes the semantics of core Ruby (specifically, the String class) and thus presents a reliability
   problem for most Ruby programs.
@@ -125,7 +125,7 @@ may not get the degree of parallelism you may expect with the multi-threaded set
   older queue with the same name.  Certain methods of RightAws::Sqs and
   RightAws::SqsInterface will fail with the message:
   "AWS.SimpleQueueService.QueueDeletedRecently: You must wait 60 seconds after deleting a queue before you can create another with the same name."
-  
+
 == REQUIREMENTS:
 
 RightAws requires REXML and the right_http_connection gem.
@@ -141,7 +141,7 @@ sudo gem install right_aws
 
 == LICENSE:
 
-Copyright (c) 2007-2009 RightScale, Inc. 
+Copyright (c) 2007-2009 RightScale, Inc.
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the

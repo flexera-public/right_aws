@@ -146,7 +146,7 @@ module RightAws
     # Describe EBS snapshots.
     #
     # Accepts a list of snapshots and/or options: :restorable_by, :owner and :filters
-    # 
+    #
     # Options: :restorable_by => Array or String, :owner => Array or String, :filters => Hash
     #
     # Filters: description, owner-alias, owner-id, progress, snapshot-id, start-time, status, tag-key,
@@ -174,7 +174,7 @@ module RightAws
     #      :aws_owner=>"711940113766",
     #      :aws_volume_id=>"vol-001efb69",
     #      :aws_started_at=>"2008-10-20T18:25:53.000Z"}, ... ]
-    #  
+    #
     #  ec2.describe_snapshots("snap-e676e28a", "snap-e176e281")
     #
     #  ec2.describe_snapshots(:restorable_by => ['123456781234'],
@@ -310,7 +310,7 @@ module RightAws
     def modify_snapshot_attribute_create_volume_permission_add_users(snapshot_id, *user_ids)
       modify_snapshot_attribute(snapshot_id, 'createVolumePermission', :add_user_ids => user_ids.flatten )
     end
-    
+
     # Revoke create volume permission for a list of users.
     #
     #  ec2.modify_snapshot_attribute_create_volume_permission_remove_users('snap-36fe435f', '000000000000', '000000000001') #=> true
@@ -477,5 +477,5 @@ module RightAws
     end
 
   end
-  
+
 end

@@ -26,10 +26,10 @@ module RightAws
   # = RightAWS::ElbInterface -- RightScale Amazon Elastic Load Balancer interface
   # The RightAws::ElbInterface class provides a complete interface to Amazon's
   # Elastic Load Balancer service.
-  # 
+  #
   # For explanations of the semantics of each call, please refer to Amazon's documentation at
   # http://docs.amazonwebservices.com/ElasticLoadBalancing/latest/DeveloperGuide/
-  # 
+  #
   # Create an interface handle:
   #
   #  elb = RightAws::ElbInterface.new(aws_access_key_id, aws_security_access_key)
@@ -175,7 +175,7 @@ module RightAws
     #
     # Listener options: :protocol, :load_balancer_port, :instance_port and :ssl_certificate_id
     # Protocols: :tcp, :http, :https or :ssl
-    # 
+    #
     #  elb.create_load_balancer( 'test-kd1',
     #                            ['us-east-1a', 'us-east-1b'],
     #                            [ { :protocol => :http,  :load_balancer_port => 80,  :instance_port => 80 },
@@ -430,7 +430,7 @@ module RightAws
     #-----------------------------------------------------------------
     #      PARSERS: Load Balancers
     #-----------------------------------------------------------------
- 
+
     class DescribeLoadBalancersParser < RightAWSParser #:nodoc:
       def tagstart(name, attributes)
         case full_tag_name
@@ -455,7 +455,7 @@ module RightAws
         when 'Target'             then @item[:health_check][:target]              = @text
         when 'HealthyThreshold'   then @item[:health_check][:healthy_threshold]   = @text.to_i
         when 'Timeout'            then @item[:health_check][:timeout]             = @text.to_i
-        when 'UnhealthyThreshold' then @item[:health_check][:unhealthy_threshold] = @text.to_i       
+        when 'UnhealthyThreshold' then @item[:health_check][:unhealthy_threshold] = @text.to_i
         when 'Protocol'           then @listener[:protocol]           = @text
         when 'LoadBalancerPort'   then @listener[:load_balancer_port] = @text
         when 'InstancePort'       then @listener[:instance_port]      = @text

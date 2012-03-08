@@ -26,7 +26,7 @@ module RightAws
   class Ec2
 
     # Enables monitoring for a running instances. For more information, refer to the Amazon CloudWatch Developer Guide.
-    # 
+    #
     #  ec2.monitor_instances('i-8437ddec') #=>
     #    {:instance_id=>"i-8437ddec", :monitoring_state=>"pending"}
     #

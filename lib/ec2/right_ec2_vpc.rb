@@ -48,7 +48,7 @@ module RightAws
     #  ec2.describe_vpcs("vpc-890ce2e0")
     #
     #  ec2.describe_vpcs( :filters => {'tag:MyTag' => 'MyValue'} )
-    #  
+    #
     #  ec2.describe_vpcs( :filters => {'cidr' => "192.168.1.0/24"} )
     #
     # P.S. filters: http://docs.amazonwebservices.com/AmazonVPC/latest/APIReference/index.html?ApiReference-query-DescribeVpcs.html
@@ -151,7 +151,7 @@ module RightAws
     # Accepts a list of DHCP options and/or a set of filters as the last parameter.
     #
     # Filters: dchp-options-id, key, value, tag-key, tag-value, tag:key
-    # 
+    #
     #  ec2.describe_dhcp_options #=>
     #    [{:dhcp_options_id=>"dopt-cb0de3a2",
     #    :dhcp_configuration_set=>
@@ -236,7 +236,7 @@ module RightAws
     end
 
     # Create customer gateway.
-    # 
+    #
     #  ec2.create_customer_gateway('ipsec.1', '12.1.2.3', 65534) #=>
     #    {:type=>"ipsec.1",
     #     :bgp_asn=>"65534",
@@ -281,7 +281,7 @@ module RightAws
     #      :vpn_gateway_id=>"vgw-dfa144b6"}]
     #
     #  ec2.describe_vpn_gateways(:filters => {'tag:MyTag' => 'MyValue'})
-    #      
+    #
     # P.S. filters: http://docs.amazonwebservices.com/AmazonVPC/latest/APIReference/index.html?ApiReference-query-DescribeVpnGateways.html
     #
     def describe_vpn_gateways(*list_and_options)

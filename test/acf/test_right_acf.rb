@@ -3,7 +3,7 @@ require File.dirname(__FILE__) + '/test_helper.rb'
 class TestAcf < Test::Unit::TestCase
 
   RIGHT_OBJECT_TEXT     = 'Right test message'
-  
+
   STDOUT.sync = true
 
   def setup
@@ -128,7 +128,7 @@ class TestAcf < Test::Unit::TestCase
     # delete the distribution
     assert_nothing_raised do
       @acf.delete_distribution(distribution[:aws_id], distribution[:e_tag])
-    end  
+    end
   end
 
   def test_09_drop_bucket

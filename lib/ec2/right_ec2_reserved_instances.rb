@@ -60,7 +60,7 @@ module RightAws
     end
 
     # Retrieve reserved instances offerings.
-    # 
+    #
     # Accepts a list of reserved instances offerings and/or a set of filters as the last parameter.
     #
     # Filters: availability-zone, duration, fixed-price, instance-type, product-description, reserved-instances-offering-id, usage-price
@@ -84,7 +84,7 @@ module RightAws
     #      :instance_tenancy=>"default",
     #      :aws_usage_price=>0.06,
     #      :aws_availability_zone=>"us-east-1a"}, ... ]
-    #      
+    #
     #  ec2.describe_reserved_instances_offerings(:filters => {'availability-zone' => 'us-east-1c'})
     #
     # P.S. filters: http://docs.amazonwebservices.com/AWSEC2/latest/APIReference/index.html?ApiReference-query-DescribeReservedInstancesOfferings.html

@@ -24,11 +24,11 @@
 module RightAws
 
   class S3Interface < RightAwsBase
-    
+
     USE_100_CONTINUE_PUT_SIZE = 1_000_000
-    
+
     include RightAwsBaseInterface
-    
+
     DEFAULT_HOST           = 's3.amazonaws.com'
     DEFAULT_PORT           = 443
     DEFAULT_PROTOCOL       = 'https'
@@ -75,7 +75,7 @@ module RightAws
       # Creates new RightS3 instance.
       #
       #  s3 = RightAws::S3Interface.new('1E3GDYEOGFJPIT7XXXXXX','hgTHt68JY07JKUY08ftHYtERkjgtfERn57XXXXXX', {:logger => Logger.new('/tmp/x.log')}) #=> #<RightAws::S3Interface:0xb7b3c27c>
-      #  
+      #
       # Params is a hash:
       #
       #    {:server        => 's3.amazonaws.com'   # Amazon service host: 's3.amazonaws.com'(default)
@@ -85,13 +85,13 @@ module RightAws
       #     :no_subdomains => true}                # Force placing bucket name into path instead of domain name
       #
     def initialize(aws_access_key_id=nil, aws_secret_access_key=nil, params={})
-      init({ :name             => 'S3', 
-             :default_host     => ENV['S3_URL'] ? URI.parse(ENV['S3_URL']).host   : DEFAULT_HOST, 
+      init({ :name             => 'S3',
+             :default_host     => ENV['S3_URL'] ? URI.parse(ENV['S3_URL']).host   : DEFAULT_HOST,
              :default_port     => ENV['S3_URL'] ? URI.parse(ENV['S3_URL']).port   : DEFAULT_PORT,
              :default_service  => ENV['S3_URL'] ? URI.parse(ENV['S3_URL']).path   : DEFAULT_SERVICE,
-             :default_protocol => ENV['S3_URL'] ? URI.parse(ENV['S3_URL']).scheme : DEFAULT_PROTOCOL }, 
-           aws_access_key_id     || ENV['AWS_ACCESS_KEY_ID'], 
-           aws_secret_access_key || ENV['AWS_SECRET_ACCESS_KEY'], 
+             :default_protocol => ENV['S3_URL'] ? URI.parse(ENV['S3_URL']).scheme : DEFAULT_PROTOCOL },
+           aws_access_key_id     || ENV['AWS_ACCESS_KEY_ID'],
+           aws_secret_access_key || ENV['AWS_SECRET_ACCESS_KEY'],
            params)
     end
 
@@ -191,12 +191,12 @@ module RightAws
         # set other headers
       request['Authorization'] = "AWS #{@aws_access_key_id}:#{signature}"
         # prepare output hash
-      { :request  => request, 
+      { :request  => request,
         :server   => server,
         :port     => @params[:port],
         :protocol => @params[:protocol] }
       end
-      
+
       # Sends request to Amazon and parses the response.
       # Raises AwsError if any banana happened.
     def request_info(request, parser, &block) # :nodoc:
@@ -205,7 +205,7 @@ module RightAws
 
       # Returns an array of customer's buckets. Each item is a +hash+.
       #
-      #  s3.list_all_my_buckets #=> 
+      #  s3.list_all_my_buckets #=>
       #    [{:owner_id           => "00000000009314cc309ffe736daa2b264357476c7fea6efb2c3347ac3ab2792a",
       #      :owner_display_name => "root",
       #      :name               => "bucket_name",
@@ -217,7 +217,7 @@ module RightAws
     rescue
       on_exception
     end
-    
+
       # Creates new bucket. Returns +true+ or an exception.
       #
       #  # create a bucket at American server
@@ -232,7 +232,7 @@ module RightAws
                  when 'eu'      then 'EU'
                  else                headers[:location].to_s
                  end
-      
+
       unless location.right_blank?
         data = "<CreateBucketConfiguration><LocationConstraint>#{location}</LocationConstraint></CreateBucketConfiguration>"
       end
@@ -242,9 +242,9 @@ module RightAws
         # if the bucket exists AWS returns an error for the location constraint interface. Drop it
       e.is_a?(RightAws::AwsError) && e.message.include?('BucketAlreadyOwnedByYou') ? true  : on_exception
     end
-    
+
       # Retrieve bucket location
-      # 
+      #
       #  s3.create_bucket('my-awesome-bucket-us')        #=> true
       #  puts s3.bucket_location('my-awesome-bucket-us') #=> '' (Amazon's default value assumed)
       #
@@ -257,14 +257,14 @@ module RightAws
     rescue
       on_exception
     end
-    
-    # Retrieves the logging configuration for a bucket. 
+
+    # Retrieves the logging configuration for a bucket.
       # Returns a hash of {:enabled, :targetbucket, :targetprefix}
-      # 
+      #
       # s3.interface.get_logging_parse(:bucket => "asset_bucket")
       #   => {:enabled=>true, :targetbucket=>"mylogbucket", :targetprefix=>"loggylogs/"}
       #
-      #  
+      #
     def get_logging_parse(params)
       AwsUtils.mandatory_arguments([:bucket], params)
       AwsUtils.allow_only([:bucket, :headers], params)
@@ -274,12 +274,12 @@ module RightAws
     rescue
       on_exception
     end
-    
+
     # Sets logging configuration for a bucket from the XML configuration document.
     #   params:
     #    :bucket
     #    :xmldoc
-    def put_logging(params)  
+    def put_logging(params)
       AwsUtils.mandatory_arguments([:bucket,:xmldoc], params)
       AwsUtils.allow_only([:bucket,:xmldoc, :headers], params)
       params[:headers] = {} unless params[:headers]
@@ -292,7 +292,7 @@ module RightAws
       # Deletes new bucket. Bucket must be empty! Returns +true+ or an exception.
       #
       #  s3.delete_bucket('my_awesome_bucket')  #=> true
-      # 
+      #
       # See also: force_delete_bucket method
       #
     def delete_bucket(bucket, headers={})
@@ -301,7 +301,7 @@ module RightAws
     rescue
       on_exception
     end
-    
+
       # Returns an array of bucket's keys. Each array item (key data) is a +hash+.
       #
       #  s3.list_bucket('my_awesome_bucket', { 'prefix'=>'t', 'marker'=>'', 'max-keys'=>5, delimiter=>'' }) #=>
@@ -327,7 +327,7 @@ module RightAws
     end
 
     # Incrementally list the contents of a bucket. Yields the following hash to a block:
-    #  s3.incrementally_list_bucket('my_awesome_bucket', { 'prefix'=>'t', 'marker'=>'', 'max-keys'=>5, delimiter=>'' }) yields  
+    #  s3.incrementally_list_bucket('my_awesome_bucket', { 'prefix'=>'t', 'marker'=>'', 'max-keys'=>5, delimiter=>'' }) yields
     #   {
     #     :name => 'bucketname',
     #     :prefix => 'subfolder/',
@@ -355,7 +355,7 @@ module RightAws
     #   }
     def incrementally_list_bucket(bucket, options={}, headers={}, &block)
       internal_options = options.right_symbolize_keys
-      begin 
+      begin
         internal_bucket = bucket.dup
         internal_bucket  += '?'+internal_options.map{|k, v| "#{k.to_s}=#{CGI::escape v.to_s}"}.join('&') unless internal_options.right_blank?
         req_hash = generate_rest_request('GET', headers.merge(:url=>internal_bucket))
@@ -364,7 +364,7 @@ module RightAws
         if(there_are_more_keys)
           internal_options[:marker] = decide_marker(response)
           total_results = response[:contents].length + response[:common_prefixes].length
-          internal_options[:'max-keys'] ? (internal_options[:'max-keys'] -= total_results) : nil 
+          internal_options[:'max-keys'] ? (internal_options[:'max-keys'] -= total_results) : nil
         end
         yield response
       end while there_are_more_keys && under_max_keys(internal_options)
@@ -372,8 +372,8 @@ module RightAws
     rescue
       on_exception
     end
-    
-    
+
+
     private
     def decide_marker(response)
       return response[:next_marker].dup if response[:next_marker]
@@ -388,11 +388,11 @@ module RightAws
         last_key > last_prefix ? last_key.dup : last_prefix.dup
       end
     end
-    
+
     def under_max_keys(internal_options)
       internal_options[:'max-keys'] ? internal_options[:'max-keys'] > 0 : true
     end
-    
+
     public
       # Saves object to Amazon. Returns +true+  or an exception.
       # Any header starting with AMAZON_METADATA_PREFIX is considered
@@ -418,16 +418,16 @@ module RightAws
       # methods.  Be sure that your class returns 'nil' from read() after having
       # read 'size' bytes. Otherwise S3 will drop the socket after
       # 'Content-Length' bytes have been uploaded, and HttpConnection will
-      # interpret this as an error. 
-      #    
+      # interpret this as an error.
+      #
       # This method now supports very large PUTs, where very large
-      # is > 2 GB. 
-      # 
+      # is > 2 GB.
+      #
       # For Win32 users: Files and IO objects should be opened in binary mode.  If
       # a text mode IO object is passed to PUT, it will be converted to binary
       # mode.
       #
-      
+
     def put(bucket, key, data=nil, headers={})
       # On Windows, if someone opens a file in text mode, we must reset it so
       # to binary mode for streaming to work properly
@@ -443,9 +443,9 @@ module RightAws
     rescue
       on_exception
     end
-   
-   
-    
+
+
+
     # New experimental API for uploading objects, introduced in RightAws 1.8.1.
     # store_object is similar in function to the older function put, but returns the full response metadata.  It also allows for optional verification
     # of object md5 checksums on upload.  Parameters are passed as hash entries and are checked for completeness as well as for spurious arguments.
@@ -457,34 +457,34 @@ module RightAws
     # The optional argument of :headers allows the caller to specify arbitrary request header values.
     #
     # s3.store_object(:bucket => "foobucket", :key => "foo", :md5 => "a507841b1bc8115094b00bbe8c1b2954", :data => "polemonium" )
-    #   => {"x-amz-id-2"=>"SVsnS2nfDaR+ixyJUlRKM8GndRyEMS16+oZRieamuL61pPxPaTuWrWtlYaEhYrI/", 
-    #       "etag"=>"\"a507841b1bc8115094b00bbe8c1b2954\"", 
-    #       "date"=>"Mon, 29 Sep 2008 18:57:46 GMT", 
-    #       :verified_md5=>true, 
-    #       "x-amz-request-id"=>"63916465939995BA", 
-    #       "server"=>"AmazonS3", 
+    #   => {"x-amz-id-2"=>"SVsnS2nfDaR+ixyJUlRKM8GndRyEMS16+oZRieamuL61pPxPaTuWrWtlYaEhYrI/",
+    #       "etag"=>"\"a507841b1bc8115094b00bbe8c1b2954\"",
+    #       "date"=>"Mon, 29 Sep 2008 18:57:46 GMT",
+    #       :verified_md5=>true,
+    #       "x-amz-request-id"=>"63916465939995BA",
+    #       "server"=>"AmazonS3",
     #       "content-length"=>"0"}
     #
     # s3.store_object(:bucket => "foobucket", :key => "foo", :data => "polemonium" )
-    #   => {"x-amz-id-2"=>"MAt9PLjgLX9UYJ5tV2fI/5dBZdpFjlzRVpWgBDpvZpl+V+gJFcBMW2L+LBstYpbR", 
-    #       "etag"=>"\"a507841b1bc8115094b00bbe8c1b2954\"", 
-    #       "date"=>"Mon, 29 Sep 2008 18:58:56 GMT", 
-    #       :verified_md5=>false, 
-    #       "x-amz-request-id"=>"3B25A996BC2CDD3B", 
-    #       "server"=>"AmazonS3", 
+    #   => {"x-amz-id-2"=>"MAt9PLjgLX9UYJ5tV2fI/5dBZdpFjlzRVpWgBDpvZpl+V+gJFcBMW2L+LBstYpbR",
+    #       "etag"=>"\"a507841b1bc8115094b00bbe8c1b2954\"",
+    #       "date"=>"Mon, 29 Sep 2008 18:58:56 GMT",
+    #       :verified_md5=>false,
+    #       "x-amz-request-id"=>"3B25A996BC2CDD3B",
+    #       "server"=>"AmazonS3",
     #       "content-length"=>"0"}
-    
+
     def store_object(params)
       AwsUtils.allow_only([:bucket, :key, :data, :headers, :md5], params)
       AwsUtils.mandatory_arguments([:bucket, :key, :data], params)
       params[:headers] = {} unless params[:headers]
-          
+
       params[:data].binmode if(params[:data].respond_to?(:binmode)) # On Windows, if someone opens a file in text mode, we must reset it to binary mode for streaming to work properly
       if (params[:data].respond_to?(:lstat) && params[:data].lstat.size >= USE_100_CONTINUE_PUT_SIZE) ||
          (params[:data].respond_to?(:size)  && params[:data].size       >= USE_100_CONTINUE_PUT_SIZE)
         params[:headers]['expect'] = '100-continue'
       end
-      
+
       req_hash = generate_rest_request('PUT', params[:headers].merge(:url=>"#{params[:bucket]}/#{CGI::escape params[:key]}", :data=>params[:data]))
       resp = request_info(req_hash, S3HttpResponseHeadParser.new)
       if(params[:md5])
@@ -496,47 +496,47 @@ module RightAws
     rescue
       on_exception
     end
-    
+
       # Identical in function to store_object, but requires verification that the returned ETag is identical to the checksum passed in by the user as the 'md5' argument.
       # If the check passes, returns the response metadata with the "verified_md5" field set true.  Raises an exception if the checksums conflict.
       # This call is implemented as a wrapper around store_object and the user may gain different semantics by creating a custom wrapper.
-      # 
+      #
       # s3.store_object_and_verify(:bucket => "foobucket", :key => "foo", :md5 => "a507841b1bc8115094b00bbe8c1b2954", :data => "polemonium" )
-      #   => {"x-amz-id-2"=>"IZN3XsH4FlBU0+XYkFTfHwaiF1tNzrm6dIW2EM/cthKvl71nldfVC0oVQyydzWpb", 
-      #       "etag"=>"\"a507841b1bc8115094b00bbe8c1b2954\"", 
-      #       "date"=>"Mon, 29 Sep 2008 18:38:32 GMT", 
-      #       :verified_md5=>true, 
-      #       "x-amz-request-id"=>"E8D7EA4FE00F5DF7", 
-      #       "server"=>"AmazonS3", 
+      #   => {"x-amz-id-2"=>"IZN3XsH4FlBU0+XYkFTfHwaiF1tNzrm6dIW2EM/cthKvl71nldfVC0oVQyydzWpb",
+      #       "etag"=>"\"a507841b1bc8115094b00bbe8c1b2954\"",
+      #       "date"=>"Mon, 29 Sep 2008 18:38:32 GMT",
+      #       :verified_md5=>true,
+      #       "x-amz-request-id"=>"E8D7EA4FE00F5DF7",
+      #       "server"=>"AmazonS3",
       #       "content-length"=>"0"}
       #
       # s3.store_object_and_verify(:bucket => "foobucket", :key => "foo", :md5 => "a507841b1bc8115094b00bbe8c1b2953", :data => "polemonium" )
-      #   RightAws::AwsError: Uploaded object failed MD5 checksum verification: {"x-amz-id-2"=>"HTxVtd2bf7UHHDn+WzEH43MkEjFZ26xuYvUzbstkV6nrWvECRWQWFSx91z/bl03n", 
-      #                                                                          "etag"=>"\"a507841b1bc8115094b00bbe8c1b2954\"", 
-      #                                                                          "date"=>"Mon, 29 Sep 2008 18:38:41 GMT", 
-      #                                                                          :verified_md5=>false, 
-      #                                                                          "x-amz-request-id"=>"0D7ADE09F42606F2", 
-      #                                                                          "server"=>"AmazonS3", 
+      #   RightAws::AwsError: Uploaded object failed MD5 checksum verification: {"x-amz-id-2"=>"HTxVtd2bf7UHHDn+WzEH43MkEjFZ26xuYvUzbstkV6nrWvECRWQWFSx91z/bl03n",
+      #                                                                          "etag"=>"\"a507841b1bc8115094b00bbe8c1b2954\"",
+      #                                                                          "date"=>"Mon, 29 Sep 2008 18:38:41 GMT",
+      #                                                                          :verified_md5=>false,
+      #                                                                          "x-amz-request-id"=>"0D7ADE09F42606F2",
+      #                                                                          "server"=>"AmazonS3",
       #                                                                          "content-length"=>"0"}
     def store_object_and_verify(params)
       AwsUtils.mandatory_arguments([:md5], params)
       r = store_object(params)
       r[:verified_md5] ? (return r) : (raise AwsError.new("Uploaded object failed MD5 checksum verification: #{r.inspect}"))
     end
-    
+
       # Retrieves object data from Amazon. Returns a +hash+  or an exception.
       #
       #  s3.get('my_awesome_bucket', 'log/curent/1.log') #=>
       #
-      #      {:object  => "Ola-la!", 
-      #       :headers => {"last-modified"     => "Wed, 23 May 2007 09:08:04 GMT", 
-      #                    "content-type"      => "", 
-      #                    "etag"              => "\"000000000096f4ee74bc4596443ef2a4\"", 
-      #                    "date"              => "Wed, 23 May 2007 09:08:03 GMT", 
-      #                    "x-amz-id-2"        => "ZZZZZZZZZZZZZZZZZZZZ1HJXZoehfrS4QxcxTdNGldR7w/FVqblP50fU8cuIMLiu", 
+      #      {:object  => "Ola-la!",
+      #       :headers => {"last-modified"     => "Wed, 23 May 2007 09:08:04 GMT",
+      #                    "content-type"      => "",
+      #                    "etag"              => "\"000000000096f4ee74bc4596443ef2a4\"",
+      #                    "date"              => "Wed, 23 May 2007 09:08:03 GMT",
+      #                    "x-amz-id-2"        => "ZZZZZZZZZZZZZZZZZZZZ1HJXZoehfrS4QxcxTdNGldR7w/FVqblP50fU8cuIMLiu",
       #                    "x-amz-meta-family" => "Woho556!",
-      #                    "x-amz-request-id"  => "0000000C246D770C", 
-      #                    "server"            => "AmazonS3", 
+      #                    "x-amz-request-id"  => "0000000C246D770C",
+      #                    "server"            => "AmazonS3",
       #                    "content-length"    => "7"}}
       #
       # If a block is provided, yields incrementally to the block as
@@ -549,7 +549,7 @@ module RightAws
       #   foo.write(chunk)
       # end
       # foo.close
-      # 
+      #
 
     def get(bucket, key, headers={}, &block)
       req_hash = generate_rest_request('GET', headers.merge(:url=>"#{bucket}/#{CGI::escape key}"))
@@ -557,7 +557,7 @@ module RightAws
     rescue
       on_exception
     end
-    
+
     # New experimental API for retrieving objects, introduced in RightAws 1.8.1.
     # retrieve_object is similar in function to the older function get.  It allows for optional verification
     # of object md5 checksums on retrieval.  Parameters are passed as hash entries and are checked for completeness as well as for spurious arguments.
@@ -573,27 +573,27 @@ module RightAws
     #   :headers - hash of additional HTTP headers to include with the request
     #   :md5     - MD5 checksum against which to verify the retrieved object
     #
-    #  s3.retrieve_object(:bucket => "foobucket", :key => "foo") 
-    #    => {:verified_md5=>false, 
-    #        :headers=>{"last-modified"=>"Mon, 29 Sep 2008 18:58:56 GMT", 
-    #                   "x-amz-id-2"=>"2Aj3TDz6HP5109qly//18uHZ2a1TNHGLns9hyAtq2ved7wmzEXDOPGRHOYEa3Qnp", 
-    #                   "content-type"=>"", 
-    #                   "etag"=>"\"a507841b1bc8115094b00bbe8c1b2954\"", 
-    #                   "date"=>"Tue, 30 Sep 2008 00:52:44 GMT", 
-    #                   "x-amz-request-id"=>"EE4855DE27A2688C", 
-    #                   "server"=>"AmazonS3", 
-    #                   "content-length"=>"10"}, 
+    #  s3.retrieve_object(:bucket => "foobucket", :key => "foo")
+    #    => {:verified_md5=>false,
+    #        :headers=>{"last-modified"=>"Mon, 29 Sep 2008 18:58:56 GMT",
+    #                   "x-amz-id-2"=>"2Aj3TDz6HP5109qly//18uHZ2a1TNHGLns9hyAtq2ved7wmzEXDOPGRHOYEa3Qnp",
+    #                   "content-type"=>"",
+    #                   "etag"=>"\"a507841b1bc8115094b00bbe8c1b2954\"",
+    #                   "date"=>"Tue, 30 Sep 2008 00:52:44 GMT",
+    #                   "x-amz-request-id"=>"EE4855DE27A2688C",
+    #                   "server"=>"AmazonS3",
+    #                   "content-length"=>"10"},
     #        :object=>"polemonium"}
     #
-    #  s3.retrieve_object(:bucket => "foobucket", :key => "foo", :md5=>'a507841b1bc8115094b00bbe8c1b2954') 
-    #    => {:verified_md5=>true, 
-    #        :headers=>{"last-modified"=>"Mon, 29 Sep 2008 18:58:56 GMT", 
-    #                   "x-amz-id-2"=>"mLWQcI+VuKVIdpTaPXEo84g0cz+vzmRLbj79TS8eFPfw19cGFOPxuLy4uGYVCvdH", 
-    #                   "content-type"=>"", "etag"=>"\"a507841b1bc8115094b00bbe8c1b2954\"", 
-    #                   "date"=>"Tue, 30 Sep 2008 00:53:08 GMT", 
-    #                   "x-amz-request-id"=>"6E7F317356580599", 
-    #                   "server"=>"AmazonS3", 
-    #                   "content-length"=>"10"}, 
+    #  s3.retrieve_object(:bucket => "foobucket", :key => "foo", :md5=>'a507841b1bc8115094b00bbe8c1b2954')
+    #    => {:verified_md5=>true,
+    #        :headers=>{"last-modified"=>"Mon, 29 Sep 2008 18:58:56 GMT",
+    #                   "x-amz-id-2"=>"mLWQcI+VuKVIdpTaPXEo84g0cz+vzmRLbj79TS8eFPfw19cGFOPxuLy4uGYVCvdH",
+    #                   "content-type"=>"", "etag"=>"\"a507841b1bc8115094b00bbe8c1b2954\"",
+    #                   "date"=>"Tue, 30 Sep 2008 00:53:08 GMT",
+    #                   "x-amz-request-id"=>"6E7F317356580599",
+    #                   "server"=>"AmazonS3",
+    #                   "content-length"=>"10"},
     #        :object=>"polemonium"}
     # If a block is provided, yields incrementally to the block as
     # the response is read.  For large responses, this function is ideal as
@@ -613,7 +613,7 @@ module RightAws
     rescue
       on_exception
     end
-    
+
       # Identical in function to retrieve_object, but requires verification that the returned ETag is identical to the checksum passed in by the user as the 'md5' argument.
       # If the check passes, returns the response metadata with the "verified_md5" field set true.  Raises an exception if the checksums conflict.
       # This call is implemented as a wrapper around retrieve_object and the user may gain different semantics by creating a custom wrapper.
@@ -627,14 +627,14 @@ module RightAws
       # Retrieves object metadata. Returns a +hash+ of http_response_headers.
       #
       #  s3.head('my_awesome_bucket', 'log/curent/1.log') #=>
-      #    {"last-modified"     => "Wed, 23 May 2007 09:08:04 GMT", 
-      #     "content-type"      => "", 
-      #     "etag"              => "\"000000000096f4ee74bc4596443ef2a4\"", 
-      #     "date"              => "Wed, 23 May 2007 09:08:03 GMT", 
-      #     "x-amz-id-2"        => "ZZZZZZZZZZZZZZZZZZZZ1HJXZoehfrS4QxcxTdNGldR7w/FVqblP50fU8cuIMLiu", 
+      #    {"last-modified"     => "Wed, 23 May 2007 09:08:04 GMT",
+      #     "content-type"      => "",
+      #     "etag"              => "\"000000000096f4ee74bc4596443ef2a4\"",
+      #     "date"              => "Wed, 23 May 2007 09:08:03 GMT",
+      #     "x-amz-id-2"        => "ZZZZZZZZZZZZZZZZZZZZ1HJXZoehfrS4QxcxTdNGldR7w/FVqblP50fU8cuIMLiu",
       #     "x-amz-meta-family" => "Woho556!",
-      #     "x-amz-request-id"  => "0000000C246D770C", 
-      #     "server"            => "AmazonS3", 
+      #     "x-amz-request-id"  => "0000000C246D770C",
+      #     "server"            => "AmazonS3",
       #     "content-length"    => "7"}
       #
     def head(bucket, key, headers={})
@@ -655,13 +655,13 @@ module RightAws
       on_exception
     end
 
-      # Copy an object. 
+      # Copy an object.
       #  directive: :copy    - copy meta-headers from source (default value)
       #             :replace - replace meta-headers by passed ones
       #
       #  # copy a key with meta-headers
       #  s3.copy('b1', 'key1', 'b1', 'key1_copy') #=> {:e_tag=>"\"e8b...8d\"", :last_modified=>"2008-05-11T10:25:22.000Z"}
-      #  
+      #
       #  # copy a key, overwrite meta-headers
       #  s3.copy('b1', 'key2', 'b1', 'key2_copy', :replace, 'x-amz-meta-family'=>'Woho555!') #=> {:e_tag=>"\"e8b...8d\"", :last_modified=>"2008-05-11T10:26:22.000Z"}
       #
@@ -677,17 +677,17 @@ module RightAws
     rescue
       on_exception
     end
-    
-      # Move an object. 
+
+      # Move an object.
       #  directive: :copy    - copy meta-headers from source (default value)
       #             :replace - replace meta-headers by passed ones
       #
       #  # move bucket1/key1 to bucket1/key2
       #  s3.move('bucket1', 'key1', 'bucket1', 'key2') #=> {:e_tag=>"\"e8b...8d\"", :last_modified=>"2008-05-11T10:27:22.000Z"}
-      #  
+      #
       #  # move bucket1/key1 to bucket2/key2 with new meta-headers assignment
       #  s3.copy('bucket1', 'key1', 'bucket2', 'key2', :replace, 'x-amz-meta-family'=>'Woho555!') #=> {:e_tag=>"\"e8b...8d\"", :last_modified=>"2008-05-11T10:28:22.000Z"}
-      #  
+      #
     def move(src_bucket, src_key, dest_bucket, dest_key=nil, directive=:copy, headers={})
       copy_result = copy(src_bucket, src_key, dest_bucket, dest_key, directive, headers)
       # delete an original key if it differs from a destination one
@@ -695,15 +695,15 @@ module RightAws
       copy_result
     end
 
-      # Rename an object. 
-      # 
+      # Rename an object.
+      #
       #  # rename bucket1/key1 to bucket1/key2
       #  s3.rename('bucket1', 'key1', 'key2') #=> {:e_tag=>"\"e8b...8d\"", :last_modified=>"2008-05-11T10:29:22.000Z"}
-      #  
+      #
     def rename(src_bucket, src_key, dest_key, headers={})
       move(src_bucket, src_key, src_bucket, dest_key, :copy, headers)
     end
-      
+
       # Retieves the ACL (access control policy) for a bucket or object. Returns a hash of headers and xml doc with ACL data. See: http://docs.amazonwebservices.com/AmazonS3/2006-03-01/RESTAccessPolicy.html.
       #
       #  s3.get_acl('my_awesome_bucket', 'log/curent/1.log') #=>
@@ -722,12 +722,12 @@ module RightAws
     def get_acl(bucket, key='', headers={})
       key = key.right_blank? ? '' : "/#{CGI::escape key}"
       req_hash = generate_rest_request('GET', headers.merge(:url=>"#{bucket}#{key}?acl"))
-      request_info(req_hash, S3HttpResponseBodyParser.new) 
+      request_info(req_hash, S3HttpResponseBodyParser.new)
     rescue
       on_exception
     end
-      
-      # Retieves the ACL (access control policy) for a bucket or object. 
+
+      # Retieves the ACL (access control policy) for a bucket or object.
       # Returns a hash of {:owner, :grantees}
       #
       #  s3.get_acl_parse('my_awesome_bucket', 'log/curent/1.log') #=>
@@ -761,7 +761,7 @@ module RightAws
         if result[:grantees].key?(key)
           result[:grantees][key][:permissions] << grantee[:permissions]
         else
-          result[:grantees][key] = 
+          result[:grantees][key] =
             { :display_name => grantee[:display_name] || grantee[:uri].to_s[/[^\/]*$/],
               :permissions  => Array(grantee[:permissions]),
               :attributes   => grantee[:attributes] }
@@ -771,7 +771,7 @@ module RightAws
     rescue
       on_exception
     end
-    
+
       # Sets the ACL on a bucket or object.
     def put_acl(bucket, key, acl_xml_doc, headers={})
       key = key.right_blank? ? '' : "/#{CGI::escape key}"
@@ -780,14 +780,14 @@ module RightAws
     rescue
       on_exception
     end
-    
+
       # Retieves the ACL (access control policy) for a bucket. Returns a hash of headers and xml doc with ACL data.
     def get_bucket_acl(bucket, headers={})
       return get_acl(bucket, '', headers)
     rescue
       on_exception
     end
-    
+
       # Sets the ACL on a bucket only.
     def put_bucket_acl(bucket, acl_xml_doc, headers={})
       return put_acl(bucket, '', acl_xml_doc, headers)
@@ -808,7 +808,7 @@ module RightAws
     rescue
       on_exception
     end
-    
+
       # Deletes all keys in bucket then deletes bucket. Returns +true+ or an exception.
       #
       #  s3.force_delete_bucket('my_awesome_bucket')
@@ -819,7 +819,7 @@ module RightAws
     rescue
       on_exception
     end
-    
+
       # Deletes all keys where the 'folder_key' may be assumed as 'folder' name. Returns an array of string keys that have been deleted.
       #
       #  s3.list_bucket('my_awesome_bucket').map{|key_data| key_data[:key]} #=> ['test','test/2/34','test/3','test1','test1/logs']
@@ -837,7 +837,7 @@ module RightAws
     rescue
       on_exception
     end
-    
+
       # Retrieves object data only (headers are omitted). Returns +string+ or an exception.
       #
       #  s3.get('my_awesome_bucket', 'log/curent/1.log') #=> 'Ola-la!'
@@ -847,7 +847,7 @@ module RightAws
     rescue
       on_exception
     end
-    
+
     #-----------------------------------------------------------------
     #      Query API: Links
     #-----------------------------------------------------------------
@@ -878,7 +878,7 @@ module RightAws
     rescue
       on_exception
     end
-    
+
       # Generates link for 'ListAllMyBuckets'.
       #
       #  s3.list_all_my_buckets_link #=> url string
@@ -888,7 +888,7 @@ module RightAws
     rescue
       on_exception
     end
-    
+
       # Generates link for 'CreateBucket'.
       #
       #  s3.create_bucket_link('my_awesome_bucket') #=> url string
@@ -898,7 +898,7 @@ module RightAws
     rescue
       on_exception
     end
-    
+
       # Generates link for 'DeleteBucket'.
       #
       #  s3.delete_bucket_link('my_awesome_bucket') #=> url string
@@ -908,7 +908,7 @@ module RightAws
     rescue
       on_exception
     end
-    
+
       # Generates link for 'ListBucket'.
       #
       #  s3.list_bucket_link('my_awesome_bucket') #=> url string
@@ -919,7 +919,7 @@ module RightAws
     rescue
       on_exception
     end
-    
+
       # Generates link for 'PutObject'.
       #
       #  s3.put_link('my_awesome_bucket',key, object) #=> url string
@@ -929,16 +929,16 @@ module RightAws
     rescue
       on_exception
     end
-    
+
       # Generates link for 'GetObject'.
       #
-      # if a bucket comply with virtual hosting naming then retuns a link with the 
+      # if a bucket comply with virtual hosting naming then retuns a link with the
       # bucket as a part of host name:
-      # 
+      #
       #  s3.get_link('my-awesome-bucket',key) #=> https://my-awesome-bucket.s3.amazonaws.com:443/asia%2Fcustomers?Signature=nh7...
-      #  
+      #
       # otherwise returns an old style link (the bucket is a part of path):
-      # 
+      #
       #  s3.get_link('my_awesome_bucket',key) #=> https://s3.amazonaws.com:443/my_awesome_bucket/asia%2Fcustomers?Signature=QAO...
       #
       # see http://docs.amazonwebservices.com/AmazonS3/2006-03-01/VirtualHosting.html
@@ -959,7 +959,7 @@ module RightAws
     rescue
       on_exception
     end
-    
+
       # Generates link for 'HeadObject'.
       #
       #  s3.head_link('my_awesome_bucket',key) #=> url string
@@ -969,7 +969,7 @@ module RightAws
     rescue
       on_exception
     end
-    
+
       # Generates link for 'DeleteObject'.
       #
       #  s3.delete_link('my_awesome_bucket',key) #=> url string
@@ -979,8 +979,8 @@ module RightAws
     rescue
       on_exception
     end
-    
-    
+
+
       # Generates link for 'GetACL'.
       #
       #  s3.get_acl_link('my_awesome_bucket',key) #=> url string
@@ -990,7 +990,7 @@ module RightAws
     rescue
       on_exception
     end
-    
+
       # Generates link for 'PutACL'.
       #
       #  s3.put_acl_link('my_awesome_bucket',key) #=> url string
@@ -1000,7 +1000,7 @@ module RightAws
     rescue
       on_exception
     end
-    
+
       # Generates link for 'GetBucketACL'.
       #
       #  s3.get_acl_link('my_awesome_bucket',key) #=> url string
@@ -1010,7 +1010,7 @@ module RightAws
     rescue
       on_exception
     end
-    
+
       # Generates link for 'PutBucketACL'.
       #
       #  s3.put_acl_link('my_awesome_bucket',key) #=> url string
@@ -1114,7 +1114,7 @@ module RightAws
           when 'DisplayName' then @current_key[:owner_display_name] = @text
           when 'Contents'    then @result[:contents] << @current_key
             # Common Prefix stuff
-          when 'CommonPrefixes' 
+          when 'CommonPrefixes'
             @result[:common_prefixes] = @common_prefixes
             @in_common_prefixes = false
         end
@@ -1162,7 +1162,7 @@ module RightAws
         end
       end
     end
-    
+
     class S3LoggingParser < RightAWSParser  # :nodoc:
       def reset
         @result          = {:enabled => false, :targetbucket => '', :targetprefix => ''}
@@ -1196,7 +1196,7 @@ module RightAws
         end
       end
     end
-    
+
     #-----------------------------------------------------------------
     #      PARSERS: Non XML
     #-----------------------------------------------------------------
@@ -1218,8 +1218,8 @@ module RightAws
 
     class S3HttpResponseBodyParser < S3HttpResponseParser  # :nodoc:
       def parse(response)
-        @result = { 
-          :object  => response.body, 
+        @result = {
+          :object  => response.body,
           :headers => headers_to_string(response.to_hash)
         }
       end
@@ -1230,7 +1230,7 @@ module RightAws
         @result = headers_to_string(response.to_hash)
       end
     end
-    
+
   end
 
 end

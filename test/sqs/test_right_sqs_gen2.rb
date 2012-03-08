@@ -5,7 +5,7 @@ class TestSqsGen2 < Test::Unit::TestCase
   GRANTEE_EMAIL_ADDRESS = 'fester@example.com'
   RIGHT_MESSAGE_TEXT    = 'Right test message'
 
-  
+
   def setup
     $stdout.sync = true
     @grantee_aws_id = '100000000001'
@@ -17,7 +17,7 @@ class TestSqsGen2 < Test::Unit::TestCase
       # for classes
     @s = Rightscale::SqsGen2.new(TestCredentials.aws_access_key_id, TestCredentials.aws_secret_access_key)
   end
-  
+
   # Wait for the queue to appear in the queues list.
   # Amazon needs some time to after the queue creation to place
   # it to the accessible queues list. If we dont want to get
@@ -41,7 +41,7 @@ class TestSqsGen2 < Test::Unit::TestCase
     end
     puts
   end
-    
+
   #---------------------------
   # Rightscale::SqsInterface
   #---------------------------
@@ -113,7 +113,7 @@ class TestSqsGen2 < Test::Unit::TestCase
     assert @sqs.send_message(queue_url, RIGHT_MESSAGE_TEXT)
     do_sleep 60
   end
-  
+
   def test_15_get_queue_length
     queue_url = @sqs.queue_url_by_name(@queue_name)
     assert_equal 5, @sqs.get_queue_length(queue_url), 'Queue must have 5 messages'
@@ -125,19 +125,19 @@ class TestSqsGen2 < Test::Unit::TestCase
     assert r_message, "Receive returned no message(s), but this is not necessarily incorrect"
     assert_equal RIGHT_MESSAGE_TEXT, r_message['Body'], 'Receive message got wrong message text'
   end
-  
+
   def test_17_delete_message
     queue_url = @sqs.queue_url_by_name(@queue_name)
     message = @sqs.receive_message(queue_url)[0]
     assert @sqs.delete_message(queue_url, message['ReceiptHandle']), 'Delete_message fail'
     assert @sqs.pop_message(queue_url), 'Pop_message fail'
   end
-  
+
   def test_18_clear_and_delete_queue
     queue_url = @sqs.queue_url_by_name(@queue_name)
-    assert @sqs.delete_queue(queue_url) 
+    assert @sqs.delete_queue(queue_url)
   end
-  
+
   #---------------------------
   # Rightscale::Sqs classes
   #---------------------------
@@ -160,7 +160,7 @@ class TestSqsGen2 < Test::Unit::TestCase
     queue = @s.queue(@queue2_name, false)
     assert queue.delete
   end
-  
+
   def test_22_queue_create
       # create new queue
     queue = Rightscale::SqsGen2::Queue.create(@s, @queue3_name, true)
@@ -169,7 +169,7 @@ class TestSqsGen2 < Test::Unit::TestCase
     wait_for_queue_url("#{@queue_name}_21")
     do_sleep 10
   end
-  
+
   def test_23_queue_attributes
     queue = Rightscale::SqsGen2::Queue.create(@s, @queue3_name, false)
       # get a list of attrinutes
@@ -185,7 +185,7 @@ class TestSqsGen2 < Test::Unit::TestCase
     assert_equal v, queue.get_attribute('VisibilityTimeout')
       # get queue visibility timeout
     assert_equal v, queue.visibility
-      # change it 
+      # change it
     queue.visibility = queue.visibility.to_i + 10
       # make sure that it is changed
     assert v.to_i + 10, queue.visibility
@@ -195,7 +195,7 @@ class TestSqsGen2 < Test::Unit::TestCase
     queue = Rightscale::SqsGen2::Queue.create(@s, @queue3_name, false)
     assert queue.delete
   end
-  
+
   def test_25_send_size
     queue = Rightscale::SqsGen2::Queue.create(@s, @queue4_name, true)
       # send 5 messages
@@ -215,7 +215,7 @@ class TestSqsGen2 < Test::Unit::TestCase
       # check queue size again
     assert_equal 6, queue.size
   end
-  
+
   def test_26_message_receive_pop_delete
     queue = Rightscale::SqsGen2::Queue.create(@s,  @queue4_name, false)
       # get queue size
@@ -237,13 +237,13 @@ class TestSqsGen2 < Test::Unit::TestCase
       # make sure that queue size has decreased again
     assert_equal size-2, queue.size
   end
- 
+
   def test_27
     queue = Rightscale::SqsGen2::Queue.create(@s, @queue4_name, false)
-      # lock message 
+      # lock message
     queue.receive(100)
       # clear queue
-    assert queue.clear 
+    assert queue.clear
       # queue size is greater than zero
     assert queue.size>0
       # delete queue
@@ -260,5 +260,5 @@ class TestSqsGen2 < Test::Unit::TestCase
     Rightscale::SqsGen2Interface.amazon_problems= nil
     assert_nil(Rightscale::SqsGen2Interface.amazon_problems)
   end
-  
+
 end

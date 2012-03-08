@@ -47,7 +47,7 @@ module RightAws
   #                               :max_size => 5)
   #
   # Create a new trigger:
-  # 
+  #
   #  as.create_or_update_scaling_trigger('kd.tr.1', 'CentOS.5.1-c-array',
   #                                      :measure_name => 'CPUUtilization',
   #                                      :statistic => :average,
@@ -194,7 +194,7 @@ module RightAws
     # The new settings are registered upon the completion of this call. Any launch configuration settings
     # will take effect on any triggers after this call returns. However, triggers that are currently in
     # progress can not be affected. See key term Trigger.
-    # 
+    #
     # Returns +true+ or raises an exception.
     #
     # Options: +:launch_configuration_name+, +:min_size+, +:max_size+, +:cooldown+, +:availability_zones+.
@@ -393,7 +393,7 @@ module RightAws
     # Incrementally describe Launch Configurations.
     # Returns a full description of the launch configurations given the specified names. If no names
     # are specified, then the full details of all launch configurations are returned.
-    # 
+    #
     # Optional params: +:max_records+, +:next_token+.
     #
     #  # get max 100 first configurations
@@ -635,7 +635,7 @@ module RightAws
             when 'VirtualName'         then @block_device_mapping[:virtual_name] = @text
             when 'member'              then @item[:block_device_mappings]        << @block_device_mapping
             end
-          when %r{member/SecurityGroups/member$} 
+          when %r{member/SecurityGroups/member$}
             @item[:security_groups] << @text
           when %r{/LaunchConfigurations/member$}
             @item[:security_groups].sort!

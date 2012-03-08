@@ -24,7 +24,7 @@
 # Test
 module RightAws
   require 'digest/md5'
-  
+
   class AwsUtils #:nodoc:
     @@digest1   = OpenSSL::Digest::Digest.new("sha1")
     @@digest256 = nil
@@ -38,7 +38,7 @@ module RightAws
       end
       time.utc.strftime("%Y-%m-%dT%H:%M:%S.000Z")
     end
-    
+
     def self.sign(aws_secret_access_key, auth_string)
       Base64.encode64(OpenSSL::HMAC.digest(@@digest1, aws_secret_access_key, auth_string)).strip
     end
@@ -118,11 +118,11 @@ module RightAws
     end
 
     # From Amazon's SQS Dev Guide, a brief description of how to escape:
-    # "URL encode the computed signature and other query parameters as specified in 
-    # RFC1738, section 2.2. In addition, because the + character is interpreted as a blank space 
-    # by Sun Java classes that perform URL decoding, make sure to encode the + character 
+    # "URL encode the computed signature and other query parameters as specified in
+    # RFC1738, section 2.2. In addition, because the + character is interpreted as a blank space
+    # by Sun Java classes that perform URL decoding, make sure to encode the + character
     # although it is not required by RFC1738."
-    # Avoid using CGI::escape to escape URIs. 
+    # Avoid using CGI::escape to escape URIs.
     # CGI::escape will escape characters in the protocol, host, and port
     # sections of the URI.  Only target chars in the query
     # string should be escaped.
@@ -130,19 +130,19 @@ module RightAws
       e = URI.escape(raw)
       e.gsub(/\+/, "%2b")
     end
-    
+
     def self.allow_only(allowed_keys, params)
       bogus_args = []
       params.keys.each {|p| bogus_args.push(p) unless allowed_keys.include?(p) }
       raise AwsError.new("The following arguments were given but are not legal for the function call #{caller_method}: #{bogus_args.inspect}") if bogus_args.length > 0
     end
-    
+
     def self.mandatory_arguments(required_args, params)
       rargs = required_args.dup
       params.keys.each {|p| rargs.delete(p)}
       raise AwsError.new("The following mandatory arguments were not provided to #{caller_method}: #{rargs.inspect}") if rargs.length > 0
     end
-    
+
     def self.caller_method
       caller[1]=~/`(.*?)'/
       $1
@@ -181,14 +181,14 @@ module RightAws
 
   class AwsNoChange < RuntimeError
   end
-  
+
   class RightAwsBase
 
     # Amazon HTTP Error handling
 
     # Text, if found in an error message returned by AWS, indicates that this may be a transient
     # error. Transient errors are automatically retried with exponential back-off.
-    AMAZON_PROBLEMS = [ 'internal service error', 
+    AMAZON_PROBLEMS = [ 'internal service error',
                         'is currently unavailable',
                         'no response from',
                         'Please try again',
@@ -200,13 +200,13 @@ module RightAws
                         'InsufficientInstanceCapacity'
                       ]
     @@amazon_problems = AMAZON_PROBLEMS
-      # Returns a list of Amazon service responses which are known to be transient problems. 
-      # We have to re-request if we get any of them, because the problem will probably disappear. 
+      # Returns a list of Amazon service responses which are known to be transient problems.
+      # We have to re-request if we get any of them, because the problem will probably disappear.
       # By default this method returns the same value as the AMAZON_PROBLEMS const.
     def self.amazon_problems
       @@amazon_problems
     end
-    
+
       # Sets the list of Amazon side problems.  Use in conjunction with the
       # getter to append problems.
     def self.amazon_problems=(problems_list)
@@ -219,7 +219,7 @@ module RightAws
     #
     # If an API call action is in the list then no attempts to retry are performed.
     #
-    RAISE_ON_TIMEOUT_ON_ACTIONS = %w{ 
+    RAISE_ON_TIMEOUT_ON_ACTIONS = %w{
       AllocateAddress
       CreateSnapshot
       CreateVolume
@@ -241,7 +241,7 @@ module RightAws
 
   module RightAwsBaseInterface
     DEFAULT_SIGNATURE_VERSION = '2'
-    
+
     @@caching = false
     def self.caching
       @@caching
@@ -305,7 +305,7 @@ module RightAws
       @params[:host_to_sign]  = @params[:server].dup
       @params[:host_to_sign] << ":#{@params[:port]}" unless default_port == @params[:port].to_i
       # a set of options to be passed to RightHttpConnection object
-      @params[:connection_options] = {} unless @params[:connection_options].is_a?(Hash) 
+      @params[:connection_options] = {} unless @params[:connection_options].is_a?(Hash)
       @with_connection_options = {}
       @params[:connections] ||= :shared # || :dedicated
       @params[:max_connections] ||= 10
@@ -330,11 +330,11 @@ module RightAws
       end
     end
 
-    # Returns +true+ if the describe_xxx responses are being cached 
+    # Returns +true+ if the describe_xxx responses are being cached
     def caching?
       @params.key?(:cache) ? @params[:cache] : @@caching
     end
-    
+
     # Check if the aws function response hits the cache or not.
     # If the cache hits:
     # - raises an +AwsNoChange+ exception if +do_raise+ == +:raise+.
@@ -352,9 +352,9 @@ module RightAws
         # check for changes
         unless @cache[function] && @cache[function][:response_md5] == response_md5
           # well, the response is new, reset cache data
-          update_cache(function, {:response_md5 => response_md5, 
-                                  :timestamp    => Time.now, 
-                                  :hits         => 0, 
+          update_cache(function, {:response_md5 => response_md5,
+                                  :timestamp    => Time.now,
+                                  :hits         => 0,
                                   :parsed       => nil})
         else
           # aha, cache hits, update the data and throw an exception if needed
@@ -370,11 +370,11 @@ module RightAws
       end
       result
     end
-    
+
     def update_cache(function, hash)
       (@cache[function.to_sym] ||= {}).merge!(hash) if caching?
     end
-    
+
     def on_exception(options={:raise=>true, :log=>true}) # :nodoc:
       raise if $!.is_a?(AwsNoChange)
       AwsError::on_aws_exception(self, options)
@@ -471,7 +471,7 @@ module RightAws
                        :protocol => @params[:protocol] }
       request_hash.merge!(@params[:connection_options])
       request_hash.merge!(@with_connection_options)
-      
+
       # If an action is marked as "non-retryable" and there was no :raise_on_timeout option set
       # explicitly then do set that option
       if Array(RightAwsBase::raise_on_timeout_on_actions).include?(action) && !request_hash.has_key?(:raise_on_timeout)
@@ -557,7 +557,7 @@ module RightAws
           check_result   = @error_handler.check(request)
           if check_result
             @error_handler = nil
-            return check_result 
+            return check_result
           end
           raise AwsError.new(@last_errors, @last_response.code, @last_request_id)
         end
@@ -836,7 +836,7 @@ module RightAws
         end
       end
     end
-    
+
     # Execute a block of code with custom set of settings for right_http_connection.
     # Accepts next options (see Rightscale::HttpConnection for explanation):
     #  :raise_on_timeout
@@ -903,35 +903,35 @@ module RightAws
   # Attribute inherited by RuntimeError:
   #  message    - the text of the error, generally as returned by AWS in its XML response.
   class AwsError < RuntimeError
-    
+
     # either an array of errors where each item is itself an array of [code, message]),
     # or an error string if the error was raised manually, as in <tt>AwsError.new('err_text')</tt>
     attr_reader :errors
-    
+
     # Request id (if exists)
     attr_reader :request_id
-    
+
     # Response HTTP error code
     attr_reader :http_code
-    
+
     def initialize(errors=nil, http_code=nil, request_id=nil)
       @errors      = errors
       @request_id  = request_id
       @http_code   = http_code
       super(@errors.is_a?(Array) ? @errors.map{|code, msg| "#{code}: #{msg}"}.join("; ") : @errors.to_s)
     end
-    
+
     # Does any of the error messages include the regexp +pattern+?
     # Used to determine whether to retry request.
     def include?(pattern)
       if @errors.is_a?(Array)
-        @errors.each{ |code, msg| return true if code =~ pattern } 
+        @errors.each{ |code, msg| return true if code =~ pattern }
       else
-        return true if @errors_str =~ pattern 
+        return true if @errors_str =~ pattern
       end
       false
     end
-    
+
     # Generic handler for AwsErrors. +aws+ is the RightAws::S3, RightAws::EC2, or RightAws::SQS
     # object that caused the exception (it must provide last_request and last_response). Supported
     # boolean options are:
@@ -955,7 +955,7 @@ module RightAws
       raise if options[:raise]  # re-raise an exception
       return nil
     end
-    
+
     # True if e is an AWS system error, i.e. something that is for sure not the caller's fault.
     # Used to force logging.
     def self.system_error?(e)
@@ -966,9 +966,9 @@ module RightAws
 
 
   class AWSErrorHandler
-    # 0-100 (%) 
-    DEFAULT_CLOSE_ON_4XX_PROBABILITY = 10     
-    
+    # 0-100 (%)
+    DEFAULT_CLOSE_ON_4XX_PROBABILITY = 10
+
     @@reiteration_start_delay = 0.2
     def self.reiteration_start_delay
       @@reiteration_start_delay
@@ -984,42 +984,42 @@ module RightAws
     def self.reiteration_time=(reiteration_time)
       @@reiteration_time = reiteration_time
     end
-    
-    @@close_on_error = true 
-    def self.close_on_error 
-      @@close_on_error 
-    end 
-    def self.close_on_error=(close_on_error) 
-      @@close_on_error = close_on_error 
-    end 
- 
-    @@close_on_4xx_probability = DEFAULT_CLOSE_ON_4XX_PROBABILITY 
-    def self.close_on_4xx_probability 
-      @@close_on_4xx_probability 
-    end 
-    def self.close_on_4xx_probability=(close_on_4xx_probability) 
-      @@close_on_4xx_probability = close_on_4xx_probability 
-    end 
- 
-    # params: 
-    #  :reiteration_time 
-    #  :errors_list 
-    #  :close_on_error           = true | false 
-    #  :close_on_4xx_probability = 1-100 
-    def initialize(aws, parser, params={}) #:nodoc:     
+
+    @@close_on_error = true
+    def self.close_on_error
+      @@close_on_error
+    end
+    def self.close_on_error=(close_on_error)
+      @@close_on_error = close_on_error
+    end
+
+    @@close_on_4xx_probability = DEFAULT_CLOSE_ON_4XX_PROBABILITY
+    def self.close_on_4xx_probability
+      @@close_on_4xx_probability
+    end
+    def self.close_on_4xx_probability=(close_on_4xx_probability)
+      @@close_on_4xx_probability = close_on_4xx_probability
+    end
+
+    # params:
+    #  :reiteration_time
+    #  :errors_list
+    #  :close_on_error           = true | false
+    #  :close_on_4xx_probability = 1-100
+    def initialize(aws, parser, params={}) #:nodoc:
       @aws           = aws              # Link to RightEc2 | RightSqs | RightS3 instance
       @parser        = parser           # parser to parse Amazon response
       @started_at    = Time.now
-      @stop_at       = @started_at  + (params[:reiteration_time] || @@reiteration_time) 
-      @errors_list   = params[:errors_list] || [] 
+      @stop_at       = @started_at  + (params[:reiteration_time] || @@reiteration_time)
+      @errors_list   = params[:errors_list] || []
       @reiteration_delay = @@reiteration_start_delay
       @retries       = 0
-      # close current HTTP(S) connection on 5xx, errors from list and 4xx errors 
+      # close current HTTP(S) connection on 5xx, errors from list and 4xx errors
       @close_on_error           = params[:close_on_error].nil? ? @@close_on_error : params[:close_on_error]
-      @close_on_4xx_probability = params[:close_on_4xx_probability] || @@close_on_4xx_probability       
+      @close_on_4xx_probability = params[:close_on_4xx_probability] || @@close_on_4xx_probability
     end
-    
-      # Returns false if 
+
+      # Returns false if
     def check(request)  #:nodoc:
       result           = false
       error_found      = false
@@ -1032,7 +1032,7 @@ module RightAws
       # is this a redirect?
       # yes!
       if response.is_a?(Net::HTTPRedirection)
-        redirect_detected = true 
+        redirect_detected = true
       else
         # no, it's an error ...
         @aws.logger.warn("##### #{@aws.class.name} returned an error: #{response.code} #{response.message}\n#{response.body} #####")
@@ -1054,7 +1054,7 @@ module RightAws
         @aws.last_request_id = '-undefined-'
         last_errors_text     = response.message
       end
-      
+
       # Ok, it is a redirect, find the new destination location
       if redirect_detected
         location = response['location']
@@ -1084,21 +1084,21 @@ module RightAws
           end
         end
       end
-      
+
         # check the time has gone from the first error come
       if redirect_detected || error_found
-        # Close the connection to the server and recreate a new one. 
-        # It may have a chance that one server is a semi-down and reconnection 
-        # will help us to connect to the other server 
+        # Close the connection to the server and recreate a new one.
+        # It may have a chance that one server is a semi-down and reconnection
+        # will help us to connect to the other server
         if !redirect_detected && @close_on_error
           @aws.destroy_connection(request, "#{self.class.name}: error match to pattern '#{error_match}'")
-        end 
-                 
+        end
+
         if (Time.now < @stop_at)
           @retries += 1
           unless redirect_detected
             @aws.logger.warn("##### Retry ##{@retries} is being performed. Sleeping for #{@reiteration_delay} sec. Whole time: #{Time.now-@started_at} sec ####")
-            sleep @reiteration_delay 
+            sleep @reiteration_delay
             @reiteration_delay *= 2
 
             # Always make sure that the fp is set to point to the beginning(?)
@@ -1117,39 +1117,39 @@ module RightAws
           result = @aws.request_info(request, @parser)
         else
           @aws.logger.warn("##### Ooops, time is over... ####")
-        end 
-      # aha, this is unhandled error: 
-      elsif @close_on_error 
+        end
+      # aha, this is unhandled error:
+      elsif @close_on_error
         # On 5xx(Server errors), 403(RequestTimeTooSkewed) and 408(Request Timeout) a conection has to be closed
         if @aws.last_response.code.to_s[/^(5\d\d|403|408)$/]
           @aws.destroy_connection(request, "#{self.class.name}: code: #{@aws.last_response.code}: '#{@aws.last_response.message}'")
-        # Is this a 4xx error ? 
-        elsif @aws.last_response.code.to_s[/^4\d\d$/] && @close_on_4xx_probability > rand(100) 
+        # Is this a 4xx error ?
+        elsif @aws.last_response.code.to_s[/^4\d\d$/] && @close_on_4xx_probability > rand(100)
           @aws.destroy_connection(request, "#{self.class.name}: code: #{@aws.last_response.code}: '#{@aws.last_response.message}', " +
                                            "probability: #{@close_on_4xx_probability}%")
         end
       end
       result
     end
-    
+
   end
 
 
   #-----------------------------------------------------------------
 
   class RightSaxParserCallbackTemplate #:nodoc:
-    def initialize(right_aws_parser) 
-      @right_aws_parser = right_aws_parser 
-    end 
-    def on_characters(chars) 
+    def initialize(right_aws_parser)
+      @right_aws_parser = right_aws_parser
+    end
+    def on_characters(chars)
       @right_aws_parser.text(chars)
-    end 
-    def on_start_document; end 
-    def on_comment(msg); end 
-    def on_processing_instruction(target, data); end 
-    def on_cdata_block(cdata); end 
-    def on_end_document; end 
-  end 
+    end
+    def on_start_document; end
+    def on_comment(msg); end
+    def on_processing_instruction(target, data); end
+    def on_cdata_block(cdata); end
+    def on_end_document; end
+  end
 
   class RightSaxParserCallback < RightSaxParserCallbackTemplate
     def self.include_callback
@@ -1173,25 +1173,25 @@ module RightAws
   end
 
   class RightAWSParser  #:nodoc:
-      # default parsing library 
-    DEFAULT_XML_LIBRARY = 'rexml' 
-      # a list of supported parsers 
-    @@supported_xml_libs = [DEFAULT_XML_LIBRARY, 'libxml'] 
-     
-    @@xml_lib = DEFAULT_XML_LIBRARY # xml library name: 'rexml' | 'libxml' 
+      # default parsing library
+    DEFAULT_XML_LIBRARY = 'rexml'
+      # a list of supported parsers
+    @@supported_xml_libs = [DEFAULT_XML_LIBRARY, 'libxml']
+
+    @@xml_lib = DEFAULT_XML_LIBRARY # xml library name: 'rexml' | 'libxml'
     def self.xml_lib
       @@xml_lib
     end
     def self.xml_lib=(new_lib_name)
       @@xml_lib = new_lib_name
     end
-    
+
     attr_accessor :result
     attr_reader   :xmlpath
     attr_accessor :xml_lib
     attr_reader   :full_tag_name
     attr_reader   :tag
-    
+
     def initialize(params={})
       @xmlpath = ''
       @full_tag_name = ''
@@ -1226,17 +1226,17 @@ module RightAws
         # Get response body
       xml_text = xml_text.body unless xml_text.is_a?(String)
       @xml_lib = params[:xml_lib] || @xml_lib
-        # check that we had no problems with this library otherwise use default 
-      @xml_lib = DEFAULT_XML_LIBRARY unless @@supported_xml_libs.include?(@xml_lib)       
+        # check that we had no problems with this library otherwise use default
+      @xml_lib = DEFAULT_XML_LIBRARY unless @@supported_xml_libs.include?(@xml_lib)
         # load xml library
       if @xml_lib=='libxml' && !defined?(XML::SaxParser)
         begin
           require 'xml/libxml'
-          # Setup SaxParserCallback 
+          # Setup SaxParserCallback
           if XML::Parser::VERSION >= '0.5.1' &&
              XML::Parser::VERSION  < '0.9.7'
             RightSaxParserCallback.include_callback
-          end           
+          end
         rescue LoadError => e
           @@supported_xml_libs.delete(@xml_lib)
           @xml_lib = DEFAULT_XML_LIBRARY
@@ -1255,31 +1255,31 @@ module RightAws
           xml        = XML::SaxParser.string(xml_text)
         else
           xml        = XML::SaxParser.new
-          xml.string = xml_text 
+          xml.string = xml_text
         end
-        # check libxml-ruby version 
+        # check libxml-ruby version
         if    XML::Parser::VERSION >= '0.9.7'
           xml.callbacks = RightSaxParserCallbackNs.new(self)
         elsif XML::Parser::VERSION >= '0.5.1'
-          xml.callbacks = RightSaxParserCallback.new(self) 
-        else 
-          xml.on_start_element{|name, attr_hash| self.tag_start(name, attr_hash)} 
+          xml.callbacks = RightSaxParserCallback.new(self)
+        else
+          xml.on_start_element{|name, attr_hash| self.tag_start(name, attr_hash)}
           xml.on_characters{   |text|            self.text(text)}
-          xml.on_end_element{  |name|            self.tag_end(name)} 
-        end 
+          xml.on_end_element{  |name|            self.tag_end(name)}
+        end
         xml.parse
       else
         REXML::Document.parse_stream(xml_text, self)
       end
     end
-      # Parser must have a lots of methods 
+      # Parser must have a lots of methods
       # (see /usr/lib/ruby/1.8/rexml/parsers/streamparser.rb)
       # We dont need most of them in RightAWSParser and method_missing helps us
       # to skip their definition
     def method_missing(method, *params)
         # if the method is one of known - just skip it ...
-      return if [:comment, :attlistdecl, :notationdecl, :elementdecl, 
-                 :entitydecl, :cdata, :xmldecl, :attlistdecl, :instruction, 
+      return if [:comment, :attlistdecl, :notationdecl, :elementdecl,
+                 :entitydecl, :cdata, :xmldecl, :attlistdecl, :instruction,
                  :doctype].include?(method)
         # ... else - call super to raise an exception
       super(method, params)
