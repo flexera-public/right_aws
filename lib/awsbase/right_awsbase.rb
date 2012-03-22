@@ -926,19 +926,21 @@ module RightAws
             sleep @reiteration_delay 
             @reiteration_delay *= 2
 
-            # Always make sure that the fp is set to point to the beginning(?)
-            # of the File/IO. TODO: it assumes that offset is 0, which is bad.
-            if(request[:request].body_stream && request[:request].body_stream.respond_to?(:pos))
-              begin
-                request[:request].body_stream.pos = 0
-              rescue Exception => e
-                @logger.warn("Retry may fail due to unable to reset the file pointer" +
-                             " -- #{self.class.name} : #{e.inspect}")
-              end
-            end
           else
             @aws.logger.info("##### Retry ##{@retries} is being performed due to a redirect.  ####")
           end
+
+          # Always make sure that the fp is set to point to the beginning(?)
+          # of the File/IO. TODO: it assumes that offset is 0, which is bad.
+          if(request[:request].body_stream && request[:request].body_stream.respond_to?(:pos))
+            begin
+              request[:request].body_stream.pos = 0
+            rescue Exception => e
+              @logger.warn("Retry may fail due to unable to reset the file pointer" +
+                           " -- #{self.class.name} : #{e.inspect}")
+            end
+          end
+
           result = @aws.request_info(request, @parser)
         else
           @aws.logger.warn("##### Ooops, time is over... ####")
