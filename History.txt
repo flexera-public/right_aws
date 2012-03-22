@@ -303,3 +303,9 @@ the source key.
     - SDB: uuid gem dependency
   - this gem requires right_http_connection 0bc3343232133bdb38c237d8285525d74495d3f5 or later
   - "Raise On Timeout On Action" feature added to avoid duplicate resources creation if a timeout error occures and a retry is performed
+  
+=== 2.1.1
+  Release Notes:
+  - Fixed:
+    - redirect issue when putting file to S3 in us-west-2 (https://github.com/rightscale/right_aws/issues/125)
+
