@@ -339,3 +339,10 @@ the source key.
   - Fixed:
     - S3 Content-Type not set in Ruby 1.9.2
     - error in rds_interface describe_db_snapshots in Ruby 1.9.2
+
+
+=== 3.0.4
+  Release Notes:
+  - Fixed:
+    - #125 - fixes redirect bug in file PUT requests (Cary)
+    - some other minor fixes
