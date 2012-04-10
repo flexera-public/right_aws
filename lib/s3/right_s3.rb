@@ -524,6 +524,28 @@ module RightAws
         meta  = self.class.add_meta_prefix(@meta_headers)
         @bucket.s3.interface.put(@bucket.name, @name, @data, meta.merge(headers))
       end
+
+        # Store object data on S3 using the Multipart Upload API. This is useful if you do not know the file size
+        # upfront (for example reading from pipe or socket) or if you are transmitting data over an unreliable network.
+        #
+        # Parameter +data+ is an object which responds to :read or an object which can be converted to a String prior to upload.
+        # Parameter +part_size+ determines the size of each part sent (must be > 5MB per Amazon's API requirements)
+        #
+        # If data is a stream the caller is responsible for calling close() on the stream after this methods returns
+        #
+        # Returns +true+.
+        #
+        #  upload_data = StringIO.new('My sample data')
+        #  key = RightAws::S3::Key.create(bucket, 'logs/today/1.log')
+        #  key.data = upload_data
+        #  key.put_multipart(:part_size => 5*1024*1024)             #=> true
+        #
+      def put_multipart(data=nil, perms=nil, headers={}, part_size=nil)
+        headers['x-amz-acl'] = perms if perms
+        @data = data || @data
+        meta  = self.class.add_meta_prefix(@meta_headers)
+        @bucket.s3.interface.store_object_multipart({:bucket => @bucket.name, :key => @name, :data => @data, :headers => meta.merge(headers), :part_size => part_size})
+      end
       
         # Rename an object. Returns new object name.
         # 
