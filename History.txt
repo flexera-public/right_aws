@@ -351,3 +351,4 @@ the source key.
   Release Notes:
   - Fixed:
     - Single-threaded multipart upload support (https://github.com/rightscale/right_aws/pull/116)
+    - S3 multi object delete (https://github.com/rightscale/right_aws/pull/106)
