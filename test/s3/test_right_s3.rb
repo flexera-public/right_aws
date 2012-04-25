@@ -433,7 +433,7 @@ class TestS3 < Test::Unit::TestCase
     sleep 10
 
     assert_equal({:enabled => true, :targetbucket => @bucket2, :targetprefix => "loggylogs/"}, bucket.logging_info)
-
+    
     assert bucket.disable_logging
 
       # check 'Drop' method
@@ -536,9 +536,9 @@ class TestS3 < Test::Unit::TestCase
   def request( uri )
     url = URI.parse( uri )
 
-    http = Net::HTTP.new(url.host, 443)
-    http.use_ssl = true
-    http.verify_mode = OpenSSL::SSL::VERIFY_PEER
+    http = Net::HTTP.new(url.host, 80)
+#    http.use_ssl = true
+#    http.verify_mode = OpenSSL::SSL::VERIFY_PEER
     http.request(Net::HTTP::Get.new( url.request_uri ))
   end
 
