@@ -502,7 +502,7 @@ class TestS3 < Test::Unit::TestCase
     keys_after = @s3.list_bucket(@bucket).map { |obj| obj[:key] }
 
     keys.each do |key|
-      keys_after.include?(key)
+      assert !keys_after.include?(key)
     end
   end
 
