@@ -124,6 +124,7 @@ module RightAws
       :additional_info => 'AdditionalInfo',
       :log_uri => 'LogUri',
       :name => 'Name',
+      :ami_version => 'AmiVersion',
       # JobFlowInstancesConfig
       :ec2_key_name          => 'Instances.Ec2KeyName',
       :hadoop_version => 'Instances.HadoopVersion',
