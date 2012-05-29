@@ -435,7 +435,7 @@ module RightAws
       # mode.
       #
       
-    def put(bucket, key, data=nil, headers={})
+    def put(bucket, key, data=nil, headers={}, &blck)
       # On Windows, if someone opens a file in text mode, we must reset it so
       # to binary mode for streaming to work properly
       if(data.respond_to?(:binmode))
@@ -446,7 +446,7 @@ module RightAws
         headers['expect'] = '100-continue'
       end
       req_hash = generate_rest_request('PUT', headers.merge(:url=>"#{bucket}/#{CGI::escape key}", :data=>data))
-      request_info(req_hash, RightHttp2xxParser.new)
+      request_info(req_hash, RightHttp2xxParser.new, &blck)
     rescue
       on_exception
     end

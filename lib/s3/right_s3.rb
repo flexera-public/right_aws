@@ -282,9 +282,9 @@ module RightAws
         #
         #  bucket.put('logs/today/1.log', 'Olala!') #=> true
         #
-      def put(key, data=nil, meta_headers={}, perms=nil, headers={})
+      def put(key, data=nil, meta_headers={}, perms=nil, headers={}, &blck)
         key = Key.create(self, key.to_s, data, meta_headers) unless key.is_a?(Key) 
-        key.put(data, perms, headers)
+        key.put(data, perms, headers, &blck)
       end
 
         # Retrieve data object from Amazon. 
@@ -518,11 +518,11 @@ module RightAws
         #   ...
         #  key.put('Olala!')   #=> true
         #
-      def put(data=nil, perms=nil, headers={})
+      def put(data=nil, perms=nil, headers={}, &blck)
         headers['x-amz-acl'] = perms if perms
         @data = data || @data
         meta  = self.class.add_meta_prefix(@meta_headers)
-        @bucket.s3.interface.put(@bucket.name, @name, @data, meta.merge(headers))
+        @bucket.s3.interface.put(@bucket.name, @name, @data, meta.merge(headers), &blck)
       end
 
         # Store object data on S3 using the Multipart Upload API. This is useful if you do not know the file size
