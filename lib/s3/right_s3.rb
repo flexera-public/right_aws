@@ -259,11 +259,12 @@ module RightAws
         #  key = RightAws::S3::Key.create(bucket, 'logs/today/1.log')
         #  key.head
         #
-      def key(key_name, head=false)
+      def key(key_name, head=false, &blck)
         raise 'Key name can not be empty.' if key_name.right_blank?
         key_instance = nil
           # if this key exists - find it ....
         keys({'prefix'=>key_name}, head).each do |key|
+          blck.call if block_given?
           if key.name == key_name.to_s
             key_instance = key
             break
