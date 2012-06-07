@@ -352,3 +352,5 @@ the source key.
   - Fixed:
     - Single-threaded multipart upload support (https://github.com/rightscale/right_aws/pull/116)
     - S3 multi object delete (https://github.com/rightscale/right_aws/pull/106)
+    - Support for "ami_version" added in emr interface (https://github.com/rightscale/right_aws/pull/129)
+    - S3: Added block references to several methods (https://github.com/rightscale/right_aws/pull/130)
