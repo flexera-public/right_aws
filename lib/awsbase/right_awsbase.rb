@@ -448,6 +448,7 @@ module RightAws
                       "AWSAccessKeyId" => @aws_access_key_id,
                       "Version"        => custom_options[:api_version] || @params[:api_version] }
       service_hash.merge!(options)
+      service_hash["SecurityToken"] = @params[:token] if @params[:token]
       # Sign request options
       service_params = signed_service_params(@aws_secret_access_key, service_hash, http_verb, @params[:host_to_sign], @params[:service])
       # Use POST if the length of the query string is too large
