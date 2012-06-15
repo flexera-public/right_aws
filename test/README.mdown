@@ -4,22 +4,17 @@
 
 Before you can run any tests, you need to set up credentials (API key and secret) that
 will be used when talking to AWS.  The credentials are loaded in `test/test_credentials.rb`
-and are expected to be found in `~/.rightscale/testcredentials.rb` and look like this:
+and are expected to be found through three environment variables:
 
-    TestCredentials.aws_access_key_id= 'AAAAAAAAAAAAAAAAAAAA'
-    TestCredentials.aws_secret_access_key= 'asdfasdfsadf'
-    TestCredentials.account_number= '???'
+    RIGHT_AWS_TEST_ACCESS_KEY_ID = 'AAAAAAAAAAAAAAAAAAAA'
+    RIGHT_AWS_TEST_ACCESS_SECRET_KEY = 'asdfasdfsadf'
+    RIGHT_AWS_TEST_ACCOUNT_NUMBER = '???'
 
 If you prefer to store your secret key in the OS X keychain, you can do this:
 
-    def secret_access_key_from_keychain (key_id)
-      dump = `security -q find-generic-password -a "#{key_id}" -g 2>&1`
-      dump[/password: "(.*)"/, 1]
-    end
-
-    TestCredentials.aws_access_key_id= 'AAAAAAAAAAAAAAAAAAAA'
-    TestCredentials.aws_secret_access_key= secret_access_key_from_keychain(TestCredentials.aws_access_key_id)
-    TestCredentials.account_number= '???'
+    RIGHT_AWS_TEST_ACCESS_KEY_ID = 'AAAAAAAAAAAAAAAAAAAA'
+    RIGHT_AWS_TEST_ACCESS_SECRET_KEY = `security -q find-generic-password -a "#{key_id}" -g 2>&1 | cut -d: -f2`
+    RIGHT_AWS_TEST_ACCOUNT_NUMBER = '???'
 
 ## Running tests
 
