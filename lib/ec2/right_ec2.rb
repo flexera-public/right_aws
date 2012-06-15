@@ -121,6 +121,7 @@ module RightAws
     # * <tt>:logger</tt>: for log messages, default: RAILS_DEFAULT_LOGGER else STDOUT
     # * <tt>:signature_version</tt>:  The signature version : '0','1' or '2'(default)
     # * <tt>:cache</tt>: true/false: caching for: ec2_describe_images, describe_instances,
+    # * <tt>:token</tt>: Option SecurityToken for temporary credentials
     # describe_images_by_owner, describe_images_by_executable_by, describe_availability_zones,
     # describe_security_groups, describe_key_pairs, describe_addresses, 
     # describe_volumes, describe_snapshots methods, default: false.
