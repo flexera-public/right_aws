@@ -30,6 +30,7 @@ module RightAws
     #-----------------------------------------------------------------
 
     VOLUME_API_VERSION = '2012-06-15'
+    VOLUME_TYPES       = ['standard', 'io1']
 
     # Describe EBS volumes.
     #
