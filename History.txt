@@ -349,6 +349,7 @@ the source key.
 
 === Next
   Release Notes:
+  - Added: API '2012-06-15' support for CreateVolume and DescribeVolumes API calls (to support IOPS)
   - Fixed:
     - Single-threaded multipart upload support (https://github.com/rightscale/right_aws/pull/116)
     - S3 multi object delete (https://github.com/rightscale/right_aws/pull/106)
