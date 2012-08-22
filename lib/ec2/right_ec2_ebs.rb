@@ -29,7 +29,7 @@ module RightAws
     #      EBS: Volumes
     #-----------------------------------------------------------------
 
-    VOLUME_API_VERSION = '2012-06-15'
+    VOLUME_API_VERSION = (API_VERSION > '2012-06-15') ? API_VERSION : '2012-06-15'
     VOLUME_TYPES       = ['standard', 'io1']
 
     # Describe EBS volumes.
@@ -101,9 +101,9 @@ module RightAws
       # Get rig of empty snapshot: e8s guys do not like it
       hash["SnapshotId"] = snapshot_id.to_s unless snapshot_id.right_blank?
       # Add IOPS support (default behavior) but skip it when an old API version call is requested
-      options[:options]               ||= {}
-      options[:options][:api_version] ||= VOLUME_API_VERSION
-      if options[:options][:api_version]>= VOLUME_API_VERSION
+      options[:options]                 ||= {}
+      options[:options][:api_version]   ||= VOLUME_API_VERSION
+      if options[:options][:api_version] >= VOLUME_API_VERSION
         hash["VolumeType"] = options[:volume_type] unless options[:volume_type].right_blank?
         hash["Iops"]       = options[:iops]        unless options[:iops].right_blank?
       end
