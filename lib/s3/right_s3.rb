@@ -259,11 +259,12 @@ module RightAws
         #  key = RightAws::S3::Key.create(bucket, 'logs/today/1.log')
         #  key.head
         #
-      def key(key_name, head=false)
+      def key(key_name, head=false, &blck)
         raise 'Key name can not be empty.' if key_name.right_blank?
         key_instance = nil
           # if this key exists - find it ....
         keys({'prefix'=>key_name}, head).each do |key|
+          blck.call if block_given?
           if key.name == key_name.to_s
             key_instance = key
             break
@@ -282,9 +283,9 @@ module RightAws
         #
         #  bucket.put('logs/today/1.log', 'Olala!') #=> true
         #
-      def put(key, data=nil, meta_headers={}, perms=nil, headers={})
+      def put(key, data=nil, meta_headers={}, perms=nil, headers={}, &blck)
         key = Key.create(self, key.to_s, data, meta_headers) unless key.is_a?(Key) 
-        key.put(data, perms, headers)
+        key.put(data, perms, headers, &blck)
       end
 
         # Retrieve data object from Amazon. 
@@ -518,11 +519,33 @@ module RightAws
         #   ...
         #  key.put('Olala!')   #=> true
         #
-      def put(data=nil, perms=nil, headers={})
+      def put(data=nil, perms=nil, headers={}, &blck)
         headers['x-amz-acl'] = perms if perms
         @data = data || @data
         meta  = self.class.add_meta_prefix(@meta_headers)
-        @bucket.s3.interface.put(@bucket.name, @name, @data, meta.merge(headers))
+        @bucket.s3.interface.put(@bucket.name, @name, @data, meta.merge(headers), &blck)
+      end
+
+        # Store object data on S3 using the Multipart Upload API. This is useful if you do not know the file size
+        # upfront (for example reading from pipe or socket) or if you are transmitting data over an unreliable network.
+        #
+        # Parameter +data+ is an object which responds to :read or an object which can be converted to a String prior to upload.
+        # Parameter +part_size+ determines the size of each part sent (must be > 5MB per Amazon's API requirements)
+        #
+        # If data is a stream the caller is responsible for calling close() on the stream after this methods returns
+        #
+        # Returns +true+.
+        #
+        #  upload_data = StringIO.new('My sample data')
+        #  key = RightAws::S3::Key.create(bucket, 'logs/today/1.log')
+        #  key.data = upload_data
+        #  key.put_multipart(:part_size => 5*1024*1024)             #=> true
+        #
+      def put_multipart(data=nil, perms=nil, headers={}, part_size=nil)
+        headers['x-amz-acl'] = perms if perms
+        @data = data || @data
+        meta  = self.class.add_meta_prefix(@meta_headers)
+        @bucket.s3.interface.store_object_multipart({:bucket => @bucket.name, :key => @name, :data => @data, :headers => meta.merge(headers), :part_size => part_size})
       end
       
         # Rename an object. Returns new object name.

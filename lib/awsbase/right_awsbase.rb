@@ -43,7 +43,12 @@ module RightAws
       Base64.encode64(OpenSSL::HMAC.digest(@@digest1, aws_secret_access_key, auth_string)).strip
     end
 
-    # Escape a string accordingly Amazon rules
+    # Calculates 'Content-MD5' header value for some content
+    def self.content_md5(content)
+      Base64.encode64(Digest::MD5::new.update(content).digest).strip
+    end
+
+    # Escape a string accordingly Amazon rulles
     # http://docs.amazonwebservices.com/AmazonSimpleDB/2007-11-07/DeveloperGuide/index.html?REST_RESTAuth.html
     def self.amz_escape(param)
       param = param.flatten.join('') if param.is_a?(Array) # ruby 1.9.x Array#to_s fix

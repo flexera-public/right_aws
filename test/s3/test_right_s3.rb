@@ -13,6 +13,8 @@ class TestS3 < Test::Unit::TestCase
     @key1   = 'test/woohoo1/'
     @key2   = 'test1/key/woohoo2'
     @key3   = 'test2/A%B@C_D&E?F+G=H"I'
+    @key4   = 'test/large_multipart_file_string'
+    @key5   = 'test/large_multipart_file_stream'
     @key1_copy =     'test/woohoo1_2'
     @key1_new_name = 'test/woohoo1_3'
     @key2_new_name = 'test1/key/woohoo2_new'
@@ -39,6 +41,26 @@ class TestS3 < Test::Unit::TestCase
     assert @s3.put(@bucket, @key1, RIGHT_OBJECT_TEXT, 'x-amz-meta-family'=>'Woohoo1!'), 'Put bucket fail'
     assert @s3.put(@bucket, @key2, RIGHT_OBJECT_TEXT, 'x-amz-meta-family'=>'Woohoo2!'), 'Put bucket fail'
     assert @s3.put(@bucket, @key3, RIGHT_OBJECT_TEXT, 'x-amz-meta-family'=>'Woohoo3!'), 'Put bucket fail'
+  end
+
+  def test_04_put_multipart_string
+    test_text = ""
+    for i in 1..100000
+      test_text << "Testing test text #{i}\n"
+    end
+    assert @s3.store_object_multipart({:bucket => @bucket, :key => @key4, :data => StringIO.new(test_text)}), 'Put bucket multipart fail'
+  end
+
+  def test_04b_store_object_multipart_stream
+    rd, wr = IO.pipe
+    producer = Thread.new(wr) do |out|
+      for i in 1..100000
+        out.write("Testing stream text #{i}\n")
+      end
+      out.close
+    end
+    assert @s3.store_object_multipart({:bucket => @bucket, :key => @key5, :data => rd , :part_size => (20*1024*1024)}), 'Put bucket multipart fail'
+    rd.close
   end
 
   def test_05_get_and_get_object
@@ -74,10 +96,12 @@ class TestS3 < Test::Unit::TestCase
 
   def test_08_keys
     keys = @s3.list_bucket(@bucket).map{|b| b[:key]}
-    assert_equal keys.size, 3, "There should be 3 keys"
+    assert_equal keys.size, 5, "There should be 5 keys"
     assert(keys.include?(@key1))
     assert(keys.include?(@key2))
     assert(keys.include?(@key3))
+    assert(keys.include?(@key4))
+    assert(keys.include?(@key5))
   end
 
   def test_09_copy_key
@@ -140,6 +164,7 @@ class TestS3 < Test::Unit::TestCase
     assert @s3.delete_bucket(@bucket)
     assert !@s3.list_all_my_buckets.map{|bucket| bucket[:name]}.include?(@bucket), "#{@bucket} must not exist"
   end
+
 
 
 
@@ -408,7 +433,7 @@ class TestS3 < Test::Unit::TestCase
     sleep 10
 
     assert_equal({:enabled => true, :targetbucket => @bucket2, :targetprefix => "loggylogs/"}, bucket.logging_info)
-
+    
     assert bucket.disable_logging
 
       # check 'Drop' method
@@ -457,14 +482,63 @@ class TestS3 < Test::Unit::TestCase
     end
   end
 
+  def test_44_delete_multiple
+    bucket = RightAws::S3::Bucket.create(@s, @bucket, true)
+
+    key1 = Rightscale::S3::Key.create(bucket, @key1)
+    key2 = Rightscale::S3::Key.create(bucket, @key2)
+    key3 = Rightscale::S3::Key.create(bucket, @key3)
+
+    assert @s3.put(@bucket, @key1, RIGHT_OBJECT_TEXT), 'Put bucket fail'
+    assert @s3.put(@bucket, @key2, RIGHT_OBJECT_TEXT), 'Put bucket fail'
+    assert @s3.put(@bucket, @key3, RIGHT_OBJECT_TEXT), 'Put bucket fail'
+
+    key1.refresh
+    key2.refresh
+    key3.refresh
+
+    assert key1.exists?
+    assert key2.exists?
+    assert key3.exists?
+
+    result = @s3.delete_multiple(@bucket, [@key1, @key2, @key3])
+    assert result.empty?
+
+    key1.refresh
+    key2.refresh
+    key3.refresh
+
+    assert !key1.exists?
+    assert !key2.exists?
+    assert !key3.exists?
+  end
+
+  def test_45_delete_multiple_more_than_1000_objects
+    n = 1200
+    keys = (1..n).map { |i| "key-#{i}"}
+
+    keys.each do |key|
+      assert @s3.put(@bucket, key, RIGHT_OBJECT_TEXT), 'Put bucket fail'
+    end
+
+    result = @s3.delete_multiple(@bucket, keys)
+    assert result.empty?
+
+    keys_after = @s3.list_bucket(@bucket).map { |obj| obj[:key] }
+
+    keys.each do |key|
+      assert !keys_after.include?(key)
+    end
+  end
+
   private
 
   def request( uri )
     url = URI.parse( uri )
 
-    http = Net::HTTP.new(url.host, 443)
-    http.use_ssl = true
-    http.verify_mode = OpenSSL::SSL::VERIFY_PEER
+    http = Net::HTTP.new(url.host, 80)
+#    http.use_ssl = true
+#    http.verify_mode = OpenSSL::SSL::VERIFY_PEER
     http.request(Net::HTTP::Get.new( url.request_uri ))
   end
 

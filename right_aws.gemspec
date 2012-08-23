@@ -43,6 +43,7 @@ Gem::Specification.new do |spec|
   spec.add_development_dependency('rake')
   spec.add_development_dependency('rcov')
 
+  spec.summary = 'The RightScale AWS gems have been designed to provide a robust, fast, and secure interface to Amazon EC2, EBS, S3, SQS, SDB, and CloudFront.'
   spec.description = <<-EOF
 == DESCRIPTION:
 

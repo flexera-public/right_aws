@@ -346,3 +346,9 @@ the source key.
   - Fixed:
     - #125 - fixes redirect bug in file PUT requests (Cary)
     - some other minor fixes
+
+=== Next
+  Release Notes:
+  - Fixed:
+    - Single-threaded multipart upload support (https://github.com/rightscale/right_aws/pull/116)
+    - S3 multi object delete (https://github.com/rightscale/right_aws/pull/106)
