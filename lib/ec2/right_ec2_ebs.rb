@@ -29,6 +29,9 @@ module RightAws
     #      EBS: Volumes
     #-----------------------------------------------------------------
 
+    VOLUME_API_VERSION = (API_VERSION > '2012-06-15') ? API_VERSION : '2012-06-15'
+    VOLUME_TYPES       = ['standard', 'io1']
+
     # Describe EBS volumes.
     #
     # Accepts a list of volumes and/or a set of filters as the last parameter.
@@ -47,6 +50,14 @@ module RightAws
     #        :aws_id                => "vol-60957009",
     #        :aws_created_at        => "2008-06-18T08:19:20.000Z",
     #        :aws_instance_id       => "i-c014c0a9"},
+    #       {:aws_id         => "vol-71de8b1f",
+    #        :aws_size       => 5,
+    #        :snapshot_id    => nil,
+    #        :zone           => "us-east-1a",
+    #        :aws_status     => "available",
+    #        :aws_created_at => "2012-06-21T18:47:34.000Z",
+    #        :volume_type    => "io1",
+    #        :iop            => "5"},#
     #       {:aws_size       => 1,
     #        :zone           => "merlot",
     #        :snapshot_id    => nil,
@@ -59,6 +70,7 @@ module RightAws
     #  P.S. filters: http://docs.amazonwebservices.com/AWSEC2/latest/APIReference/index.html?ApiReference-query-DescribeVolumes.html
     #
     def describe_volumes(*list_and_options)
+      list_and_options = merge_new_options_into_list_and_options(list_and_options, :options => {:api_version => VOLUME_API_VERSION})
       describe_resources_with_list_and_options('DescribeVolumes', 'VolumeId', QEc2DescribeVolumesParser, list_and_options)
     end
 
@@ -73,12 +85,29 @@ module RightAws
     #       :aws_created_at => "2008-06-24T18:13:32.000Z",
     #       :aws_size       => 94}
     #
-    def create_volume(snapshot_id, size, zone)
+    #  ec2.create_volume(nil, 5, 'us-east-1a', :iops => '5', :volume_type => 'io1') #=>
+    #      {:aws_id=>"vol-71de8b1f",
+    #       :aws_size=>5,
+    #       :snapshot_id=>nil,
+    #       :zone=>"us-east-1a",
+    #       :aws_status=>"creating",
+    #       :aws_created_at=>"2012-06-21T18:47:34.000Z",
+    #       :volume_type=>"io1",
+    #       :iops=>"5"}
+    #
+    def create_volume(snapshot_id, size, zone, options={})
       hash = { "Size"              => size.to_s,
                "AvailabilityZone"  => zone.to_s }
       # Get rig of empty snapshot: e8s guys do not like it
       hash["SnapshotId"] = snapshot_id.to_s unless snapshot_id.right_blank?
-      link = generate_request("CreateVolume", hash )
+      # Add IOPS support (default behavior) but skip it when an old API version call is requested
+      options[:options]                 ||= {}
+      options[:options][:api_version]   ||= VOLUME_API_VERSION
+      if options[:options][:api_version] >= VOLUME_API_VERSION
+        hash["VolumeType"] = options[:volume_type] unless options[:volume_type].right_blank?
+        hash["Iops"]       = options[:iops]        unless options[:iops].right_blank?
+      end
+      link = generate_request("CreateVolume", hash, options[:options])
       request_info(link, QEc2CreateVolumeParser.new(:logger => @logger))
     rescue Exception
       on_exception
@@ -364,6 +393,8 @@ module RightAws
         when 'size'             then @result[:aws_size]       = @text.to_i ###
         when 'snapshotId'       then @result[:snapshot_id]    = @text.right_blank? ? nil : @text ###
         when 'availabilityZone' then @result[:zone]           = @text ###
+        when 'volumeType'       then @result[:volume_type]    = @text
+        when 'iops'             then @result[:iops]           = @text
         end
       end
       def reset
@@ -403,6 +434,8 @@ module RightAws
         when 'snapshotId'       then @item[:snapshot_id]     = @text.right_blank? ? nil : @text
         when 'availabilityZone' then @item[:zone]            = @text
         when 'deleteOnTermination' then @item[:delete_on_termination] = (@text == 'true')
+        when 'volumeType'       then @item[:volume_type]     = @text
+        when 'iops'             then @item[:iops]            = @text
         else
           case full_tag_name
           when %r{/volumeSet/item/volumeId$}   then @item[:aws_id]                = @text
