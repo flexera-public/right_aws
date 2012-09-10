@@ -54,6 +54,17 @@ module RightAws
         'uploadId',
         'uploads',
         'delete'].sort
+    S3_COMMON_REQUEST_HEADERS = [
+        'authorization',
+        'content-length',
+        'content-type',
+        'content-md5',
+        'date',
+        'expect',
+        'host',
+        'x-amz-date',
+        'x-amz-security-token'
+    ]
     MULTI_OBJECT_DELETE_MAX_KEYS = 1000
 
     
@@ -597,7 +608,8 @@ module RightAws
           retry_attempts = 1
           while true
             begin
-              send_part_hash = generate_rest_request('PUT', params[:headers].merge({ :url=>"#{params[:bucket]}/#{CGI::escape params[:key]}?partNumber=#{index}&uploadId=#{upload_id}", :data=>part_data } ))
+              send_part_headers = Hash[ params[:headers].select { |k, v| S3_COMMON_REQUEST_HEADERS.include?(k.downcase) } ]
+              send_part_hash = generate_rest_request('PUT', send_part_headers.merge({ :url=>"#{params[:bucket]}/#{CGI::escape params[:key]}?partNumber=#{index}&uploadId=#{upload_id}", :data=>part_data } ))
               send_part_resp = request_info(send_part_hash, S3HttpResponseHeadParser.new)
               part_etags << {:part_num => index, :etag => send_part_resp['etag']}
               index += 1
