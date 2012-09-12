@@ -242,7 +242,8 @@ module RightAws
         :monitoring_enabled      => { :name  => 'Monitoring.Enabled',
                                       :value => Proc.new{ options[:monitoring_enabled] && options[:monitoring_enabled].to_s }})
       # Log debug information
-      @logger.info("Launching instance of image #{image_id}. Options: #{params.inspect}")
+      @logger.info("Launching instance of image #{image_id}.")
+      @logger.debug("Launching instance of image #{image_id}. Options: #{params.inspect}")
       link = generate_request("RunInstances", params)
       instances = request_info(link, QEc2DescribeInstancesParser.new(:logger => @logger))
       get_desc_instances(instances)
