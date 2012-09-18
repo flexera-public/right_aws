@@ -25,6 +25,8 @@ module RightAws
 
   class Ec2
 
+    INSTANCE_API_VERSION = (API_VERSION > '2012-07-20') ? API_VERSION : '2012-07-20'
+
   #-----------------------------------------------------------------
   #      Instances
   #-----------------------------------------------------------------
@@ -108,6 +110,7 @@ module RightAws
     # P.S. filters: http://docs.amazonwebservices.com/AWSEC2/latest/APIReference/index.html?ApiReference-query-DescribeInstances.html
     #
     def describe_instances(*list_and_options)
+      list_and_options = merge_new_options_into_list_and_options(list_and_options, :options => {:api_version => INSTANCE_API_VERSION})
       describe_resources_with_list_and_options('DescribeInstances', 'InstanceId', QEc2DescribeInstancesParser, list_and_options) do |parser|
         get_desc_instances(parser.result)
       end
@@ -176,7 +179,8 @@ module RightAws
     # 
     # Options: :image_id, :addressing_type, :min_count, max_count, :key_name, :kernel_id, :ramdisk_id,
     # :availability_zone, :monitoring_enabled, :subnet_id, :disable_api_termination, :instance_initiated_shutdown_behavior,
-    # :block_device_mappings, :placement_group_name, :license_pool, :group_ids, :group_names, :private_ip_address
+    # :block_device_mappings, :placement_group_name, :license_pool, :group_ids, :group_names, :private_ip_address,
+    # :ebs_optimized
     # 
     # Returns a list of launched instances or an exception.
     #
@@ -225,7 +229,7 @@ module RightAws
       params = map_api_keys_and_values( options,
         :key_name, :addressing_type, :kernel_id,
         :ramdisk_id, :subnet_id, :instance_initiated_shutdown_behavior,
-        :private_ip_address, :additional_info, :license_pool,
+        :private_ip_address, :additional_info, :license_pool, :ebs_optimized,
         :image_id                => { :value => image_id },
         :min_count               => { :value => options[:min_count] || 1 },
         :max_count               => { :value => options[:max_count] || options[:min_count] || 1 },
@@ -243,7 +247,12 @@ module RightAws
                                       :value => Proc.new{ options[:monitoring_enabled] && options[:monitoring_enabled].to_s }})
       # Log debug information
       @logger.info("Launching instance of image #{image_id}. Options: #{params.inspect}")
-      link = generate_request("RunInstances", params)
+      # Add IOPS support (default behavior) but skip it when an old API version call is requested
+      options[:options]                 ||= {}
+      options[:options][:api_version]   ||= INSTANCE_API_VERSION
+      params.delete("EbsOptimized") if options[:options][:api_version] < INSTANCE_API_VERSION
+      #
+      link = generate_request("RunInstances", params, options[:options])
       instances = request_info(link, QEc2DescribeInstancesParser.new(:logger => @logger))
       get_desc_instances(instances)
     rescue Exception
@@ -383,7 +392,7 @@ module RightAws
       when 'GroupId'  then request_hash.merge!(amazonize_list('GroupId', value))
       else                 request_hash["#{attribute}.Value"] = value
       end
-      link = generate_request('ModifyInstanceAttribute', request_hash)
+      link = generate_request('ModifyInstanceAttribute', request_hash, :api_version => INSTANCE_API_VERSION)
       request_info(link, RightBoolResponseParser.new(:logger => @logger))
     rescue Exception
       on_exception
@@ -588,9 +597,10 @@ module RightAws
         when 'requesterId'           then @item[:requester_id]             = @text
         when 'virtualizationType'    then @item[:virtualization_type]      = @text
         when 'clientToken'           then @item[:client_token]      = @text
-        when 'sourceDestCheck'       then @item[:source_dest_check] = @text == 'true' ? true : false
+        when 'sourceDestCheck'       then @item[:source_dest_check] = @text == 'true'
         when 'tenancy'               then @item[:placement_tenancy] = @text
         when 'hypervisor'            then @item[:hypervisor]        = @text
+        when 'ebsOptimized'          then @item[:ebs_optimized]     = @text == 'true'
         else
           case full_tag_name
           # EC2 Groups
@@ -618,7 +628,7 @@ module RightAws
             when 'volumeId'            then @block_device_mapping[:ebs_volume_id]              = @text
             when 'status'              then @block_device_mapping[:ebs_status]                 = @text
             when 'attachTime'          then @block_device_mapping[:ebs_attach_time]            = @text
-            when 'deleteOnTermination' then @block_device_mapping[:ebs_delete_on_termination]  = @text == 'true' ? true : false
+            when 'deleteOnTermination' then @block_device_mapping[:ebs_delete_on_termination]  = @text == 'true'
             when 'item'                then @item[:block_device_mappings]                     << @block_device_mapping
             end
           when %r{/instancesSet/item$} then @reservation[:instances_set] << @item
@@ -675,9 +685,9 @@ module RightAws
         when %r{/ramdisk/value$}        then @result = @text
         when %r{/userData/value$}       then @result = @text
         when %r{/rootDeviceName/value$} then @result = @text
-        when %r{/disableApiTermination/value}              then @result = @text == 'true' ? true : false
+        when %r{/disableApiTermination/value}              then @result = @text == 'true'
         when %r{/instanceInitiatedShutdownBehavior/value$} then @result = @text
-        when %r{/sourceDestCheck/value$}                   then @result = @text == 'true' ? true : false
+        when %r{/sourceDestCheck/value$}                   then @result = @text == 'true'
         when %r{/groupSet/item} # no trailing $
           case name
           when 'groupId'   then @group[:group_id]   = @text
@@ -692,7 +702,7 @@ module RightAws
           when 'volumeId'            then @block_device_mapping[:ebs_volume_id]              = @text
           when 'status'              then @block_device_mapping[:ebs_status]                 = @text
           when 'attachTime'          then @block_device_mapping[:ebs_attach_time]            = @text
-          when 'deleteOnTermination' then @block_device_mapping[:ebs_delete_on_termination]  = @text == 'true' ? true : false
+          when 'deleteOnTermination' then @block_device_mapping[:ebs_delete_on_termination]  = @text == 'true'
           when 'item'                then @result                                           << @block_device_mapping
           end
         end
