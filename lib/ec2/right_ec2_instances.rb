@@ -392,7 +392,7 @@ module RightAws
       when 'GroupId'  then request_hash.merge!(amazonize_list('GroupId', value))
       else                 request_hash["#{attribute}.Value"] = value
       end
-      link = generate_request('ModifyInstanceAttribute', request_hash)
+      link = generate_request('ModifyInstanceAttribute', request_hash, :api_version => INSTANCE_API_VERSION)
       request_info(link, RightBoolResponseParser.new(:logger => @logger))
     rescue Exception
       on_exception
