@@ -69,7 +69,7 @@ module RightAws
     #  # Create handle to S3 account
     #  s3 = RightAws::S3.new(aws_access_key_id, aws_secret_access_key)
     #  my_buckets_names = s3.buckets.map{|b| b.name}
-    #  puts "Buckets on S3: #{my_bucket_names.join(', ')}"
+    #  puts "Buckets on S3: #{my_buckets_names.join(', ')}"
     def buckets
       @interface.list_all_my_buckets.map! do |entry|
         owner = Owner.new(entry[:owner_id], entry[:owner_display_name])
