@@ -91,6 +91,7 @@ module RightAws
                                  'm2.xlarge' ,
                                  'm2.2xlarge',
                                  'm2.4xlarge',
+                                 'm3.2xlarge',
                                 'cc1.4xlarge',
                                 'cg1.4xlarge',
                                 'cc2.8xlarge',
