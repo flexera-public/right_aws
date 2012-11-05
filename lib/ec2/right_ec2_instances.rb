@@ -161,7 +161,6 @@ module RightAws
                                    :group_names                          => group_names,
                                    :key_name                             => key_name,
                                    :instance_type                        => instance_type,
-                                   :addressing_type                      => addressing_type,
                                    :kernel_id                            => kernel_id,
                                    :ramdisk_id                           => ramdisk_id,
                                    :availability_zone                    => availability_zone,
@@ -177,7 +176,7 @@ module RightAws
 
     # Launch new EC2 instances.
     # 
-    # Options: :image_id, :addressing_type, :min_count, max_count, :key_name, :kernel_id, :ramdisk_id,
+    # Options: :image_id, :min_count, max_count, :key_name, :kernel_id, :ramdisk_id,
     # :availability_zone, :monitoring_enabled, :subnet_id, :disable_api_termination, :instance_initiated_shutdown_behavior,
     # :block_device_mappings, :placement_group_name, :license_pool, :group_ids, :group_names, :private_ip_address,
     # :ebs_optimized
@@ -227,7 +226,7 @@ module RightAws
     def launch_instances(image_id, options={})
       options[:user_data] = options[:user_data].to_s
       params = map_api_keys_and_values( options,
-        :key_name, :addressing_type, :kernel_id,
+        :key_name, :kernel_id,
         :ramdisk_id, :subnet_id, :instance_initiated_shutdown_behavior,
         :private_ip_address, :additional_info, :license_pool, :ebs_optimized,
         :image_id                => { :value => image_id },
