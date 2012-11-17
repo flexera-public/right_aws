@@ -418,6 +418,20 @@ module RightAws
       describe_resources_with_list_and_options('DescribeRegions', 'RegionName', QEc2DescribeRegionsParser, list_and_options)
     end
 
+    #-----------------------------------------------------------------
+    #      Accounts
+    #-----------------------------------------------------------------
+
+    # Describe the specified attribute of your AWS account.
+    #
+    #  ec2.describe_account_attributes(:attribute_name => ['default-vpc','supported-platforms']) #=> 
+    #    {"default-vpc"=>"vpc-8c3b00e7", "supported-platforms"=>"VPC"}
+    #
+    def describe_account_attributes(*list_and_options)
+      list_and_options = merge_new_options_into_list_and_options(list_and_options, :options => {:api_version => VPC_API_VERSION})
+      describe_resources_with_list_and_options('DescribeAccountAttributes', 'accountAttributeValues', QEc2DescribeAccountAttributesParser, list_and_options)
+    end
+
   #-----------------------------------------------------------------
   #      PARSERS: Key Pair
   #-----------------------------------------------------------------
@@ -557,7 +571,31 @@ module RightAws
         @result = []
       end
     end
-    
+
+  #-----------------------------------------------------------------
+  #      PARSERS: Account
+  #-----------------------------------------------------------------
+
+    class QEc2DescribeAccountAttributesParser < RightAWSParser #:nodoc:
+      def tagstart(name, attributes)
+        if name == 'item'
+          @attribute_name  = nil
+          @attribute_value = nil
+        end
+      end
+      def tagend(name)
+        case name
+        when 'attributeName'  then @attribute_name  = @text
+        when 'attributeValue' then @attribute_value = @text
+        when 'item'           then
+          @result[@attribute_name] = @attribute_value if @attribute_name
+        end
+      end
+      def reset
+        @result = {}
+      end
+    end
+
   end
       
 end

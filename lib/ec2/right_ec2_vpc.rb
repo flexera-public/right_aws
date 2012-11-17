@@ -25,6 +25,9 @@ module RightAws
 
   class Ec2
 
+
+    VPC_API_VERSION = (API_VERSION > '2012-10-15') ? API_VERSION : '2012-10-15'
+
   public
 
     #-----------------
@@ -54,6 +57,7 @@ module RightAws
     # P.S. filters: http://docs.amazonwebservices.com/AmazonVPC/latest/APIReference/index.html?ApiReference-query-DescribeVpcs.html
     #
     def describe_vpcs(*list_and_options)
+      list_and_options = merge_new_options_into_list_and_options(list_and_options, :options => {:api_version => VPC_API_VERSION})
       describe_resources_with_list_and_options('DescribeVpcs', 'VpcId', QEc2DescribeVpcsParser, list_and_options)
     end
 
@@ -108,6 +112,7 @@ module RightAws
     # P.S. filters: http://docs.amazonwebservices.com/AmazonVPC/latest/APIReference/index.html?ApiReference-query-DescribeSubnets.html
     #
     def describe_subnets(*list_and_options)
+      list_and_options = merge_new_options_into_list_and_options(list_and_options, :options => {:api_version => VPC_API_VERSION})
       describe_resources_with_list_and_options('DescribeSubnets', 'SubnetId', QEc2DescribeSubnetsParser, list_and_options)
     end
 
@@ -418,6 +423,7 @@ module RightAws
         when 'dhcpOptionsId'   then @item[:dhcp_options_id] = @text
         when 'cidrBlock'       then @item[:cidr_block]      = @text
         when 'instanceTenancy' then @item[:instance_tenancy] = @text
+        when 'isDefault'       then @item[:is_default]      = @text == 'true'
         else
           case full_tag_name
           when %r{/tagSet/item/key$}   then @aws_tag[:key]               = @text
@@ -447,6 +453,8 @@ module RightAws
         when 'cidrBlock'               then @item[:cidr_block]                 = @text
         when 'availabilityZone'        then @item[:availability_zone]          = @text
         when 'availableIpAddressCount' then @item[:available_ip_address_count] = @text
+        when 'defaultForAz'            then @item[:default_for_az]             = @text == 'true'
+        when 'mapPublicIpOnLaunch'     then @item[:map_public_ip_on_launch]    = @text == 'true'
         else
           case full_tag_name
           when %r{/tagSet/item/key$}   then @aws_tag[:key]               = @text
