@@ -27,7 +27,7 @@ module RightAws
     
     include RightAwsBaseInterface
 
-    API_VERSION      = "2011-04-01"
+    API_VERSION      = "2012-09-17"
     DEFAULT_HOST     = 'rds.amazonaws.com'
     DEFAULT_PORT     = 443
     DEFAULT_PROTOCOL = 'https'
@@ -177,7 +177,7 @@ module RightAws
     # Optional params: +:allocated_storage+ (25 by def), +:instance_class+, +:engine+ ('MySQL' by def),
     # +:endpoint_port+, +:db_name+, +:db_security_groups+, +:db_parameter_group+,  +:availability_zone+, +:preferred_maintenance_window+
     # +:backup_retention_period+, +:preferred_backup_window+, +:multi_az+, +:engine_version+, +:auto_minor_version_upgrade+,
-    # +:license_model+
+    # +:license_model+, +:iops+, +:db_subnet_group_name+, +:character_set_name+, +:option_group_name+
     #
     #   rds.create_db_instance('kd-delete-me-01', 'username', 'password',
     #                           :instance_class    => 'db.m1.small',
@@ -222,6 +222,10 @@ module RightAws
       request_hash['EngineVersion']              = params[:engine_version]                  unless params[:engine_version].right_blank?
       request_hash['AutoMinorVersionUpgrade']    = params[:auto_minor_version_upgrade].to_s unless params[:auto_minor_version_upgrade].nil?
       request_hash['LicenseModel']               = params[:license_model]                   unless params[:license_model].right_blank?
+      request_hash['CharacterSetName']           = params[:character_set_name]              unless params[:character_set_name].right_blank?
+      request_hash['DBSubnetGroupName']          = params[:db_subnet_group_name]            unless params[:db_subnet_group_name].right_blank?
+      request_hash['Iops']                       = params[:iops]                            unless params[:iops].right_blank?
+      request_hash['OptionGroupName']            = params[:option_group_name]               unless params[:option_group_name].right_blank?
       request_hash.merge!(amazonize_list('DBSecurityGroups.member',  params[:db_security_groups]))
       link = generate_request('CreateDBInstance', request_hash)
       request_info(link, DescribeDbInstancesParser.new(:logger => @logger))[:db_instances].first
@@ -233,7 +237,7 @@ module RightAws
     # Optional params: +:master_user_password+, +:instance_class+, +:db_security_groups+,
     # +:db_parameter_group+, +:preferred_maintenance_window+, +:allocated_storage+, +:apply_immediately+,
     # +:backup_retention_period+, +:preferred_backup_window+, +:multi_az+, +:engine_version+,
-    # +:auto_minor_version_upgrade+, +:allow_major_version_upgrade+
+    # +:auto_minor_version_upgrade+, +:allow_major_version_upgrade+, +:iops+, +::option_group_name+
     #
     #    rds.modify_db_instance('kd-delete-me-01',
     #                           :master_user_password => 'newpassword',
@@ -286,11 +290,15 @@ module RightAws
       request_hash['ApplyImmediately']           = params[:apply_immediately].to_s          unless params[:apply_immediately].right_blank?
       request_hash.merge!(amazonize_list('DBSecurityGroups.member',  params[:db_security_groups]))
       request_hash['DBParameterGroupName']       = params[:db_parameter_group]              unless params[:db_parameter_group].right_blank?
+      request_hash['Iops']                       = params[:iops]                            unless params[:iops].right_blank?
+      request_hash['OptionGroupName']            = params[:option_group_name]               unless params[:option_group_name].right_blank?
       link = generate_request('ModifyDBInstance', request_hash)
       request_info(link, DescribeDbInstancesParser.new(:logger => @logger))[:db_instances].first
     end
 
     # Reboot Db instance.
+    #
+    # Options: +:force_failover+
     #
     #  rds.reboot_db_instance('kd-my-awesome-db') #=>
     #    {:status=>"rebooting",
@@ -305,9 +313,12 @@ module RightAws
     #     :engine=>"MySQL5.1",
     #     :preferred_maintenance_window=>"Sun:05:00-Sun:09:00"}
     #
+    # P.S. http://docs.amazonwebservices.com/AmazonRDS/latest/APIReference/API_RebootDBInstance.html
+    #
     def reboot_db_instance(aws_id, params={})
       params = params.dup
       params['DBInstanceIdentifier'] = aws_id
+      params['ForceFailover']        = !!params[:force_failover] if params.has_key?(:force_failover)
       link = generate_request('RebootDBInstance', params)
       request_info(link, DescribeDbInstancesParser.new(:logger => @logger))[:db_instances].first
     end
@@ -382,6 +393,8 @@ module RightAws
     # Create a database security group so that ingress to an RDS Instance can be controlled.
     # A new security group cannot have the same name as an existing group.
     #
+    # Options: :vpc_id
+    #
     #  ds.create_db_security_group('kd3', 'kd') #=>
     #    {:ec2_security_groups=>[],
     #     :description=>"kd",
@@ -389,9 +402,11 @@ module RightAws
     #     :name=>"kd3",
     #     :owner_id=>"82...25"}
     #
-    def create_db_security_group(db_security_group_name, db_security_group_description)
-      link = generate_request('CreateDBSecurityGroup', 'DBSecurityGroupName'        => db_security_group_name,
-                                                       'DBSecurityGroupDescription' => db_security_group_description)
+    def create_db_security_group(db_security_group_name, db_security_group_description, params={})
+      request_hash = { 'DBSecurityGroupName'        => db_security_group_name,
+                       'DBSecurityGroupDescription' => db_security_group_description }
+      request_hash['EC2VpcId'] = params[:vpc_id] unless params[:vpc_id].right_blank?
+      link = generate_request('CreateDBSecurityGroup', request_hash)
       request_info(link, DescribeDbSecurityGroupsParser.new(:logger => @logger))[:db_security_groups].first
     end
 
@@ -400,6 +415,7 @@ module RightAws
       request_hash['CIDRIP']                  = params[:cidrip]                   unless params[:cidrip].right_blank?
       request_hash['EC2SecurityGroupName']    = params[:ec2_security_group_name]  unless params[:ec2_security_group_name].right_blank?
       request_hash['EC2SecurityGroupOwnerId'] = params[:ec2_security_group_owner] unless params[:ec2_security_group_owner].right_blank?
+      request_hash['EC2SecurityGroupId']      = params[:ec2_security_group_id]    unless params[:ec2_security_group_id].right_blank?
       link = generate_request(action, request_hash)
       request_info(link, DescribeDbSecurityGroupsParser.new(:logger => @logger))[:db_security_groups].first
     end
@@ -556,20 +572,20 @@ module RightAws
     def reset_db_parameter_group(db_parameter_group_name, *params)
       params = params.flatten
       request_hash = { 'DBParameterGroupName' => db_parameter_group_name }
-      if params.first.to_s == 'all'
-        request_hash['ResetAllParameters'] = true
-      else
-        tmp = []
-        params.each{ |item| tmp |= item.to_a }
-        params = []
-        tmp.each do |key, method|
-          method = 'pending-reboot' unless method
-          params << [key, method]
+        if params.first.to_s == 'all'
+          request_hash['ResetAllParameters'] = true
+        else
+          tmp = []
+          params.each{ |item| tmp |= item.to_a }
+          params = []
+          tmp.each do |key, method|
+            method = 'pending-reboot' unless method
+            params << [key, method]
+          end
+          request_hash.merge!( amazonize_list(['Parameters.member.?.ParameterName',
+                                               'Parameters.member.?.ApplyMethod'],
+                                               params ))
         end
-        request_hash.merge!( amazonize_list(['Parameters.member.?.ParameterName',
-                                             'Parameters.member.?.ApplyMethod'],
-                                             params ))
-      end
       link = generate_request('ResetDBParameterGroup', request_hash)
       request_info(link, RightHttp2xxParser.new(:logger => @logger))
     end
@@ -640,7 +656,7 @@ module RightAws
     end
 
     # Describe a list of orderable DB Instance options for the specified engine.
-    # Optionals: +:instance_class+, +:engine_version+ , +:license_model+
+    # Optionals: +:instance_class+, +:engine_version+ , +:license_model+, +:vpc+
     #
     #  rds.describe_orderable_db_instance_options('oracle-ee', :engine_version => '11.2.0.2.v2') #=>
     #    [{:read_replica_capable=>false,
@@ -654,8 +670,9 @@ module RightAws
     def describe_orderable_db_instance_options(engine, params={}, &block)
       request_hash = { 'Engine' => engine }
       request_hash['DBInstanceClass'] = params[:instance_class] unless params[:instance_class].right_blank?
-      request_hash['EngineVersion']   = params[:engine_version]    unless params[:engine_version].right_blank?
-      request_hash['LicenseModel']    = params[:license_model]     unless params[:license_model].right_blank?
+      request_hash['EngineVersion']   = params[:engine_version] unless params[:engine_version].right_blank?
+      request_hash['LicenseModel']    = params[:license_model]  unless params[:license_model].right_blank?
+      request_hash['Vpc']             = !!params[:vpc]          if     params.has_key?(:vpc)
       result = []
       incrementally_list_items('DescribeOrderableDBInstanceOptions', DescribeOrderableDBInstanceOptionsParser, request_hash) do |response|
         result += response[:items]
@@ -745,7 +762,8 @@ module RightAws
     # in the "Available" state. The new RDS instance is created with the Default security group.
     #
     # Optional params: +:instance_class+, +:endpoint_port+, +:availability_zone+, +:multi_az+,
-    # +:auto_minor_version_upgrade+, +:license_model+, +:db_name+, +:engine+
+    # +:auto_minor_version_upgrade+, +:license_model+, +:db_name+, +:engine+, +:db_subnet_group_name+,
+    # +:iops+, +:option_group_name+
     #
     #  rds.restore_db_instance_from_db_snapshot('ahahahaha-final-snapshot-20090828081159', 'q1') #=>
     #    {:status=>"creating",
@@ -772,6 +790,9 @@ module RightAws
       request_hash['LicenseModel']            = params[:license_model]              unless params[:license_model].right_blank?
       request_hash['DBName']                  = params[:db_name]                    unless params[:db_name].right_blank?
       request_hash['Engine']                  = params[:engine]                     unless params[:enginel].right_blank?
+      request_hash['DBSubnetGroupName']       = params[:db_subnet_group_name]       unless params[:db_subnet_group_name].right_blank?
+      request_hash['Iops']                    = params[:iops]                       unless params[:iops].right_blank?
+      request_hash['OptionGroupName']         = params[:option_group_name]          unless params[:option_group_name].right_blank?
       link = generate_request('RestoreDBInstanceFromDBSnapshot', request_hash)
       request_info(link, DescribeDbInstancesParser.new(:logger => @logger))[:db_instances].first
     end
@@ -783,6 +804,7 @@ module RightAws
     #
     # Optional params: +:instance_class+, +:endpoint_port+, +:availability_zone+, +:multi_az+, +:restore_time+,
     # +:auto_minor_version_upgrade+, +:use_latest_restorable_time+, +:license_model+, +:db_name+, +:engine+
+    # +:db_subnet_group_name+, +:iops+, +:option_group_name+
     #
     def restore_db_instance_to_point_in_time(instance_aws_id, new_instance_aws_id, params={})
       request_hash = { 'SourceDBInstanceIdentifier' => instance_aws_id,
@@ -797,6 +819,9 @@ module RightAws
       request_hash['LicenseModel']            = params[:license_model]              unless params[:license_model].right_blank?
       request_hash['DBName']                  = params[:db_name]                    unless params[:db_name].right_blank?
       request_hash['Engine']                  = params[:engine]                     unless params[:enginel].right_blank?
+      request_hash['DBSubnetGroupName']       = params[:db_subnet_group_name]       unless params[:db_subnet_group_name].right_blank?
+      request_hash['Iops']                    = params[:iops]                       unless params[:iops].right_blank?
+      request_hash['OptionGroupName']         = params[:option_group_name]          unless params[:option_group_name].right_blank?
       link = generate_request('RestoreDBInstanceToPointInTime', request_hash)
       request_info(link, DescribeDbInstancesParser.new(:logger => @logger))[:db_instances].first
     end
@@ -875,7 +900,7 @@ module RightAws
     # --------------------------------------------
 
     # Get a list of the available DB engines.
-    # Optional params: +:db_parameter_group_family+, +:default_only+, +:engine+, +:engine_version+
+    # Optional params: +:db_parameter_group_family+, +:default_only+, +:engine+, +:engine_version+. +:engine_version+
     #
     #  rds.describe_db_engine_versions #=>
     #    [{:db_parameter_group_family=>"mysql5.1",
@@ -890,12 +915,41 @@ module RightAws
     #       "Oracle Standard Edition One - DB Engine Version 11.2.0.2.v2",
     #      :engine_version=>"11.2.0.2.v2"}]
     #
+    #  rds.describe_db_engine_versions(:list_supported_character_sets => true) #=> 
+    #    [{:db_parameter_group_family=>"mysql5.1",
+    #      :engine=>"mysql",
+    #      :db_engine_description=>"MySQL Community Edition",
+    #      :engine_version=>"5.1.45",
+    #      :db_engine_version_description=>"MySQL 5.1.45"},
+    #     {:db_parameter_group_family=>"oracle-ee-11.2",
+    #      :engine=>"oracle-ee",
+    #      :supported_character_sets=>
+    #       [{:name=>"AL32UTF8",
+    #         :description=>"Unicode 5.0 UTF-8 Universal character set"},
+    #        {:name=>"JA16EUC", :description=>"EUC 24-bit Japanese"},
+    #        {:name=>"JA16EUCTILDE",
+    #         :description=>
+    #          "The same as JA16EUC except for the way that the wave dash and the tilde are mapped to and from Unicode."},
+    #        {:name=>"JA16SJIS", :description=>"Shift-JIS 16-bit Japanese"},
+    #        {:name=>"WE8ISO8859P9",
+    #         :description=>"ISO 8859-9 West European and Turkish"},
+    #        {:name=>"US7ASCII", :description=>"ASCII 7-bit American"}],
+    #      :db_engine_description=>"Oracle Database Enterprise Edition",
+    #      :default_character_set=>
+    #       {:name=>"AL32UTF8",
+    #        :description=>"Unicode 5.0 UTF-8 Universal character set"},
+    #      :engine_version=>"11.2.0.2.v3",
+    #      :db_engine_version_description=>"Oracle 11.2.0.2.v3"}, ... ]
+    #
+    # P.S. http://docs.amazonwebservices.com/AmazonRDS/latest/APIReference/API_DescribeDBEngineVersions.html
+    #
     def describe_db_engine_versions(params={}, &block)
       params = params.dup
       params['DBParameterGroupFamily'] = params.delete(:db_parameter_group_family) unless params[:db_parameter_group_family].right_blank?
       params['DefaultOnly']            = params.delete(:default_only).to_s         unless params[:default_only].nil?
       params['Engine']                 = params.delete(:engine)                    unless params[:engine].right_blank?
       params['EngineVersion']          = params.delete(:engine_version)            unless params[:engine_version].right_blank?
+      params['ListSupportedCharacterSets'] = !!params.delete(:list_supported_character_sets) if params.has_key?(:list_supported_character_sets)
       result = []
       incrementally_list_items('DescribeDBEngineVersions', DescribeDBEngineVersionsParser, params) do |response|
         result += response[:db_engine_versions]
@@ -910,7 +964,8 @@ module RightAws
 
     # Create a DB Instance that acts as a Read Replica of a source DB Instance.
     #
-    # Optional params: +:endpoint_port+, +:availability_zone+, +:instance_class+, +:auto_minor_version_upgrade+
+    # Optional params: +:endpoint_port+, +:availability_zone+, +:instance_class+, +:auto_minor_version_upgrade+,
+    # +:iops+, +:option_group_name+
     #
     #    rds.create_db_instance_read_replica('kd-delete-me-01-replica-01', 'kd-delete-me-01',
     #                                        :instance_class => 'db.m1.small',
@@ -941,6 +996,8 @@ module RightAws
       request_hash['AvailabilityZone']        = params[:availability_zone]               unless params[:availability_zone].right_blank?
       request_hash['DBInstanceClass']         = params[:instance_class]                  unless params[:instance_class].right_blank?
       request_hash['AutoMinorVersionUpgrade'] = params[:auto_minor_version_upgrade].to_s unless params[:auto_minor_version_upgrade].nil?
+      request_hash['Iops']                    = params[:iops]                            unless params[:iops].right_blank?
+      request_hash['OptionGroupName']         = params[:option_group_name]               unless params[:option_group_name].right_blank?
       link = generate_request('CreateDBInstanceReadReplica', request_hash)
       request_info(link, DescribeDbInstancesParser.new(:logger => @logger))[:db_instances].first
     end
@@ -954,22 +1011,26 @@ module RightAws
     # Options: :aws_id, :instance_class, :duration, :product_description, :multi_az
     #
     #  rds.describe_reserved_db_instances_offerings #=>
-    #    [{:usage_price=>0.262,
-    #      :offering_aws_id=>"248e7b75-2451-4381-9025-b5553d421c7b",
-    #      :multi_az=>false,
-    #      :duration=>31536000,
-    #      :currency_code=>"USD",
-    #      :instance_class=>"db.m2.xlarge",
-    #      :product_description=>"mysql",
-    #      :fixed_price=>1325.0},
-    #     {:usage_price=>0.092,
-    #      :offering_aws_id=>"248e7b75-49a7-4cd7-9a9b-354f4906a9b1",
-    #      :multi_az=>true,
-    #      :duration=>94608000,
-    #      :currency_code=>"USD",
-    #      :instance_class=>"db.m1.small",
-    #      :product_description=>"mysql",
-    #      :fixed_price=>700.0},   ...]
+    #    [{:recurring_charges=>[],
+    #        :offering_type=>"Medium Utilization",
+    #        :duration=>94608000,
+    #        :currency_code=>"USD",
+    #        :fixed_price=>82.0,
+    #        :product_description=>"oracle-se(byol)",
+    #        :usage_price=>0.01,
+    #        :aws_id=>"248e7b75-01ff-4f1d-8fad-918b76337c13",
+    #        :multi_az=>false,
+    #        :instance_class=>"db.t1.micro"},
+    #      {:recurring_charges=>[{:frequency=>"Hourly", :amount=>"0.24"}],
+    #        :offering_type=>"Heavy Utilization",
+    #        :duration=>31536000,
+    #        :currency_code=>"USD",
+    #        :fixed_price=>1040.0,
+    #        :product_description=>"sqlserver-web(li)",
+    #        :usage_price=>0.0,
+    #        :aws_id=>"248e7b75-05eb-46df-a7b8-4117b5001667",
+    #        :multi_az=>false,
+    #        :instance_class=>"db.m2.xlarge"}, ... ]
     #
     #  rds.describe_reserved_db_instances_offerings(:aws_id => "248e7b75-49a7-4cd7-9a9b-354f4906a9b1") #=>
     #    [{:duration=>94608000,
@@ -1038,7 +1099,124 @@ module RightAws
       link = generate_request('PurchaseReservedDBInstancesOffering', request_hash)
       request_info(link, DescribeReservedDBInstancesParser.new(:logger => @logger))[:reserved_db_instances].first
     end
-    
+
+    #---------------------------------------------
+    #  Subnet Groups
+    #---------------------------------------------
+
+    # Lists available DB Subnet Groups.
+    # Options: :name, :max_records, :marker
+    #
+    #  rds.describe_db_subnet_groups #=>
+    #    [{:subnets=>
+    #       [{:availability_zone=>
+    #          {:name=>"us-east-1d", :provisioned_iops_capable=>false},
+    #         :status=>"Active",
+    #         :subnet_id=>"subnet-5259d03a"},
+    #        {:availability_zone=>
+    #          {:name=>"us-east-1a", :provisioned_iops_capable=>false},
+    #         :status=>"Active",
+    #         :subnet_id=>"subnet-eb518f83"}],
+    #      :vpc_id=>"vpc-10518f78",
+    #      :status=>"Complete",
+    #      :description=>"delete me please",
+    #      :name=>"kd-subnet-group"},
+    #     {:subnets=>
+    #       [{:availability_zone=>
+    #          {:name=>"us-east-1a", :provisioned_iops_capable=>false},
+    #         :status=>"Active",
+    #         :subnet_id=>"subnet-eb518f83"},
+    #        {:availability_zone=>
+    #          {:name=>"us-east-1d", :provisioned_iops_capable=>false},
+    #         :status=>"Active",
+    #         :subnet_id=>"subnet-5259d03a"}],
+    #      :vpc_id=>"vpc-10518f78",
+    #      :status=>"Complete",
+    #      :description=>"delete me please",
+    #      :name=>"kd-subnet-group-1"}]
+    #
+    # P.S. http://docs.amazonwebservices.com/AmazonRDS/latest/APIReference/API_DescribeDBSubnetGroups.html
+    #
+    def describe_db_subnet_groups(params={}, &block)
+      params = params.dup
+      params['DBSubnetGroupName'] = params.delete(:name) unless params[:name].right_blank?
+      result = []
+      incrementally_list_items('DescribeDBSubnetGroups', DescribeDBSubnetGroupsParser, params) do |response|
+        result += response[:subnet_groups]
+        block ? block.call(response) : true
+      end
+      result
+    end
+
+    def get_db_subnet_group(group_name, &block)
+      describe_db_subnet_groups(:name => group_name, &block)
+    end
+
+    # Create a new DB Subnet Group.
+    #
+    #  rds.create_db_subnet_group('kd-subnet-group-1', ['subnet-5259d03a', 'subnet-eb518f83'], 'delete me please') #=>
+    #    {:subnets=>
+    #      [{:availability_zone=>
+    #         {:name=>"us-east-1a", :provisioned_iops_capable=>false},
+    #        :status=>"Active",
+    #        :subnet_id=>"subnet-eb518f83"},
+    #       {:availability_zone=>
+    #         {:name=>"us-east-1d", :provisioned_iops_capable=>false},
+    #        :status=>"Active",
+    #        :subnet_id=>"subnet-5259d03a"}],
+    #     :vpc_id=>"vpc-10518f78",
+    #     :status=>"Complete",
+    #     :description=>"delete me please",
+    #     :name=>"kd-subnet-group-1"}
+    #
+    # P.S. http://docs.amazonwebservices.com/AmazonRDS/latest/APIReference/API_CreateDBSubnetGroup.html
+    #
+    def create_db_subnet_group(subnet_group_name, subnets, subnet_group_description = '-')
+      request_hash = { 'DBSubnetGroupName'        => subnet_group_name,
+                       'DBSubnetGroupDescription' => subnet_group_description }
+      request_hash.merge!(amazonize_list('SubnetIds.member',  subnets))
+      link = generate_request('CreateDBSubnetGroup', request_hash)
+      request_info(link, DescribeDBSubnetGroupsParser.new(:logger => @logger))[:subnet_groups].first
+    end
+
+    # Modify an existing DB Subnet Group.
+    #
+    #  rds.modify_db_subnet_group('kd-subnet-group', ['subnet-5259d03a', 'subnet-eb518f83'], 'hahaha!') #=>
+    #    {:subnets=>
+    #      [{:availability_zone=>
+    #         {:name=>"us-east-1d", :provisioned_iops_capable=>false},
+    #        :status=>"Active",
+    #        :subnet_id=>"subnet-5259d03a"},
+    #       {:availability_zone=>
+    #         {:name=>"us-east-1a", :provisioned_iops_capable=>false},
+    #        :status=>"Active",
+    #        :subnet_id=>"subnet-eb518f83"}],
+    #     :vpc_id=>"vpc-10518f78",
+    #     :status=>"Complete",
+    #     :description=>"hahaha!",
+    #     :name=>"kd-subnet-group"}
+    #
+    # P.S. http://docs.amazonwebservices.com/AmazonRDS/latest/APIReference/API_ModifyDBSubnetGroup.html
+    #
+    def modify_db_subnet_group(subnet_group_name, subnets, subnet_group_description = '')
+      request_hash = { 'DBSubnetGroupName' => subnet_group_name}
+      request_hash['DBSubnetGroupDescription'] = subnet_group_description unless subnet_group_description.right_blank?
+      request_hash.merge!(amazonize_list('SubnetIds.member',  subnets))
+      link = generate_request('ModifyDBSubnetGroup', request_hash)
+      request_info(link, DescribeDBSubnetGroupsParser.new(:logger => @logger))[:subnet_groups].first
+    end
+
+    # Delete a DB Subnet Group.
+    #
+    #  rds.delete_db_subnet_group("kd-subnet-group-1") #=> true
+    #
+    # P.S. http://docs.amazonwebservices.com/AmazonRDS/latest/APIReference/API_DeleteDBSubnetGroup.html
+    #
+    def delete_db_subnet_group(name)
+      link = generate_request('DeleteDBSubnetGroup', 'DBSubnetGroupName' => name)
+      request_info(link, RightHttp2xxParser.new(:logger => @logger))
+    end
+
     # --------------------------------------------
     #  Parsers
     # --------------------------------------------
@@ -1053,8 +1231,13 @@ module RightAws
       end
       def tagstart(name, attributes)
         case name
-        when 'DBInstance'             then @item = { :db_security_groups => [], :pending_modified_values => {}, :read_replica_db_instance_identifiers => [] }
+        when 'DBInstance'             then @item = { :db_security_groups                   => [],
+                                                     :pending_modified_values              => {},
+                                                     :read_replica_db_instance_identifiers => [],
+                                                     :option_group_membership              => {} }
         when 'DBSecurityGroup'        then @db_security_group = {}
+        when 'DBSubnetGroup'          then @item[:db_subnet_group] = {}
+        when 'Subnet'                 then @subnet = { :availability_zone => {} }
         when 'DBParameterGroup',
              'DBParameterGroupStatus' then @db_parameter_group = {}
         end
@@ -1074,10 +1257,10 @@ module RightAws
         when 'LatestRestorableTime'                  then @item[:latest_restorable_time] = @text
         when 'LicenseModel'                          then @item[:license_model]          = @text
         when 'DBName'                                then @item[:db_name]                = @text
+        when 'Iops'                                  then @item[:iops]                   = @text
+        when 'CharacterSetName'                      then @item[:character_set_name]     = @text
         when 'ReadReplicaSourceDBInstanceIdentifier' then @item[:read_replica_source_db_instance_identifier] = @text
         when 'ReadReplicaDBInstanceIdentifier'       then @item[:read_replica_db_instance_identifiers]      << @text
-        when 'DBSecurityGroupName'                   then @db_security_group[:name]             = @text
-        when 'Status'                                then @db_security_group[:status]           = @text
         when 'DBParameterGroupName'                  then @db_parameter_group[:name]            = @text
         when 'ParameterApplyStatus'                  then @db_parameter_group[:status]          = @text
         when 'DBSecurityGroup'                       then @item[:db_security_groups] << @db_security_group
@@ -1105,6 +1288,19 @@ module RightAws
           when %r{PendingModifiedValues/EngineVersion$}              then @item[:pending_modified_values][:engine_version]               = @text
           when %r{PendingModifiedValues/AutoMinorVersionUpgrade$}    then @item[:pending_modified_values][:auto_minor_version_upgrade]   = (@text == 'true')
           when %r{PendingModifiedValues/AllowMajorVersionUpgrade$}   then @item[:pending_modified_values][:allow_major_version_upgrade]  = (@text == 'true')
+          when %r{OptionGroupMembership/Status$}                     then @item[:option_group_membership][:status] = @text
+          when %r{OptionGroupMembership/OptionGroupName$}            then @item[:option_group_membership][:name]   = @text
+          when %r{DBSecurityGroup/Status$}                           then @db_security_group[:status]           = @text
+          when %r{DBSecurityGroup/DBSecurityGroupName$}              then @db_security_group[:name]             = @text
+          when %r{DBSubnetGroup/DBSubnetGroupDescription$}           then @item[:db_subnet_group][:description]        = @text
+          when %r{DBSubnetGroup/DBSubnetGroupName$}                  then @item[:db_subnet_group][:name]               = @text
+          when %r{DBSubnetGroup/SubnetGroupStatus$}                  then @item[:db_subnet_group][:status]             = @text
+          when %r{Subnet/SubnetIdentifier$}                          then @subnet[:subnet_id]                = @text
+          when %r{Subnet/SubnetStatus$}                              then @subnet[:status]                   = @text
+          when %r{Subnet/AvailabilityZone/Name$}                     then @subnet[:availability_zone][:name] = @text
+          when %r{Subnet/AvailabilityZone/ProvisionedIopsCapable$}   then @subnet[:availability_zone][:provisioned_iops_capable] = @text == 'true'
+          when %r{DBSubnetGroup/Subnet$}                             then (@item[:db_subnet_group][:subnets] ||= [])  << @subnet
+          when %r{DBSubnetGroup/VpcId$}                              then @item[:db_subnet_group][:vpc_id]             = @text
           end
         end
       end
@@ -1129,6 +1325,7 @@ module RightAws
         when 'LicenseModel'               then @item[:license_model]        = @text
         when 'MultiAZCapable'             then @item[:multi_az_capable]     = @text
         when 'ReadReplicaCapable'         then @item[:read_replica_capable] = @text == 'true'
+        when 'Vpc'                        then @item[:vpc]                  = @text == 'true'
         when 'Name'                       then @item[:availability_zones]  << @text
         when 'OrderableDBInstanceOption'  then @result[:items]             << @item
         end
@@ -1157,11 +1354,13 @@ module RightAws
         when 'DBSecurityGroupDescription' then @item[:description ]           = @text
         when 'OwnerId'                    then @item[:owner_id]               = @text
         when 'DBSecurityGroupName'        then @item[:name]                   = @text
+        when 'EC2SecurityGroupId'         then @ec2_security_group[:group_id] = @text
         when 'EC2SecurityGroupName'       then @ec2_security_group[:name]     = @text
         when 'EC2SecurityGroupOwnerId'    then @ec2_security_group[:owner_id] = @text
         when 'CIDRIP'                     then @ip_range[:cidrip]             = @text
         when 'IPRange'                    then @item[:ip_ranges]             << @ip_range
         when 'EC2SecurityGroup'           then @item[:ec2_security_groups]   << @ec2_security_group
+        when 'VpcId'                      then @item[:vpc_id]                 = @text
         when 'DBSecurityGroup'
           # Sort the ip_ranges and ec2_security_groups
           @item[:ip_ranges].sort!{ |i1,i2| "#{i1[:cidrip]}" <=> "#{i2[:cidrip]}" }
@@ -1262,6 +1461,9 @@ module RightAws
         when 'DBInstanceIdentifier' then @item[:instance_aws_id]      = @text
         when 'DBSnapshotIdentifier' then @item[:aws_id]               = @text
         when 'LicenseModel'         then @item[:license_model]        = @text
+        when 'Iops'                 then @item[:iops]                 = @text
+        when 'SnapshotType'         then @item[:snapshot_type]        = @text
+        when 'VpcId'                then @item[:vpc_id]               = @text
         when 'DBSnapshot'           then @result[:db_snapshots]      << @item
         end
       end
@@ -1294,7 +1496,7 @@ module RightAws
     end
 
     # --------------------------------------------
-    #  DB Events
+    #  DB Engine Versions
     # --------------------------------------------
 
     class DescribeDBEngineVersionsParser < RightAWSParser # :nodoc:
@@ -1304,6 +1506,11 @@ module RightAws
       def tagstart(name, attributes)
         case name
         when 'DBEngineVersion' then @item = {}
+        else
+          case full_tag_name
+          when %r{DefaultCharacterSet$}    then @item[:default_character_set] = {}
+          when %r{SupportedCharacterSets/CharacterSet$} then @set = {}
+          end
         end
       end
       def tagend(name)
@@ -1316,6 +1523,14 @@ module RightAws
         when 'DBEngineDescription'    then @item[:db_engine_description]     = @text
         when 'DBEngineVersionDescription' then @item[:db_engine_version_description] = @text
         when 'DBEngineVersion'        then @result[:db_engine_versions]     << @item
+        else
+          case full_tag_name
+          when %r{DefaultCharacterSet/CharacterSetDescription$}    then @item[:default_character_set][:description] = @text
+          when %r{DefaultCharacterSet/CharacterSetName$}           then @item[:default_character_set][:name]        = @text
+          when %r{SupportedCharacterSets/CharacterSet/CharacterSetDescription$} then @set[:description] = @text
+          when %r{SupportedCharacterSets/CharacterSet/CharacterSetName$}        then @set[:name]        = @text
+          when %r{SupportedCharacterSets/CharacterSet$}                         then (@item[:supported_character_sets] ||= []) << @set
+          end
         end
       end
     end
@@ -1330,7 +1545,8 @@ module RightAws
       end
       def tagstart(name, attributes)
         case name
-        when 'ReservedDBInstancesOffering' then @item = {}
+        when 'ReservedDBInstancesOffering' then @item = { :recurring_charges => [] }
+        when 'RecurringCharge'             then @recurring_charge = {}
         end
       end
       def tagend(name)
@@ -1344,8 +1560,15 @@ module RightAws
         when 'UsagePrice'                    then @item[:usage_price]         = @text.to_f
         when 'MultiAZ'                       then @item[:multi_az]            = (@text == 'true')
         when 'ProductDescription'            then @item[:product_description] = @text
+        when 'OfferingType'                  then @item[:offering_type]       = @text
         when 'ReservedDBInstancesOfferingId' then @item[:aws_id]              = @text
+        when 'RecurringCharge'               then @item[:recurring_charges]  << @recurring_charge
         when 'ReservedDBInstancesOffering'   then @result[:reserved_db_instances_offerings] << @item
+        else
+          case full_tag_name
+          when %r{RecurringCharge/RecurringChargeAmount$}    then @recurring_charge[:amount]    = @text
+          when %r{RecurringCharge/RecurringChargeFrequency$} then @recurring_charge[:frequency] = @text
+          end
         end
       end
     end
@@ -1356,7 +1579,8 @@ module RightAws
       end
       def tagstart(name, attributes)
         case name
-        when 'ReservedDBInstance' then @item = {}
+        when 'ReservedDBInstance' then @item = { :recurring_charges => [] }
+        when 'RecurringCharge'    then @recurring_charge = {}
         end
       end
       def tagend(name)
@@ -1375,7 +1599,49 @@ module RightAws
         when 'State'                         then @item[:state]               = @text
         when 'DBInstanceCount'               then @item[:instance_count]      = @text.to_i
         when 'StartTime'                     then @item[:start_time]          = @text
+        when 'OfferingType'                  then @item[:offering_type]       = @text
+        when 'RecurringCharge'               then @item[:recurring_charges]  << @recurring_charge
         when 'ReservedDBInstance'            then @result[:reserved_db_instances] << @item
+        else
+          case full_tag_name
+          when %r{RecurringCharge/RecurringChargeAmount$}    then @recurring_charge[:amount]    = @text
+          when %r{RecurringCharge/RecurringChargeFrequency$} then @recurring_charge[:frequency] = @text
+          end
+        end
+      end
+    end
+
+    # --------------------------------------------
+    #  DB Subnet Groups
+    # --------------------------------------------
+
+    class DescribeDBSubnetGroupsParser < RightAWSParser # :nodoc:
+      def reset
+        @result = { :subnet_groups => [] }
+      end
+      def tagstart(name, attributes)
+        case name
+        when 'DBSubnetGroup' then @item   = { :subnets           => [] }
+        when 'Subnet'        then @subnet = { :availability_zone => {}}
+        end
+      end
+      def tagend(name)
+        case name
+        when 'Marker'                   then @result[:marker]        = @text
+        when 'MaxRecords'               then @result[:max_records]   = @text.to_i
+        when 'DBSubnetGroupName'        then @item[:name]            = @text
+        when 'DBSubnetGroupDescription' then @item[:description]     = @text
+        when 'SubnetGroupStatus'        then @item[:status]          = @text
+        when 'Subnet'                   then @item[:subnets]         << @subnet
+        when 'VpcId'                    then @item[:vpc_id]          = @text
+        when 'DBSubnetGroup'            then @result[:subnet_groups] << @item
+        else
+          case full_tag_name
+          when %r{Subnet/SubnetIdentifier$}                 then @subnet[:subnet_id]                = @text
+          when %r{Subnet/SubnetStatus$}                     then @subnet[:status]                   = @text
+          when %r{AvailabilityZone/Name$}                   then @subnet[:availability_zone][:name] = @text
+          when %r{AvailabilityZone/ProvisionedIopsCapable$} then @subnet[:availability_zone][:provisioned_iops_capable] = @text == 'true'
+          end
         end
       end
     end
