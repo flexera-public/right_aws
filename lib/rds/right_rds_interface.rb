@@ -572,20 +572,20 @@ module RightAws
     def reset_db_parameter_group(db_parameter_group_name, *params)
       params = params.flatten
       request_hash = { 'DBParameterGroupName' => db_parameter_group_name }
-        if params.first.to_s == 'all'
-          request_hash['ResetAllParameters'] = true
-        else
-          tmp = []
-          params.each{ |item| tmp |= item.to_a }
-          params = []
-          tmp.each do |key, method|
-            method = 'pending-reboot' unless method
-            params << [key, method]
-          end
-          request_hash.merge!( amazonize_list(['Parameters.member.?.ParameterName',
-                                               'Parameters.member.?.ApplyMethod'],
-                                               params ))
+      if params.first.to_s == 'all'
+        request_hash['ResetAllParameters'] = true
+      else
+        tmp = []
+        params.each{ |item| tmp |= item.to_a }
+        params = []
+        tmp.each do |key, method|
+          method = 'pending-reboot' unless method
+          params << [key, method]
         end
+        request_hash.merge!( amazonize_list(['Parameters.member.?.ParameterName',
+                                             'Parameters.member.?.ApplyMethod'],
+                                             params ))
+      end
       link = generate_request('ResetDBParameterGroup', request_hash)
       request_info(link, RightHttp2xxParser.new(:logger => @logger))
     end
