@@ -34,7 +34,14 @@ module RightAws
     DEFAULT_PATH     = '/'
 
     DEFAULT_INSTANCE_CLASS   =  'db.m1.small'
-    INSTANCE_CLASSES         = ['db.m1.small', 'db.m1.large', 'db.m1.xlarge', 'db.m2.2xlarge', 'db.m2.2xlarge', 'db.m2.4xlarge']
+    INSTANCE_CLASSES         = [ 'db.t1.micro',
+                                 'db.m1.small',
+                                 'db.m1.medium',
+                                 'db.m1.large',
+                                 'db.m1.xlarge',
+                                 'db.m2.xlarge',
+                                 'db.m2.2xlarge',
+                                 'db.m2.4xlarge']
     LICENSE_MODELS           = ['bring-your-own-license', 'license-included', 'general-public-license']
 
     @@bench = AwsBenchmarkingBlock.new
