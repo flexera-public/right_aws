@@ -96,7 +96,9 @@ module RightAws
                                 'cc1.4xlarge',
                                 'cg1.4xlarge',
                                 'cc2.8xlarge',
-                                'hi1.4xlarge' ]
+                                'hi1.4xlarge',
+                                'hs1.8xlarge'
+                              ]
     
     @@bench = AwsBenchmarkingBlock.new
     def self.bench_xml
