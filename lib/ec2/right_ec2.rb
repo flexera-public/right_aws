@@ -93,11 +93,12 @@ module RightAws
                                  'm2.4xlarge',
                                  'm3.xlarge' ,
                                  'm3.2xlarge',
-                                'cc1.4xlarge',
-                                'cg1.4xlarge',
-                                'cc2.8xlarge',
-                                'hi1.4xlarge',
-                                'hs1.8xlarge'
+                                 'cc1.4xlarge',
+                                 'cg1.4xlarge',
+                                 'cc2.8xlarge',
+                                 'hi1.4xlarge',
+                                 'hs1.8xlarge',
+                                 'cr1.8xlarge'
                               ]
     
     @@bench = AwsBenchmarkingBlock.new
