@@ -623,7 +623,7 @@ module RightAws
           when 'ScriptBootstrapAction'
             @bootstrap_action[:script_bootstrap_action] = @text
           when 'BootstrapActionConfig'
-            @step[:bootstrap_actions] << @bootstrap_action
+            # @step[:bootstrap_actions] << @bootstrap_action
           end
         when %r{/InstanceGroups/member} # no trailing $
           case name
