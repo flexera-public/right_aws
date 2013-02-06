@@ -91,9 +91,12 @@ module RightAws
                                  'm2.xlarge' ,
                                  'm2.2xlarge',
                                  'm2.4xlarge',
+                                 'm3.xlarge' ,
+                                 'm3.2xlarge',
                                 'cc1.4xlarge',
                                 'cg1.4xlarge',
-                                'cc2.8xlarge']
+                                'cc2.8xlarge',
+                                'hi1.4xlarge' ]
     
     @@bench = AwsBenchmarkingBlock.new
     def self.bench_xml
@@ -120,6 +123,7 @@ module RightAws
     # * <tt>:logger</tt>: for log messages, default: RAILS_DEFAULT_LOGGER else STDOUT
     # * <tt>:signature_version</tt>:  The signature version : '0','1' or '2'(default)
     # * <tt>:cache</tt>: true/false: caching for: ec2_describe_images, describe_instances,
+    # * <tt>:token</tt>: Option SecurityToken for temporary credentials
     # describe_images_by_owner, describe_images_by_executable_by, describe_availability_zones,
     # describe_security_groups, describe_key_pairs, describe_addresses, 
     # describe_volumes, describe_snapshots methods, default: false.
@@ -154,12 +158,15 @@ module RightAws
       # 'RemoteFunctionName' -> :remote_funtion_name
       cache_name = remote_function_name.right_underscore.to_sym
       list, options = AwsUtils::split_items_and_params(list_and_options)
+      custom_options = {}
       # Resource IDs to fetch
       request_hash  = amazonize_list(remote_item_name, list)
       # Other custom options
       options.each do |key, values|
         next if values.right_blank?
         case key
+        when :options
+          custom_options = values
         when :filters then
           request_hash.merge!(amazonize_list(['Filter.?.Name', 'Filter.?.Value.?'], values))
         else
@@ -167,10 +174,15 @@ module RightAws
         end
       end
       cache_for = (list.right_blank? && options.right_blank?) ? cache_name : nil
-      link = generate_request(remote_function_name, request_hash)
+      link = generate_request(remote_function_name, request_hash, custom_options)
       request_cache_or_info(cache_for, link,  parser_class, @@bench, cache_for, &block)
     rescue Exception
       on_exception
+    end
+
+    def merge_new_options_into_list_and_options(list_and_options, new_options)
+      list, options = AwsUtils::split_items_and_params(list_and_options)
+      list << options.merge(new_options)
     end
 
   #-----------------------------------------------------------------
