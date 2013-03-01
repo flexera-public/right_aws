@@ -3,6 +3,8 @@
 Published by RightScale, Inc. under the MIT License.
 For information about RightScale, see http://www.rightscale.com
 
+ Maintained by the RightScale "Orange_team"
+
 == DESCRIPTION:
 
 The RightScale AWS gems have been designed to provide a robust, fast, and secure interface to Amazon EC2, EBS, S3, SQS, SDB, and CloudFront. 
@@ -141,7 +143,7 @@ sudo gem install right_aws
 
 == LICENSE:
 
-Copyright (c) 2007-2009 RightScale, Inc. 
+Copyright (c) 2007-2013 RightScale, Inc.
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
