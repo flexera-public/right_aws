@@ -71,7 +71,7 @@ module RightAws
     #
     def create_vpc(cidr_block, options = {})
       request_hash = {'CidrBlock' => cidr_block}
-      request_hash['instanceTenancy'] = options[:instance_tenancy] unless options[:instance_tenancy].right_blank?
+      request_hash['InstanceTenancy'] = options[:instance_tenancy] unless options[:instance_tenancy].right_blank?
       link = generate_request("CreateVpc", request_hash )
       request_info(link, QEc2DescribeVpcsParser.new(:logger => @logger)).first
     rescue Exception
