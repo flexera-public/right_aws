@@ -31,8 +31,8 @@ Gem::Specification.new do |spec|
   spec.authors = ['RightScale, Inc.']
   spec.email = 'support@rightscale.com'
   spec.summary = 'Interface classes for the Amazon EC2, SQS, and S3 Web Services'
-  spec.rdoc_options = ['--main', 'README.txt', '--title', '']
-  spec.extra_rdoc_files = ['README.txt']
+  spec.rdoc_options = ['--main', 'README.rdoc', '--title', '']
+  spec.extra_rdoc_files = ['README.rdoc']
   spec.required_ruby_version = '>= 1.8.7'
   spec.require_path = 'lib'
 
@@ -85,7 +85,7 @@ The RightScale AWS gems comprise:
 - Test suite (requires AWS account to do "live" testing).
 EOF
 
-  candidates = Dir.glob('{lib,test}/**/*') + ['History.txt', 'Manifest.txt', 'README.txt', 'Rakefile', 'right_aws.gemspec']
+  candidates = Dir.glob('{lib,test}/**/*') + ['History.txt', 'Manifest.txt', 'README.rdoc', 'Rakefile', 'right_aws.gemspec']
   spec.files = candidates.sort
   spec.test_files = Dir.glob('test/**/*')
 end
