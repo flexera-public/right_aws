@@ -541,11 +541,11 @@ module RightAws
         #  key.data = upload_data
         #  key.put_multipart(:part_size => 5*1024*1024)             #=> true
         #
-      def put_multipart(data=nil, perms=nil, headers={}, part_size=nil)
+      def put_multipart(data=nil, perms=nil, headers={}, part_size=nil, &block)
         headers['x-amz-acl'] = perms if perms
         @data = data || @data
         meta  = self.class.add_meta_prefix(@meta_headers)
-        @bucket.s3.interface.store_object_multipart({:bucket => @bucket.name, :key => @name, :data => @data, :headers => meta.merge(headers), :part_size => part_size})
+        @bucket.s3.interface.store_object_multipart({:bucket => @bucket.name, :key => @name, :data => @data, :headers => meta.merge(headers), :part_size => part_size}, &block)
       end
       
         # Rename an object. Returns new object name.
