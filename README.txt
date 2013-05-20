@@ -2,6 +2,7 @@
 
 Published by RightScale, Inc. under the MIT License.
 For information about RightScale, see http://www.rightscale.com
+Maintained by the RightScale “Orange_team”
 
 == DESCRIPTION:
 
