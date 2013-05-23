@@ -183,6 +183,30 @@ module RightAws
       on_exception
     end
 
+    # Incrementally lists given API call.
+    #
+    # All params are the same as for describe_resources_with_list_and_options call.
+    #
+    # Block is called on every chunk of resources received. If you need to stop the loop
+    # just make the block to return nil or false.
+    #
+    # The API call should support 'NextToken' parameter and the response should return :next_token
+    # as well.
+    #
+    # Returns the last response from the cloud.
+    #
+    def incrementally_list_items(remote_function_name, remote_item_name, parser_class, list_and_options, &block) # :nodoc:
+      last_response = nil
+      loop do
+        last_response = describe_resources_with_list_and_options(remote_function_name, remote_item_name, parser_class, list_and_options)
+        break unless block && block.call(last_response) && !last_response[:next_token].right_blank?
+        list, options = AwsUtils::split_items_and_params(list_and_options)
+        options[:next_token] = last_response[:next_token]
+        list_and_options = list + [options]
+      end
+      last_response
+    end
+
     def merge_new_options_into_list_and_options(list_and_options, new_options)
       list, options = AwsUtils::split_items_and_params(list_and_options)
       list << options.merge(new_options)

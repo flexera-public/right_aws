@@ -355,3 +355,4 @@ the source key.
     - S3 multi object delete (https://github.com/rightscale/right_aws/pull/106)
     - Support for "ami_version" added in emr interface (https://github.com/rightscale/right_aws/pull/129)
     - S3: Added block references to several methods (https://github.com/rightscale/right_aws/pull/130)
+    - EC2: describe_reserved_instances_offerings was fixed to support pagination
