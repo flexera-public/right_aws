@@ -200,8 +200,9 @@ module RightAws
       loop do
         last_response = describe_resources_with_list_and_options(remote_function_name, remote_item_name, parser_class, list_and_options)
         break unless block && block.call(last_response) && !last_response[:next_token].right_blank?
-        _, options = AwsUtils::split_items_and_params(list_and_options)
+        list, options = AwsUtils::split_items_and_params(list_and_options)
         options[:next_token] = last_response[:next_token]
+        list_and_options = list + [options]
       end
       last_response
     end
