@@ -99,11 +99,31 @@ module RightAws
     #
     #  ec2.describe_reserved_instances_offerings(:filters => {'availability-zone' => 'us-east-1c'})
     #
+    #  # Get all ReservedInstancesOfferings (list by 50 items)
+    #  result = ec2.describe_reserved_instances_offerings(:max_results => 50) do |response|
+    #    puts response[:items].count
+    #    true
+    #  end
+    #
+    #  # Get first 400 ReservedInstancesOfferings.
+    #  # P.S. it stops making calls one the block below returns false.
+    #  max_count_to_get = 400
+    #  counter          = 0
+    #  result = ec2.describe_reserved_instances_offerings do |response|
+    #    counter += response[:items].count
+    #    max_count_to_get <= counter
+    #  end
+    #
     # P.S. filters: http://docs.amazonwebservices.com/AWSEC2/latest/APIReference/index.html?ApiReference-query-DescribeReservedInstancesOfferings.html
     #
-    def describe_reserved_instances_offerings(*list_and_options)
+    def describe_reserved_instances_offerings(*list_and_options, &block)
+      result = []
       list_and_options = merge_new_options_into_list_and_options(list_and_options, :options => {:api_version => RESERVED_INSTANCE_API_VERSION})
-      describe_resources_with_list_and_options('DescribeReservedInstancesOfferings', 'ReservedInstancesOfferingId', QEc2DescribeReservedInstancesOfferingsParser, list_and_options)
+      incrementally_list_items('DescribeReservedInstancesOfferings', 'ReservedInstancesOfferingId', QEc2DescribeReservedInstancesOfferingsParser, list_and_options) do |response|
+        result += response[:items]
+        block ? block.call(response) : true
+      end
+      result
     end
 
     # Purchase a Reserved Instance.
@@ -178,6 +198,7 @@ module RightAws
       end
       def tagend(name)
         case name
+        when 'nextToken'                   then @result[:next_token]            = @text
         when 'reservedInstancesOfferingId' then @item[:aws_id]                  = @text
         when 'instanceType'                then @item[:aws_instance_type]       = @text
         when 'availabilityZone'            then @item[:aws_availability_zone]   = @text
@@ -197,12 +218,12 @@ module RightAws
           when %r{/pricingDetailsSet/item/price$}       then @pricing_details[:price]       = @text
           when %r{/pricingDetailsSet/item/count$}       then @pricing_details[:count]       = @text
           when %r{/pricingDetailsSet/item$}             then (@item[:pricing_details_set] ||= []) << @pricing_details
-          when %r{/reservedInstancesOfferingsSet/item$} then @result                       << @item
+          when %r{/reservedInstancesOfferingsSet/item$} then @result[:items] << @item
           end
         end
       end
       def reset
-        @result = []
+        @result = { :items => [] }
       end
     end
 
