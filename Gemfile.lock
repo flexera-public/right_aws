@@ -10,7 +10,6 @@ GEM
     libxml-ruby (0.5.2.0)
     rake (0.8.7)
     rcov (0.8.1.2.0)
-    uuidtools (1.0.7)
 
 PLATFORMS
   ruby
@@ -20,4 +19,3 @@ DEPENDENCIES
   rake
   rcov
   right_http_connection (= 1.2.5)!
-  uuidtools (~> 1.0.7)

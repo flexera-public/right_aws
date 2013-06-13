@@ -7,7 +7,3 @@ group :development do
   gem 'rake'
   gem 'rcov'
 end
-
-group :activesdb do
-  gem 'uuidtools', "~> 1.0.7"
-end
