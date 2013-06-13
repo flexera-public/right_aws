@@ -340,7 +340,6 @@ the source key.
     - S3 Content-Type not set in Ruby 1.9.2
     - error in rds_interface describe_db_snapshots in Ruby 1.9.2
 
-
 === 3.0.4
   Release Notes:
   - Fixed:
@@ -356,3 +355,18 @@ the source key.
     - Support for "ami_version" added in emr interface (https://github.com/rightscale/right_aws/pull/129)
     - S3: Added block references to several methods (https://github.com/rightscale/right_aws/pull/130)
     - Some other minor changes
+
+=== 3.1.0
+  Release Notes:
+  - Added:
+    - EC2:
+      - hs1.8xlarge, cr1.8xlarge instance types
+      - API version '2012-10-01' support for ReservedInstances and ReservedInstancesOfferings
+      - API version '2012-10-15' for some of VPC calls (including new DescribeAccountAttributes)
+  - Removed:  UUID dependency
+  - Fixed:
+    - EC2:
+      - describe_reserved_instances_offerings was fixed to support pagination
+      - typo in create_vpc
+    - RDS: instances types list
+    - Some other minor bugs
