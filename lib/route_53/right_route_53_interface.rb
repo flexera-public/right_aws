@@ -212,6 +212,7 @@ module RightAws
       # Auth
       signature = AwsUtils::sign(@aws_secret_access_key, headers['date'])
       headers['X-Amzn-Authorization'] = "AWS3-HTTPS AWSAccessKeyId=#{@aws_access_key_id},Algorithm=HmacSHA1,Signature=#{signature}"
+      headers['x-amz-security-token'] = @params[:token] if @params[:token]
       # Request
       path    = "#{@params[:service]}#{@params[:api_version]}/#{path}"
       request = "Net::HTTP::#{method.capitalize}".right_constantize.new(path)
