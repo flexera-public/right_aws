@@ -106,6 +106,7 @@ module RightAws
       if options[:options][:api_version] >= VOLUME_API_VERSION
         hash["VolumeType"] = options[:volume_type] unless options[:volume_type].right_blank?
         hash["Iops"]       = options[:iops]        unless options[:iops].right_blank?
+        hash["Encrypted"]  = options[:encrypted]   unless options[:encrypted].right_blank?
       end
       link = generate_request("CreateVolume", hash, options[:options])
       request_info(link, QEc2CreateVolumeParser.new(:logger => @logger))
@@ -395,6 +396,7 @@ module RightAws
         when 'availabilityZone' then @result[:zone]           = @text ###
         when 'volumeType'       then @result[:volume_type]    = @text
         when 'iops'             then @result[:iops]           = @text
+        when 'encrypted'        then @result[:encrypted]      = @text
         end
       end
       def reset
