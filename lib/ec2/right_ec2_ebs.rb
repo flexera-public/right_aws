@@ -30,7 +30,7 @@ module RightAws
     #-----------------------------------------------------------------
 
     VOLUME_API_VERSION = (API_VERSION > '2012-06-15') ? API_VERSION : '2012-06-15'
-    VOLUME_TYPES       = ['standard', 'io1']
+    VOLUME_TYPES       = ['standard', 'io1', 'gp2']
 
     # Describe EBS volumes.
     #
