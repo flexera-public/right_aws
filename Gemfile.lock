@@ -1,6 +1,7 @@
 GIT
   remote: git@github.com:rightscale/right_http_connection.git
   revision: e5482b9d9573a030030047e331bfd221dfb16ce1
+  tag: v1.4.0
   specs:
     right_http_connection (1.4.0)
 
