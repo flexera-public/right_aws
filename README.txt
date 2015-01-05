@@ -2,9 +2,10 @@
 
 Published by RightScale, Inc. under the MIT License.
 For information about RightScale, see http://www.rightscale.com
-Maintained by the RightScale “Orange_team”
 
- Maintained by the RightScale "Orange_team"
+== THE GEM IS NO LONGER MAINTAINED
+
+We recommend you use https://github.com/rightscale/right_aws_api instead.
 
 == DESCRIPTION:
 
