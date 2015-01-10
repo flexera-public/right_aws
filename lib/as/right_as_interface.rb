@@ -74,7 +74,8 @@ module RightAws
     include RightAwsBaseInterface
 
     # Amazon AS API version being used
-    API_VERSION       = '2009-05-15'
+    #API_VERSION       = '2009-05-15'
+    API_VERSION       = '2011-01-01'
     DEFAULT_HOST      = 'autoscaling.amazonaws.com'
     DEFAULT_PATH      = '/'
     DEFAULT_PROTOCOL  = 'https'
@@ -585,6 +586,7 @@ module RightAws
         when 'InstanceId'              then @instance[:instance_id]       = @text
         when 'LifecycleState'          then @instance[:lifecycle_state]   = @text
         when 'AvailabilityZone'        then @instance[:availability_zone] = @text
+        when 'HealthStatus'            then @instance[:health_status]     = @text
         when 'member'
           case @xmlpath
           when @p then
