@@ -597,7 +597,7 @@ module RightAws
           retry_attempts = 1
           while true
             begin
-              send_part_hash = generate_rest_request('PUT', params[:headers].merge({ :url=>"#{params[:bucket]}/#{CGI::escape params[:key]}?partNumber=#{index}&uploadId=#{upload_id}", :data=>part_data } ))
+              send_part_hash = generate_rest_request('PUT', params[:headers].merge({ :url=>"#{params[:bucket]}/#{CGI::escape params[:key]}?partNumber=#{index}&uploadId=#{upload_id}", :data=>part_data, 'content-md5' => Digest::MD5.base64digest(part_data) } ))
               send_part_resp = request_info(send_part_hash, S3HttpResponseHeadParser.new)
               part_etags << {:part_num => index, :etag => send_part_resp['etag']}
               index += 1
