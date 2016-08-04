@@ -97,7 +97,7 @@ module RightAws
     #    :unit         - Seconds, Percent, Bytes, Bits, Count, Bytes/Second, Bits/Second, Count/Second, and None
     #    :custom_unit  - The user-defined CustomUnit applied to a Measure. Please see the key term Unit.
     #    
-    #    :dimentions
+    #    :dimensions
     #      Dimensions for EC2 Metrics:
     #      * ImageId              - shows the requested metric for all instances running this EC2 Amazon Machine Image(AMI)
     #      * AvailabilityZone     - shows the requested metric for all instances running in that EC2 Availability Zone
