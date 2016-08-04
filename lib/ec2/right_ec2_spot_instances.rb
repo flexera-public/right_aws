@@ -234,6 +234,7 @@ module RightAws
                                     :value => Proc.new { !options[:user_data].empty? && Base64.encode64(options[:user_data]).delete("\n") }},
         :group_names           => { :amazonize_list => 'LaunchSpecification.SecurityGroup'},
         :group_ids             => { :amazonize_list => 'LaunchSpecification.SecurityGroupId'},
+        :persistence           => { :name => "Type.1", :value => Proc.new { options[:persistent] ? "persistent" : "one-time" } },
         :block_device_mappings => { :amazonize_bdm  => 'LaunchSpecification.BlockDeviceMapping'})
       link = generate_request("RequestSpotInstances", request_hash)
       request_info(link, QEc2DescribeSpotInstanceParser.new(:logger => @logger))
