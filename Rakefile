@@ -27,6 +27,18 @@ else
   end
 end
 
+begin
+  require 'rcov/rcovtask'
+rescue LoadError => e
+  STDERR.puts("RCov is not available, some rake tasks will not be defined: #{e.message}")
+else
+  desc "Analyze code coverage of the unit tests."
+  Rcov::RcovTask.new do |t|
+    t.test_files = FileList[testglobs]
+    #t.verbose = true     # uncomment to see the executed command
+  end
+end
+
 # == Gem == #
 
 gemtask = Rake::GemPackageTask.new(Gem::Specification.load("right_aws.gemspec")) do |package|
