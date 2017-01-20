@@ -637,7 +637,8 @@ module RightAws
         link   = generate_request("Select", request_params)
         result = select_response_to_ruby(request_info( link, QSdbSelectParser.new ))
       end while true
-    rescue Exception
+    rescue Exception => e
+      Rails.logger.info(e);
       on_exception
     end
 

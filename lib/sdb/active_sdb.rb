@@ -421,6 +421,7 @@ module RightAws
         # see http://docs.amazonwebservices.com/AmazonSimpleDB/2007-11-07/DeveloperGuide/index.html?UsingSelect.html
         #
         def select(*args)
+          Rails.logger.info("SELECT: args are #{args}");
           options = args.last.is_a?(Hash) ? args.pop : {}
           case args.first
             when :all   then sql_select(options)
@@ -471,8 +472,11 @@ module RightAws
         def sql_select(options) # :nodoc:
           @next_token = options[:next_token]
           select_expression = build_select(options)
+          Rails.logger.info("SQL_SELECT: Select Expression #{select_expression}")
           # request items
           query_result = self.connection.select(select_expression, @next_token)
+          Rails.logger.info("SQL_SELECT: query_result is #{query_result}")
+
           @next_token = query_result[:next_token]
           items = query_result[:items].map do |hash|
             id, attributes = hash.shift

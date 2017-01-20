@@ -381,6 +381,7 @@ module RightAws
     end
     
     def on_exception(options={:raise=>true, :log=>true}) # :nodoc:
+
       raise if $!.is_a?(AwsNoChange)
       AwsError::on_aws_exception(self, options)
     end
@@ -462,6 +463,7 @@ module RightAws
       # create a request
       case http_verb
       when 'GET'
+        Rails.logger.info("GENERATE_REQUEST_IMPL: #{@params[:service]}?#{service_params}")
         request = Net::HTTP::Get.new("#{@params[:service]}?#{service_params}")
       when 'POST'
         request      = Net::HTTP::Post.new(@params[:service])
@@ -524,6 +526,7 @@ module RightAws
                 end
               rescue Exception => e
                 blockexception = e
+                Rails.logger.info("REQUEST_INFO_IMPL: Block Exception #{e}")
               end
             end
           rescue Exception => e
@@ -579,6 +582,8 @@ module RightAws
       # If the caching is enabled and hit then throw  AwsNoChange.
       # P.S. caching works for the whole images list only! (when the list param is blank)
       # check cache
+
+      Rails.logger.info("REQUEST_CACHE_OR_INFO: Use Cache #{use_cache}")
       response, params = request_info(link, RightDummyParser.new)
       cache_hits?(method.to_sym, response.body) if use_cache
       parser = parser_class.new(:logger => @logger)
@@ -586,6 +591,9 @@ module RightAws
       result = block ? block.call(parser) : parser.result
       # update parsed data
       update_cache(method.to_sym, :parsed => result) if use_cache
+
+      Rails.logger.info("REQUEST_CACHE_OR_INFO: Results are #{result}")
+
       result
     end
 
@@ -959,6 +967,7 @@ module RightAws
         end
       end
       raise if options[:raise]  # re-raise an exception
+      Rails.logger.info("Exception occured and raised = #{options[:raise]} and response is #{response}")
       return nil
     end
     
