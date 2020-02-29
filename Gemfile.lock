@@ -9,7 +9,7 @@ GEM
   remote: http://rubygems.org/
   specs:
     libxml-ruby (0.5.2.0)
-    rake (0.8.7)
+    rake (12.3.3)
     rcov (0.8.1.2.0)
 
 PLATFORMS
