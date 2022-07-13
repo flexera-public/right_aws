@@ -1,7 +1,7 @@
 source "http://rubygems.org"
 
 gem 'right_http_connection', '>= 1.2.5',
-  :git => 'git@github.com:rightscale/right_http_connection.git',
+  :git => 'https://github.com/flexera-public/right_http_connection',
   :tag => 'v1.4.0'
 gem 'libxml-ruby', '~> 0.5.2'
 
