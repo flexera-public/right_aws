@@ -3,6 +3,8 @@
 Published by RightScale, Inc. under the MIT License.
 For information about RightScale, see http://www.rightscale.com
 
+This is a test
+
 == THE GEM IS NO LONGER MAINTAINED
 
 We recommend you use https://github.com/rightscale/right_aws_api instead.
