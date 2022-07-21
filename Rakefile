@@ -16,15 +16,12 @@ else
 end
 
 begin
-  require 'rcov/rcovtask'
+  require 'simplecov'
 rescue LoadError => e
-  STDERR.puts("RCov is not available, some rake tasks will not be defined: #{e.message}")
+  STDERR.puts("SimpleCov is not available: #{e.message}")
 else
   desc "Analyze code coverage of the unit tests."
-  Rcov::RcovTask.new do |t|
-    t.test_files = FileList[testglobs]
-    #t.verbose = true     # uncomment to see the executed command
-  end
+  SimpleCov.start
 end
 
 # == Gem == #
