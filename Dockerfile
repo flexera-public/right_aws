@@ -1,11 +1,9 @@
 FROM ruby:2.1.10
 
-RUN apt-get update -qq \
-&& apt-get install -y build-essential libxml2 libxslt-dev libxml2-dev
+RUN apt-get update -qq && apt-get install -y build-essential libxml2 libxml2-dev
 
-ADD . /code/Ruby-Docker
-WORKDIR /code/Ruby-Docker
+WORKDIR /right_aws
 
-RUN  bundle install
+COPY Gemfile Gemfile.lock /right_aws/
 
-CMD ["bash"]
+RUN bundle install --system

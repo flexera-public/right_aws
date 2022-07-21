@@ -2,6 +2,6 @@ version: "3.8"
 services:
   web:
     build: .
-    command: bash -c "bundle exec rake testsqs"
+    command: bash -c "bundle exec rake -T"
     volumes:
       - .:/code/Ruby-Docker
