@@ -41,7 +41,6 @@ Gem::Specification.new do |spec|
   spec.requirements << "libxml-ruby >= 0.5.2.0 is encouraged"
 
   spec.add_development_dependency('rake')
-  spec.add_development_dependency('simplecov')
 
   spec.summary = 'The RightScale AWS gems have been designed to provide a robust, fast, and secure interface to Amazon EC2, EBS, S3, SQS, SDB, and CloudFront.'
   spec.description = <<-EOF

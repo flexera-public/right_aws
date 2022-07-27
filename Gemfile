@@ -5,5 +5,4 @@ gem 'libxml-ruby', "2.8.0"
 
 group :development do
   gem 'rake', '10.4.2'
-  gem 'simplecov', '0.9.2'
 end
