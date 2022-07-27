@@ -2,7 +2,7 @@
 
 require 'rubygems'
 require "rake/testtask"
-require 'rake/gempackagetask'
+require 'rubygems/package_task'
 require 'rake/clean'
 $: << File.dirname(__FILE__)
 testglobs =     ["test/ts_right_aws.rb"]
@@ -15,18 +15,9 @@ else
   Bundler::GemHelper.install_tasks :name => 'right_aws'
 end
 
-begin
-  require 'simplecov'
-rescue LoadError => e
-  STDERR.puts("SimpleCov is not available: #{e.message}")
-else
-  desc "Analyze code coverage of the unit tests."
-  SimpleCov.start
-end
-
 # == Gem == #
 
-gemtask = Rake::GemPackageTask.new(Gem::Specification.load("right_aws.gemspec")) do |package|
+gemtask = Gem::PackageTask.new(Gem::Specification.load("right_aws.gemspec")) do |package|
   package.package_dir = ENV['PACKAGE_DIR'] || 'pkg'
   package.need_zip = true
   package.need_tar = true
