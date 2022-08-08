@@ -1,22 +1,22 @@
 GIT
-  remote: git@github.com:rightscale/right_http_connection.git
-  revision: e5482b9d9573a030030047e331bfd221dfb16ce1
-  tag: v1.4.0
+  remote: https://github.com/flexera-public/right_http_connection
+  revision: 0d28d3d43a43a9a8592bcc615707872bf3c9735a
   specs:
-    right_http_connection (1.4.0)
+    right_http_connection (1.5.1)
 
 GEM
   remote: http://rubygems.org/
   specs:
-    libxml-ruby (0.5.2.0)
-    rake (0.8.7)
-    rcov (0.8.1.2.0)
+    libxml-ruby (2.8.0)
+    rake (10.4.2)
 
 PLATFORMS
   ruby
 
 DEPENDENCIES
-  libxml-ruby (~> 0.5.2)
-  rake
-  rcov
-  right_http_connection (>= 1.2.5)!
+  libxml-ruby (= 2.8.0)
+  rake (= 10.4.2)
+  right_http_connection (>= 1.5.0)!
+
+BUNDLED WITH
+   1.15.1

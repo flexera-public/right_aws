@@ -1,11 +1,8 @@
 source "http://rubygems.org"
 
-gem 'right_http_connection', '>= 1.2.5',
-  :git => 'git@github.com:rightscale/right_http_connection.git',
-  :tag => 'v1.4.0'
-gem 'libxml-ruby', '~> 0.5.2'
+gem "right_http_connection", ">= 1.5.0", git: "https://github.com/flexera-public/right_http_connection"
+gem 'libxml-ruby', "2.8.0"
 
 group :development do
-  gem 'rake'
-  gem 'rcov'
+  gem 'rake', '10.4.2'
 end
