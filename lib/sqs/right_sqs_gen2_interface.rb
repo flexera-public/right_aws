@@ -104,6 +104,7 @@ module RightAws
                        "AWSAccessKeyId"   => @aws_access_key_id,
                        "Version"          => API_VERSION }
       service_hash.update(param)
+      service_hash["SecurityToken"] = @params[:token] if @params[:token]
       service_params = signed_service_params(@aws_secret_access_key, service_hash, :get, @params[:server], service)
       request        = Net::HTTP::Get.new("#{AwsUtils.URLencode(service)}?#{service_params}")
         # prepare output hash
