@@ -548,3 +548,7 @@ module RightAws
     end
   end
 end
+
+require 'acf/right_acf_streaming_interface'
+require 'acf/right_acf_origin_access_identities'
+require 'acf/right_acf_invalidations'

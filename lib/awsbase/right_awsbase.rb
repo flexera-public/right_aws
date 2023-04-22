@@ -21,10 +21,17 @@
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
+module Digest
+  autoload :MD5, 'digest/md5'
+end
+
+module REXML
+  autoload :Document, 'rexml/document'
+  autoload :Text, 'rexml/text'
+end
+
 # Test
 module RightAws
-  require 'digest/md5'
-  
   class AwsUtils #:nodoc:
     @@digest1   = OpenSSL::Digest.new("sha1")
     @@digest256 = nil
