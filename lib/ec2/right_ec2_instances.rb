@@ -53,7 +53,7 @@ module RightAws
     # Retrieve information about EC2 instances.
     #
     # Accepts a list of instances and/or a set of filters as the last parameter.
-    # 
+    #
     # Filters: architecture, availability-zone, block-device-mapping.attach-time, block-device-mapping.delete-on-termination,
     # block-device-mapping.device-name, block-device-mapping.status, block-device-mapping.volume-id, client-token, dns-name,
     # group-id, image-id, instance-id, instance-lifecycle, instance-state-code, instance-state-name, instance-type, ip-address,
@@ -175,12 +175,12 @@ module RightAws
     end
 
     # Launch new EC2 instances.
-    # 
+    #
     # Options: :image_id, :min_count, max_count, :key_name, :kernel_id, :ramdisk_id,
     # :availability_zone, :monitoring_enabled, :subnet_id, :disable_api_termination, :instance_initiated_shutdown_behavior,
     # :block_device_mappings, :placement_group_name, :license_pool, :group_ids, :group_names, :private_ip_address,
     # :ebs_optimized
-    # 
+    #
     # Returns a list of launched instances or an exception.
     #
     #  ec2.launch_instances( "ami-78779511",
@@ -364,7 +364,7 @@ module RightAws
     # Describe instance attribute.
     #
     # Attributes: 'kernel', 'ramdisk', 'sourceDestCheck'
-    # 
+    #
     #  ec2.reset_instance_attribute(instance, 'kernel') #=> true
     #
     def reset_instance_attribute(instance_id, attribute)
@@ -392,6 +392,20 @@ module RightAws
       else                 request_hash["#{attribute}.Value"] = value
       end
       link = generate_request('ModifyInstanceAttribute', request_hash, :api_version => INSTANCE_API_VERSION)
+      request_info(link, RightBoolResponseParser.new(:logger => @logger))
+    rescue Exception
+      on_exception
+    end
+
+    # The existing modify_instance_attribute method does not work properly for modifying block device attributes.
+    #
+    # ec2.modify_block_device_delete_on_termination_attribute(instance, "/dev/sdi", "true") #=> true
+    #
+    def modify_block_device_delete_on_termination_attribute(instance_id, device_name, delete_on_termination)
+      request_hash = {'InstanceId' => instance_id}
+      request_hash["BlockDeviceMapping.1.DeviceName"] = device_name
+      request_hash["BlockDeviceMapping.1.Ebs.DeleteOnTermination"] = delete_on_termination
+      link = generate_request('ModifyInstanceAttribute', request_hash)
       request_info(link, RightBoolResponseParser.new(:logger => @logger))
     rescue Exception
       on_exception
