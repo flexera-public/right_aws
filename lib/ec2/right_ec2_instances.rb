@@ -37,7 +37,7 @@ module RightAws
         reservation[:instances_set].each do |instance|
           # Parse and remove timestamp from the reason string. The timestamp is of
           # the request, not when EC2 took action, thus confusing & useless...
-          instance[:aws_reason]         = instance[:aws_reason].sub(/\(\d[^)]*GMT\) */, '')
+          instance[:aws_reason]         = instance[:aws_reason].sub(/\(\d[^)]*GMT\) */, '') unless instance[:aws_reason].nil?
           instance[:aws_owner]          = reservation[:aws_owner]
           instance[:aws_reservation_id] = reservation[:aws_reservation_id]
           # Security Groups
