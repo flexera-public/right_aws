@@ -1277,6 +1277,7 @@ module RightAws
         end 
         xml.parse
       else
+        xml_text.force_encoding 'utf-8'
         REXML::Document.parse_stream(xml_text, self)
       end
     end
